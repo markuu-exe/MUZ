@@ -1,0 +1,100 @@
+[
+  {
+    "id": "pno-mod1-node1",
+    "instrument": "piano",
+    "module_index": 1,
+    "node_index": 1,
+    "title": "Finding Middle C & Ergonomic Posture",
+    "description": "Master Middle C key identification, neutral forearm leveling, and 150°+ wrist alignment.",
+    "required_exp": 0,
+    "payload": {
+      "theory_cards": [
+        {
+          "id": "card-1",
+          "title": "Identifying Middle C",
+          "content": "Middle C (C4) sits immediately to the left of the two-black-key cluster near the center of your keyboard.",
+          "notation_url": "/assets/notation/middle_c.svg",
+          "audio_sample_url": "/assets/audio/c4_piano.mp3"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Which key cluster identifies Middle C?",
+          "options": ["Group of 2 Black Keys", "Group of 3 Black Keys", "Far Right White Key"],
+          "correct_index": 0
+        }
+      ],
+      "practice_target": {
+        "type": "single_note",
+        "target_pitch": "C4",
+        "target_frequency_hz": 261.63,
+        "target_elbow_band": [80, 110],
+        "target_wrist_min": 150
+      }
+    }
+  },
+  {
+    "id": "pno-mod1-node2",
+    "instrument": "piano",
+    "module_index": 1,
+    "node_index": 2,
+    "title": "The C Major Triad",
+    "description": "Learn polyphonic chord execution combining C4, E4, and G4 with real-time chromagram analysis.",
+    "required_exp": 50,
+    "payload": {
+      "theory_cards": [
+        {
+          "id": "card-2",
+          "title": "Building the C Major Chord",
+          "content": "Play C4 (Root), E4 (Major Third), and G4 (Perfect Fifth) simultaneously while maintaining ergonomic posture.",
+          "notation_url": "/assets/notation/c_major_triad.svg",
+          "audio_sample_url": "/assets/audio/c_major_chord.mp3"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Which notes construct the C Major Triad?",
+          "options": ["C4 - E4 - G4", "C4 - F4 - A4", "D4 - F#4 - A4"],
+          "correct_index": 0
+        }
+      ],
+      "practice_target": {
+        "type": "chord",
+        "target_chord": "C_Maj",
+        "target_notes": ["C4", "E4", "G4"],
+        "min_cosine_similarity": 0.72,
+        "sustain_ms": 200,
+        "target_elbow_band": [80, 110],
+        "target_wrist_min": 150
+      }
+    }
+  },
+  {
+    "id": "pno-mod1-node3",
+    "instrument": "piano",
+    "module_index": 1,
+    "node_index": 3,
+    "title": "Basic Rhythm & Quarter Notes",
+    "description": "Develop precise tempo control tapping quarter notes at 80 BPM.",
+    "required_exp": 100,
+    "payload": {
+      "theory_cards": [
+        {
+          "id": "card-3",
+          "title": "Understanding Quarter Notes",
+          "content": "In 4/4 time, each quarter note receives exactly one beat. Press the Spacebar in time with the metronome.",
+          "notation_url": "/assets/notation/quarter_notes.svg"
+        }
+      ],
+      "rhythm_target": {
+        "bpm": 80,
+        "total_measures": 4,
+        "time_signature": [4, 4],
+        "tolerance_ms": {
+          "perfect": 25,
+          "good": 50
+        }
+      }
+    }
+  }
+]
