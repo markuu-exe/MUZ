@@ -29,6 +29,18 @@ export interface Database {
           payload: Json;
         };
       };
+      user_progress: {
+        Row: {
+          id: string;
+          profile_id: string;
+          lesson_id: string;
+          completed: boolean;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: Partial<Database['public']['Tables']['user_progress']['Row']>;
+        Update: Partial<Database['public']['Tables']['user_progress']['Row']>;
+      };
     };
   };
 }
