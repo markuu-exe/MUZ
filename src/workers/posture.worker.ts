@@ -62,21 +62,30 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
   if (message.type === 'PROCESS') {
     if (!landmarker) {
       self.postMessage({ type: 'ERROR', message: 'Landmarker not initialized' });
+      if (typeof message.frame.close === 'function') {
+        message.frame.close();
+      }
       return;
     }
 
     try {
+      const startedAt = performance.now();
       const result = landmarker.detectForVideo(message.frame, performance.now());
       const landmarks = result.landmarks?.[0] ?? [];
       self.postMessage({
         type: 'RESULT',
         pose: extractPoseKeypoints(landmarks),
+        inferenceMs: performance.now() - startedAt,
       });
     } catch (error) {
       self.postMessage({
         type: 'ERROR',
         message: error instanceof Error ? error.message : 'Pose detection failed',
       });
+    } finally {
+      if (typeof message.frame.close === 'function') {
+        message.frame.close();
+      }
     }
   }
 };
