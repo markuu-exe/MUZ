@@ -5,19 +5,19 @@ export default {
     extend: {
       colors: {
         muz: {
-          bg: '#070b14',
-          panel: '#101827',
-          panelStrong: '#121d2e',
-          accent: '#73e0a9',
-          accentStrong: '#54d18c',
+          bg: '#0b0d14',
+          panel: '#151821',
+          panelStrong: '#1a1e2b',
+          accent: '#8b6cff',
+          accentStrong: '#7454f5',
           warning: '#ffb454',
           danger: '#ff5d73',
           text: '#edf2ff',
-          muted: '#9aa8bd',
+          muted: '#9aa3b8',
         },
       },
       boxShadow: {
-        glow: '0 0 25px rgba(115, 224, 169, 0.28)',
+        glow: '0 0 25px rgba(139, 108, 255, 0.28)',
       },
     },
   },
