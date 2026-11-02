@@ -7,6 +7,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const DEMO_USER_KEY = 'muz_demo_session_active';
 
+const getMetadataUsername = (user: User): string | undefined => {
+  const username = user.user_metadata?.username;
+  return typeof username === 'string' && username.trim() ? username.trim() : undefined;
+};
+
 const mockDemoProfile: UserProfile = {
   id: 'demo-user-muz-01',
   username: 'ChopinVirtuoso',
@@ -27,7 +32,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return sessionStorage.getItem(DEMO_USER_KEY) === 'true';
   });
 
-  const fetchProfile = useCallback(async (userId: string, userEmail?: string): Promise<UserProfile | null> => {
+  const fetchProfile = useCallback(async (
+    userId: string,
+    userEmail?: string,
+    preferredUsername?: string,
+  ): Promise<UserProfile | null> => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -40,13 +49,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data) {
+        if (preferredUsername && data.username !== preferredUsername) {
+          const { data: updated, error: updateError } = await supabase
+            .from('profiles')
+            .update({ username: preferredUsername })
+            .eq('id', userId)
+            .select()
+            .maybeSingle();
+
+          if (updateError) {
+            console.warn('Could not update profile username:', updateError.message);
+          } else if (updated) {
+            return updated;
+          }
+        }
+
         return data as UserProfile;
       }
 
       // If profile not found, try to upsert a default profile
       const defaultProfile: UserProfile = {
         id: userId,
-        username: userEmail?.split('@')[0] || 'Pianist',
+        username: preferredUsername || userEmail?.split('@')[0] || 'Pianist',
         instrument_focus: 'piano',
         current_streak: 1,
         last_activity_date: new Date().toISOString(),
@@ -93,7 +117,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (initialSession?.user) {
             setSession(initialSession);
             setUser(initialSession.user);
-            const userProf = await fetchProfile(initialSession.user.id, initialSession.user.email);
+            const userProf = await fetchProfile(
+              initialSession.user.id,
+              initialSession.user.email,
+              getMetadataUsername(initialSession.user),
+            );
             if (mounted) setProfile(userProf);
           } else {
             setSession(null);
@@ -125,7 +153,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(newSession?.user ?? null);
 
       if (newSession?.user) {
-        const userProf = await fetchProfile(newSession.user.id, newSession.user.email);
+        const userProf = await fetchProfile(
+          newSession.user.id,
+          newSession.user.email,
+          getMetadataUsername(newSession.user),
+        );
         if (mounted) setProfile(userProf);
       } else {
         setProfile(null);
@@ -156,7 +188,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.session) {
         setSession(data.session);
         setUser(data.user);
-        const userProf = await fetchProfile(data.user.id, data.user.email);
+        const userProf = await fetchProfile(
+          data.user.id,
+          data.user.email,
+          getMetadataUsername(data.user),
+        );
         setProfile(userProf);
       }
 
@@ -169,13 +205,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUpWithEmail = async (email: string, password: string, username?: string) => {
     setIsDemo(false);
     sessionStorage.removeItem(DEMO_USER_KEY);
+    const profileUsername = username?.trim() || email.split('@')[0];
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            username: username || email.split('@')[0],
+            username: profileUsername,
           },
         },
       });
@@ -187,7 +224,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.session && data.user) {
         setSession(data.session);
         setUser(data.user);
-        const userProf = await fetchProfile(data.user.id, email);
+        const userProf = await fetchProfile(
+          data.user.id,
+          email,
+          profileUsername,
+        );
         setProfile(userProf);
       }
 
@@ -262,7 +303,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshProfile = async () => {
     if (user) {
-      const prof = await fetchProfile(user.id, user.email);
+      const prof = await fetchProfile(user.id, user.email, getMetadataUsername(user));
       setProfile(prof);
     }
   };
