@@ -14,12 +14,12 @@ const getMetadataUsername = (user: User): string | undefined => {
 
 const mockDemoProfile: UserProfile = {
   id: 'demo-user-muz-01',
-  username: 'ChopinVirtuoso',
+  username: 'Mike Andrew',
   instrument_focus: 'piano',
-  current_streak: 14,
+  current_streak: 7,
   last_activity_date: new Date().toISOString(),
-  exp: 2450,
-  hearts: 5,
+  exp: 1240,
+  hearts: 4,
   created_at: new Date().toISOString(),
 };
 

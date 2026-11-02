@@ -80,6 +80,7 @@ export interface Database {
         };
         Insert: Partial<Database['public']['Tables']['user_progress']['Row']>;
         Update: Partial<Database['public']['Tables']['user_progress']['Row']>;
+        Relationships: [];
       };
     };
     Views: {
@@ -96,3 +97,7 @@ export interface Database {
     };
   };
 }
+
+export type Profile = Database['public']['Tables']['profiles']['Row'];
+export type Lesson = Database['public']['Tables']['lessons']['Row'];
+export type UserProgress = Database['public']['Tables']['user_progress']['Row'];
