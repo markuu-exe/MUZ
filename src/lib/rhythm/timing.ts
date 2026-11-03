@@ -1,4 +1,5 @@
-export type HitRating = "Perfect" | "Good" | "Miss";
+import type { Verdict } from "../../types/engine.types";
+export type HitRating = Verdict;
 
 export const PERFECT_MS = 25;
 export const GOOD_MS = 50;
