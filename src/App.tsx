@@ -1,8 +1,6 @@
 import {
   Activity,
-  Headphones,
   ShieldCheck,
-  Sparkles,
   LogOut,
   Flame,
   Award,
@@ -15,7 +13,7 @@ import { LoginPage } from './components/auth/LoginPage';
 import { useAuth } from './context/AuthContext';
 
 export default function App() {
-  const { user, profile, loading, signOut, isDemo } = useAuth();
+  const { user, profile, loading, signOut, isDemo, isPasswordRecovery } = useAuth();
 
   // Loading state while checking session
   if (loading) {
@@ -35,8 +33,8 @@ export default function App() {
     );
   }
 
-  // If not authenticated, show the Login Page
-  if (!user) {
+  // If not authenticated or in password recovery flow, show the Login Page
+  if (!user || isPasswordRecovery) {
     return <LoginPage />;
   }
 
@@ -68,6 +66,7 @@ export default function App() {
   ];
 
   const displayName = profile?.username || user.email?.split('@')[0] || 'Pianist';
+  const instrumentFocus = profile?.instrument_focus || 'piano';
 
   return (
     <>
@@ -90,6 +89,9 @@ export default function App() {
                     <CheckCircle className="h-2.5 w-2.5" /> Authenticated
                   </span>
                 )}
+                <span className="rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-sky-300">
+                  {instrumentFocus}
+                </span>
               </div>
               <h1 className="mt-1 text-2xl md:text-3xl font-semibold text-white">
                 Piano practice command center
