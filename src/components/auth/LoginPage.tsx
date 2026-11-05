@@ -6,30 +6,31 @@ import {
   Eye,
   EyeOff,
   ArrowRight,
-  Sparkles,
   Music,
   Music2,
+  Music3,
+  Music4,
   AlertCircle,
   CheckCircle2,
   Loader2,
-  KeyRound,
-  ShieldCheck,
   ArrowLeft,
-  Flame,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-type AuthMode = 'signin' | 'signup' | 'forgot' | 'magic';
+type AuthMode = 'signin' | 'signup' | 'forgot';
 
 interface LoginPageProps {
   onSuccess?: () => void;
 }
 
+// White key x-offsets and black key positions for a 3-octave wireframe piano wave
+const WHITE_KEY_INDICES = Array.from({ length: 22 }, (_, i) => i);
+const BLACK_KEY_OFFSETS = [0, 1, 3, 4, 5, 7, 8, 10, 11, 12, 14, 15, 17, 18, 19];
+
 export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
   const {
     signInWithEmail,
     signUpWithEmail,
-    signInWithMagicLink,
     resetPasswordForEmail,
     enterDemoMode,
   } = useAuth();
@@ -40,28 +41,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [username, setUsername] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
 
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const clearMessages = () => {
+  const handleModeChange = (newMode: AuthMode) => {
     setErrorMessage(null);
     setSuccessMessage(null);
-  };
-
-  const handleModeChange = (newMode: AuthMode) => {
-    clearMessages();
     setMode(newMode);
   };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    clearMessages();
+    setErrorMessage(null);
+    setSuccessMessage(null);
 
-    if (!email || !password) {
-      setErrorMessage('Please fill in both email and password.');
+    if (!email.trim() || !password) {
+      setErrorMessage('Please enter both your email and password.');
       return;
     }
 
@@ -70,34 +67,33 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
     setLoading(false);
 
     if (error) {
-      if (error.message.includes('Invalid login credentials')) {
-        setErrorMessage('Invalid email or password. Please verify your credentials or try quick demo.');
-      } else if (error.message.includes('Email not confirmed')) {
-        setErrorMessage('Your email address has not been confirmed yet. Please check your inbox.');
-      } else {
-        setErrorMessage(error.message);
-      }
-    } else {
-      if (onSuccess) onSuccess();
+      setErrorMessage(
+        error.message.toLowerCase().includes('invalid login credentials')
+          ? 'Invalid email or password.'
+          : error.message
+      );
+    } else if (onSuccess) {
+      onSuccess();
     }
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    clearMessages();
+    setErrorMessage(null);
+    setSuccessMessage(null);
 
-    if (!email || !password) {
+    if (!email.trim() || !password) {
       setErrorMessage('Email and password are required.');
       return;
     }
 
     if (password.length < 6) {
-      setErrorMessage('Password must be at least 6 characters long.');
+      setErrorMessage('Password must be at least 6 characters.');
       return;
     }
 
     if (password !== confirmPassword) {
-      setErrorMessage('Passwords do not match. Please re-enter.');
+      setErrorMessage('Passwords do not match.');
       return;
     }
 
@@ -108,20 +104,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
     if (error) {
       setErrorMessage(error.message);
     } else if (session) {
-      setSuccessMessage('Account created successfully! Welcome to MUZ.');
       if (onSuccess) onSuccess();
     } else {
-      setSuccessMessage('Verification email sent! Check your inbox to confirm your account, or sign in.');
+      setSuccessMessage('Verification link sent! Please check your email.');
       setMode('signin');
     }
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    clearMessages();
+    setErrorMessage(null);
+    setSuccessMessage(null);
 
-    if (!email) {
-      setErrorMessage('Please enter your email to receive recovery instructions.');
+    if (!email.trim()) {
+      setErrorMessage('Please enter your email address.');
       return;
     }
 
@@ -132,234 +128,365 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
     if (error) {
       setErrorMessage(error.message);
     } else {
-      setSuccessMessage('Password reset link sent! Please check your email inbox.');
-    }
-  };
-
-  const handleMagicLink = async (e: React.FormEvent) => {
-    e.preventDefault();
-    clearMessages();
-
-    if (!email) {
-      setErrorMessage('Please enter your email address for magic link login.');
-      return;
-    }
-
-    setLoading(true);
-    const { error } = await signInWithMagicLink(email.trim());
-    setLoading(false);
-
-    if (error) {
-      setErrorMessage(error.message);
-    } else {
-      setSuccessMessage('Magic link sent! Check your email to sign in immediately without a password.');
+      setSuccessMessage('Password reset link sent to your email.');
     }
   };
 
   const handleDemoSignIn = () => {
-    clearMessages();
-    enterDemoMode();
+    enterDemoMode('virtuoso');
     if (onSuccess) onSuccess();
   };
 
+  // Helper to compute smooth wave Y offset for the wireframe piano keys
+  const getWaveY = (x: number) =>
+    Math.sin((x / 1440) * Math.PI * 2.2) * 28 +
+    Math.cos((x / 1440) * Math.PI * 1.1) * 12;
+
   return (
-    <div className="relative flex min-h-screen w-full items-center justify-center bg-muz-bg px-4 py-12 text-muz-text selection:bg-muz-accent selection:text-slate-900 overflow-hidden">
-      {/* Background ambient lighting */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 left-1/2 h-[550px] w-[550px] -translate-x-1/2 rounded-full bg-muz-accent/15 blur-[130px]" />
-        <div className="absolute bottom-10 -right-20 h-[400px] w-[400px] rounded-full bg-muz-accentStrong/10 blur-[110px]" />
-        <div className="absolute top-1/3 -left-24 h-[350px] w-[350px] rounded-full bg-sky-500/10 blur-[120px]" />
+    <div className="relative flex h-dvh w-full items-center justify-center overflow-hidden bg-muz-bg px-4 text-muz-text selection:bg-muz-accent selection:text-slate-950">
+      {/* Subtle Musical Background Accents & Edge Glows */}
+      <div className="pointer-events-none absolute inset-0 select-none overflow-hidden" aria-hidden="true">
+        {/* Core & Edge Soft Glowing Musical Accents */}
+        <div className="absolute -top-36 left-1/2 h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-muz-accent/10 blur-[130px]" />
+        <div className="absolute -bottom-36 left-1/3 h-[360px] w-[360px] rounded-full bg-sky-500/10 blur-[120px]" />
+        <div className="animate-edge-glow absolute -left-24 -top-24 h-72 w-72 rounded-full bg-muz-accent/10 blur-[100px]" />
+        <div className="animate-edge-glow-delayed absolute -bottom-24 -right-24 h-80 w-80 rounded-full bg-sky-400/10 blur-[110px]" />
+        <div className="animate-edge-glow-delayed absolute -right-20 top-1/4 h-56 w-56 rounded-full bg-emerald-400/8 blur-[95px]" />
+        <div className="animate-edge-glow absolute -left-20 bottom-1/4 h-56 w-56 rounded-full bg-sky-500/8 blur-[95px]" />
 
-        {/* Decorative Musical Staff Wave in background */}
+        {/* Soft Glowing Corner Acoustic Resonance Arcs */}
         <svg
-          className="absolute inset-0 h-full w-full opacity-20 pointer-events-none animate-staff-wave"
-          viewBox="0 0 1440 900"
+          className="animate-edge-glow absolute -left-12 -top-12 h-64 w-64 text-muz-accent/15"
+          viewBox="0 0 200 200"
           fill="none"
-          xmlns="http://www.w3.org/2000/svg"
         >
-          {/* 5-line musical stave 1 */}
-          <path
-            d="M-50,220 C300,160 500,280 850,210 C1200,140 1350,230 1500,190"
-            stroke="url(#staff-gradient)"
-            strokeWidth="1.2"
-          />
-          <path
-            d="M-50,235 C300,175 500,295 850,225 C1200,155 1350,245 1500,205"
-            stroke="url(#staff-gradient)"
-            strokeWidth="1.2"
-          />
-          <path
-            d="M-50,250 C300,190 500,310 850,240 C1200,170 1350,260 1500,220"
-            stroke="url(#staff-gradient)"
-            strokeWidth="1.2"
-          />
-          <path
-            d="M-50,265 C300,205 500,325 850,255 C1200,185 1350,275 1500,235"
-            stroke="url(#staff-gradient)"
-            strokeWidth="1.2"
-          />
-          <path
-            d="M-50,280 C300,220 500,340 850,270 C1200,200 1350,290 1500,250"
-            stroke="url(#staff-gradient)"
-            strokeWidth="1.2"
-          />
+          <circle cx="0" cy="0" r="70" stroke="currentColor" strokeWidth="0.75" strokeDasharray="4 6" />
+          <circle cx="0" cy="0" r="110" stroke="currentColor" strokeWidth="0.6" />
+          <circle cx="0" cy="0" r="150" stroke="currentColor" strokeWidth="0.4" strokeDasharray="2 8" />
+        </svg>
 
-          {/* 5-line musical stave 2 (lower counter-melody) */}
-          <path
-            d="M-50,680 C350,740 600,620 950,690 C1250,750 1380,670 1500,700"
-            stroke="url(#staff-gradient-subtle)"
-            strokeWidth="1"
-          />
-          <path
-            d="M-50,695 C350,755 600,635 950,705 C1250,765 1380,685 1500,715"
-            stroke="url(#staff-gradient-subtle)"
-            strokeWidth="1"
-          />
-          <path
-            d="M-50,710 C350,770 600,650 950,720 C1250,780 1380,700 1500,730"
-            stroke="url(#staff-gradient-subtle)"
-            strokeWidth="1"
-          />
-          <path
-            d="M-50,725 C350,785 600,665 950,735 C1250,795 1380,715 1500,745"
-            stroke="url(#staff-gradient-subtle)"
-            strokeWidth="1"
-          />
-          <path
-            d="M-50,740 C350,800 600,680 950,750 C1250,810 1380,730 1500,760"
-            stroke="url(#staff-gradient-subtle)"
-            strokeWidth="1"
-          />
+        <svg
+          className="animate-edge-glow-delayed absolute -bottom-12 -right-12 h-64 w-64 text-sky-400/15"
+          viewBox="0 0 200 200"
+          fill="none"
+        >
+          <circle cx="200" cy="200" r="70" stroke="currentColor" strokeWidth="0.75" strokeDasharray="4 6" />
+          <circle cx="200" cy="200" r="110" stroke="currentColor" strokeWidth="0.6" />
+          <circle cx="200" cy="200" r="150" stroke="currentColor" strokeWidth="0.4" strokeDasharray="2 8" />
+        </svg>
 
+        {/* Subtle Drifting Stave Lines (Upper & Mid Ribbon) */}
+        <svg
+          className="animate-staff-wave absolute -left-[5%] top-[10%] h-[260px] w-[110%]"
+          viewBox="0 0 1440 260"
+          fill="none"
+          preserveAspectRatio="none"
+        >
           <defs>
-            <linearGradient id="staff-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <linearGradient id="staveGradPrimary" x1="0%" y1="0%" x2="100%" y2="0%">
               <stop offset="0%" stopColor="#73e0a9" stopOpacity="0" />
-              <stop offset="25%" stopColor="#73e0a9" stopOpacity="0.45" />
-              <stop offset="70%" stopColor="#38bdf8" stopOpacity="0.45" />
+              <stop offset="20%" stopColor="#73e0a9" stopOpacity="0.16" />
+              <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.1" />
+              <stop offset="80%" stopColor="#73e0a9" stopOpacity="0.16" />
               <stop offset="100%" stopColor="#73e0a9" stopOpacity="0" />
             </linearGradient>
-            <linearGradient id="staff-gradient-subtle" x1="0%" y1="0%" x2="100%" y2="0%">
+          </defs>
+          {[0, 12, 24, 36, 48].map((offset) => (
+            <path
+              key={`upper-stave-${offset}`}
+              d={`M -40 ${90 + offset} C 320 ${35 + offset}, 680 ${150 + offset}, 1060 ${70 + offset} C 1260 ${30 + offset}, 1380 ${95 + offset}, 1480 ${80 + offset}`}
+              stroke="url(#staveGradPrimary)"
+              strokeWidth="1"
+            />
+          ))}
+          {/* Subtle Measure Barlines & Harmonic Nodes on Stave */}
+          <line x1="280" y1="73" x2="280" y2="121" stroke="#73e0a9" strokeOpacity="0.12" strokeWidth="1" />
+          <line x1="1150" y1="58" x2="1150" y2="106" stroke="#38bdf8" strokeOpacity="0.12" strokeWidth="1" />
+          <circle cx="220" cy="88" r="3" fill="#73e0a9" fillOpacity="0.22" />
+          <circle cx="340" cy="103" r="2.5" fill="#38bdf8" fillOpacity="0.2" />
+          <circle cx="1090" cy="79" r="3" fill="#73e0a9" fillOpacity="0.22" />
+          <circle cx="1210" cy="94" r="2.5" fill="#38bdf8" fillOpacity="0.18" />
+        </svg>
+
+        {/* Secondary Counter-Drifting Stave Lines */}
+        <svg
+          className="animate-staff-wave-slow absolute -left-[5%] bottom-[16%] h-[220px] w-[110%]"
+          viewBox="0 0 1440 220"
+          fill="none"
+          preserveAspectRatio="none"
+        >
+          <defs>
+            <linearGradient id="staveGradSecondary" x1="0%" y1="0%" x2="100%" y2="0%">
               <stop offset="0%" stopColor="#38bdf8" stopOpacity="0" />
-              <stop offset="40%" stopColor="#73e0a9" stopOpacity="0.3" />
+              <stop offset="25%" stopColor="#38bdf8" stopOpacity="0.13" />
+              <stop offset="50%" stopColor="#73e0a9" stopOpacity="0.08" />
+              <stop offset="75%" stopColor="#73e0a9" stopOpacity="0.14" />
               <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
             </linearGradient>
           </defs>
+          {[0, 11, 22, 33, 44].map((offset) => (
+            <path
+              key={`lower-stave-${offset}`}
+              d={`M -40 ${110 + offset} C 380 ${165 + offset}, 760 ${45 + offset}, 1140 ${125 + offset} C 1300 ${155 + offset}, 1400 ${105 + offset}, 1480 ${115 + offset}`}
+              stroke="url(#staveGradSecondary)"
+              strokeWidth="0.9"
+            />
+          ))}
         </svg>
 
-        {/* Floating Musical Notes & Clef Elements */}
-        {/* Treble Clef floating top left */}
-        <div className="absolute top-[10%] left-[8%] font-serif text-5xl text-muz-accent/25 select-none animate-music-drift-1 drop-shadow-[0_0_15px_rgba(115,224,169,0.3)]">
+        {/* Minimalist Wireframe Piano Key Wave with Slow Floating Physics */}
+        <svg
+          className="animate-piano-wave absolute -left-[4%] bottom-[3%] h-[190px] w-[108%]"
+          viewBox="0 0 1440 200"
+          fill="none"
+          preserveAspectRatio="none"
+        >
+          <defs>
+            <linearGradient id="pianoWireframeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#73e0a9" stopOpacity="0" />
+              <stop offset="15%" stopColor="#73e0a9" stopOpacity="0.22" />
+              <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.16" />
+              <stop offset="85%" stopColor="#73e0a9" stopOpacity="0.22" />
+              <stop offset="100%" stopColor="#73e0a9" stopOpacity="0" />
+            </linearGradient>
+            <linearGradient id="blackKeyFillGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#73e0a9" stopOpacity="0.12" />
+              <stop offset="100%" stopColor="#070b14" stopOpacity="0.35" />
+            </linearGradient>
+          </defs>
+
+          {/* Upper and Lower Continuous Wave Rails */}
+          <path
+            d={`M ${WHITE_KEY_INDICES.map((i) => {
+              const x = 60 + i * 60;
+              const y = 68 + getWaveY(x);
+              return `${i === 0 ? '' : 'L '}${x} ${y.toFixed(1)}`;
+            }).join(' ')}`}
+            stroke="url(#pianoWireframeGrad)"
+            strokeWidth="1"
+          />
+          <path
+            d={`M ${WHITE_KEY_INDICES.map((i) => {
+              const x = 42 + i * 60;
+              const y = 148 + getWaveY(x) * 1.08;
+              return `${i === 0 ? '' : 'L '}${x} ${y.toFixed(1)}`;
+            }).join(' ')}`}
+            stroke="url(#pianoWireframeGrad)"
+            strokeWidth="1.1"
+          />
+          <path
+            d={`M ${WHITE_KEY_INDICES.map((i) => {
+              const x = 42 + i * 60;
+              const y = 155 + getWaveY(x) * 1.08;
+              return `${i === 0 ? '' : 'L '}${x} ${y.toFixed(1)}`;
+            }).join(' ')}`}
+            stroke="url(#pianoWireframeGrad)"
+            strokeWidth="0.6"
+            strokeDasharray="3 5"
+          />
+
+          {/* White Key Wireframe Divisions & Lip Ticks */}
+          {WHITE_KEY_INDICES.map((i) => {
+            const xTop = 60 + i * 60;
+            const yTop = 68 + getWaveY(xTop);
+            const xBot = 42 + i * 60;
+            const yBot = 148 + getWaveY(xTop) * 1.08;
+            return (
+              <g key={`wk-${i}`}>
+                <line
+                  x1={xTop}
+                  y1={yTop}
+                  x2={xBot}
+                  y2={yBot}
+                  stroke="url(#pianoWireframeGrad)"
+                  strokeWidth="0.85"
+                />
+                <line
+                  x1={xBot}
+                  y1={yBot}
+                  x2={xBot}
+                  y2={yBot + 7}
+                  stroke="url(#pianoWireframeGrad)"
+                  strokeWidth="0.85"
+                />
+              </g>
+            );
+          })}
+
+          {/* Raised Minimalist Wireframe Black Keys */}
+          {BLACK_KEY_OFFSETS.map((keyIdx) => {
+            const xTop = 60 + (keyIdx + 0.68) * 60;
+            const yTop = 64 + getWaveY(xTop);
+            const xBot = 50 + (keyIdx + 0.68) * 60;
+            const yBot = 112 + getWaveY(xTop) * 1.04;
+            const w = 22;
+            const hLift = 6;
+
+            return (
+              <g key={`bk-${keyIdx}`}>
+                {/* 3D Top Face of Black Key */}
+                <polygon
+                  points={`${xTop},${yTop - hLift} ${xTop + w},${yTop - hLift + 1.5} ${xBot + w},${yBot - hLift + 1.5} ${xBot},${yBot - hLift}`}
+                  fill="url(#blackKeyFillGrad)"
+                  stroke="url(#pianoWireframeGrad)"
+                  strokeWidth="0.95"
+                />
+                {/* Front Bevel Wireframe Lines */}
+                <line
+                  x1={xBot}
+                  y1={yBot - hLift}
+                  x2={xBot}
+                  y2={yBot}
+                  stroke="url(#pianoWireframeGrad)"
+                  strokeWidth="0.8"
+                />
+                <line
+                  x1={xBot + w}
+                  y1={yBot - hLift + 1.5}
+                  x2={xBot + w}
+                  y2={yBot + 1.5}
+                  stroke="url(#pianoWireframeGrad)"
+                  strokeWidth="0.8"
+                />
+                <line
+                  x1={xBot}
+                  y1={yBot}
+                  x2={xBot + w}
+                  y2={yBot + 1.5}
+                  stroke="url(#pianoWireframeGrad)"
+                  strokeWidth="0.8"
+                />
+              </g>
+            );
+          })}
+        </svg>
+
+        {/* Small Floating Music Notes (Slow Floating Physics around Perimeter) */}
+        <div className="animate-music-drift-1 absolute left-[10%] top-[18%] text-muz-accent/30 drop-shadow-[0_0_10px_rgba(115,224,169,0.35)]">
+          <Music className="h-4 w-4" />
+        </div>
+        <div className="animate-music-drift-2 absolute right-[12%] top-[16%] text-sky-400/30 drop-shadow-[0_0_10px_rgba(56,189,248,0.35)]">
+          <Music2 className="h-5 w-5" />
+        </div>
+        <div className="animate-music-drift-3 absolute left-[15%] bottom-[24%] text-muz-accent/25 drop-shadow-[0_0_8px_rgba(115,224,169,0.3)]">
+          <Music3 className="h-4 w-4" />
+        </div>
+        <div className="animate-music-drift-4 absolute right-[14%] bottom-[26%] text-sky-300/25 drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]">
+          <Music4 className="h-4 w-4" />
+        </div>
+        <span className="animate-music-drift-5 absolute left-[24%] top-[11%] font-serif text-lg text-muz-accent/25 drop-shadow-[0_0_8px_rgba(115,224,169,0.3)]">
           𝄞
-        </div>
-
-        {/* Beamed Eighth Notes floating top right */}
-        <div className="absolute top-[18%] right-[12%] font-serif text-4xl text-sky-400/30 select-none animate-music-drift-2 drop-shadow-[0_0_12px_rgba(56,189,248,0.25)]">
+        </span>
+        <span className="animate-music-drift-6 absolute right-[23%] top-[28%] text-sm text-sky-300/25 drop-shadow-[0_0_8px_rgba(56,189,248,0.25)]">
           ♫
-        </div>
-
-        {/* Bass Clef floating bottom left */}
-        <div className="absolute bottom-[16%] left-[10%] font-serif text-4xl text-muz-accent/20 select-none animate-music-drift-3 drop-shadow-[0_0_15px_rgba(115,224,169,0.2)]">
-          𝄢
-        </div>
-
-        {/* Sixteenth Notes floating bottom right */}
-        <div className="absolute bottom-[22%] right-[10%] font-serif text-3xl text-emerald-400/25 select-none animate-music-drift-4 drop-shadow-[0_0_10px_rgba(52,211,153,0.25)]">
-          ♬
-        </div>
-
-        {/* Single Eighth Note floating mid left */}
-        <div className="absolute top-[46%] left-[5%] font-serif text-3xl text-sky-300/20 select-none animate-music-drift-5">
+        </span>
+        <span className="animate-music-drift-2 absolute left-[7%] top-[48%] text-xs text-muz-accent/25 drop-shadow-[0_0_6px_rgba(115,224,169,0.25)]">
           ♪
-        </div>
+        </span>
+        <span className="animate-music-drift-5 absolute right-[8%] top-[52%] text-sm text-muz-accent/25 drop-shadow-[0_0_6px_rgba(115,224,169,0.25)]">
+          ♬
+        </span>
 
-        {/* Quarter Note floating mid right */}
-        <div className="absolute top-[58%] right-[6%] font-serif text-3xl text-muz-accent/20 select-none animate-music-drift-6">
-          ♩
-        </div>
+        {/* Salt-and-Pepper Ambient Particles & Soft Glowing Edge Micro-Touches */}
+        <span className="animate-pulse absolute left-[6%] top-[26%] h-1.5 w-1.5 rounded-full bg-muz-accent/40 shadow-[0_0_8px_#73e0a9]" />
+        <span className="animate-pulse absolute right-[7%] top-[22%] h-1 w-1 rounded-full bg-sky-400/45 shadow-[0_0_8px_#38bdf8]" />
+        <span className="animate-pulse absolute left-[19%] bottom-[16%] h-1 w-1 rounded-full bg-muz-accent/35 shadow-[0_0_6px_#73e0a9]" />
+        <span className="animate-pulse absolute right-[20%] bottom-[14%] h-1.5 w-1.5 rounded-full bg-sky-300/35 shadow-[0_0_8px_#38bdf8]" />
+        <span className=" absolute left-[29%] top-[36%] h-1 w-1 rounded-full bg-slate-400/20" />
+        <span className="absolute right-[28%] top-[40%] h-1 w-1 rounded-full bg-slate-400/20" />
+        <span className="absolute left-[12%] bottom-[38%] h-0.5 w-0.5 rounded-full bg-slate-300/25" />
+        <span className="absolute right-[11%] bottom-[42%] h-0.5 w-0.5 rounded-full bg-slate-300/25" />
 
-        {/* Sharp sign floating near header */}
-        <div className="absolute top-[28%] left-[22%] font-serif text-2xl text-amber-300/20 select-none animate-music-drift-2">
-          ♯
+        {/* Subtle Edge Equalizer Glow Micro-Accents */}
+        <div className=" hidden sm:flex items-end gap-1 absolute bottom-6 left-7 h-5 opacity-35">
+          <span className="animate-eq-1 w-0.5 rounded-full bg-muz-accent shadow-[0_0_6px_#73e0a9]" />
+          <span className="animate-eq-2 w-0.5 rounded-full bg-muz-accent shadow-[0_0_6px_#73e0a9]" />
+          <span className="animate-eq-3 w-0.5 rounded-full bg-sky-400 shadow-[0_0_6px_#38bdf8]" />
+          <span className="animate-eq-4 w-0.5 rounded-full bg-muz-accent shadow-[0_0_6px_#73e0a9]" />
+          <span className="animate-eq-5 w-0.5 rounded-full bg-sky-400 shadow-[0_0_6px_#38bdf8]" />
         </div>
-
-        {/* Flat sign floating near bottom card */}
-        <div className="absolute bottom-[32%] right-[22%] font-serif text-2xl text-sky-300/20 select-none animate-music-drift-3">
-          ♭
+        <div className="hidden sm:flex items-end gap-1 absolute top-6 right-7 h-5 opacity-30">
+          <span className="animate-eq-3 w-0.5 rounded-full bg-sky-400 shadow-[0_0_6px_#38bdf8]" />
+          <span className="animate-eq-1 w-0.5 rounded-full bg-muz-accent shadow-[0_0_6px_#73e0a9]" />
+          <span className="animate-eq-5 w-0.5 rounded-full bg-muz-accent shadow-[0_0_6px_#73e0a9]" />
+          <span className="animate-eq-2 w-0.5 rounded-full bg-sky-400 shadow-[0_0_6px_#38bdf8]" />
         </div>
       </div>
 
-      <div className="relative z-10 w-full max-w-md">
-        {/* Brand identity header with Musical Equalizer */}
-        <div className="mb-8 text-center">
-          <div className="inline-flex items-center justify-center gap-3 rounded-2xl border border-slate-700/80 bg-muz-panel/90 px-4 py-2.5 shadow-glow backdrop-blur-md">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muz-accent/15 text-muz-accent">
-              <Music className="h-5 w-5" />
+      <div className="relative z-10 w-full max-w-[400px]">
+        {/* Minimal Brand Header with App Name Cleanly Above Form */}
+        <div className="mb-5 text-center">
+          <div className="mb-2.5 inline-flex items-center gap-2.5 rounded-2xl border border-slate-800/90 bg-muz-panel/90 px-3.5 py-1.5 shadow-glow backdrop-blur-md">
+            <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-muz-accent/15 text-muz-accent">
+              <Music className="h-4 w-4" />
             </div>
-            <div className="text-left">
-              <div className="flex items-center gap-2">
-                <span className="block font-black tracking-widest text-white text-base">MUZ</span>
-                {/* Lively music frequency equalizer bars */}
-                <div className="flex items-end gap-0.5 h-3.5 px-1">
-                  <div className="w-1 rounded-full bg-muz-accent animate-eq-1" />
-                  <div className="w-1 rounded-full bg-sky-400 animate-eq-2" />
-                  <div className="w-1 rounded-full bg-muz-accent animate-eq-3" />
-                  <div className="w-1 rounded-full bg-sky-400 animate-eq-4" />
-                  <div className="w-1 rounded-full bg-muz-accent animate-eq-5" />
-                </div>
-              </div>
-            </div>
+            <span className="text-sm font-extrabold uppercase tracking-[0.28em] text-white">
+              MUZ
+            </span>
           </div>
-
-          <h2 className="mt-5 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            {mode === 'signin' && 'Welcome back to practice'}
-            {mode === 'signup' && 'Create your pianist account'}
-            {mode === 'forgot' && 'Reset your password'}
-            {mode === 'magic' && 'Passwordless sign in'}
-          </h2>
-
-          <p className="mt-2 text-sm text-muz-muted">
-            {mode === 'signin' && 'Sign in to access real-time posture AI and acoustic pitch verification.'}
-            {mode === 'signup' && 'Track posture angles, chord accuracy, and sync with Supabase.'}
-            {mode === 'forgot' && "Enter your email address and we'll send a password recovery link."}
-            {mode === 'magic' && 'Receive an instant one-click login link delivered directly to your inbox.'}
+          <h1 className="text-2xl font-bold tracking-tight text-white">
+            {mode === 'signin' && 'Welcome back'}
+            {mode === 'signup' && 'Create an account'}
+            {mode === 'forgot' && 'Reset password'}
+          </h1>
+          <p className="mt-1 text-xs text-muz-muted">
+            {mode === 'signin' && 'Sign in to continue to MUZ Studio'}
+            {mode === 'signup' && 'Start your piano practice journey today'}
+            {mode === 'forgot' && "We'll send a recovery link to your inbox"}
           </p>
         </div>
 
-        {/* Main Auth Container Card */}
-        <div className="relative overflow-hidden rounded-3xl border border-slate-700/90 bg-muz-panel/90 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
-          {/* Decorative Piano Keys Trim along card top */}
-          <div className="absolute top-0 inset-x-0 h-2 bg-slate-900 border-b border-slate-800 flex overflow-hidden">
-            {[...Array(18)].map((_, i) => (
-              <div
-                key={i}
-                className={`flex-1 h-full border-r border-slate-700/60 ${
-                  [1, 3, 6, 8, 10, 13, 15].includes(i % 14) ? 'bg-slate-950' : 'bg-slate-200/90'
+        {/* Auth Card */}
+        <div className="rounded-3xl border border-slate-800/90 bg-muz-panel/90 p-6 shadow-2xl backdrop-blur-xl">
+          {/* Segmented Switcher */}
+          {mode !== 'forgot' && (
+            <div className="mb-5 grid grid-cols-2 rounded-xl bg-slate-950/80 p-1 border border-slate-800/80">
+              <button
+                type="button"
+                onClick={() => handleModeChange('signin')}
+                className={`rounded-lg py-2 text-xs font-semibold transition-all ${
+                  mode === 'signin'
+                    ? 'bg-muz-accent text-slate-950 shadow-sm'
+                    : 'text-muz-muted hover:text-white'
                 }`}
-              />
-            ))}
-          </div>
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => handleModeChange('signup')}
+                className={`rounded-lg py-2 text-xs font-semibold transition-all ${
+                  mode === 'signup'
+                    ? 'bg-muz-accent text-slate-950 shadow-sm'
+                    : 'text-muz-muted hover:text-white'
+                }`}
+              >
+                Sign Up
+              </button>
+            </div>
+          )}
 
-          {/* Feedback alerts */}
+          {/* Feedback Alert */}
           {errorMessage && (
-            <div className="mt-2 mb-5 flex items-start gap-3 rounded-xl border border-muz-danger/30 bg-muz-danger/10 p-3.5 text-sm text-muz-danger animate-in fade-in duration-200">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <div className="leading-snug">{errorMessage}</div>
+            <div className="mb-4 flex items-center gap-2 rounded-xl border border-muz-danger/30 bg-muz-danger/10 px-3 py-2 text-xs text-muz-danger">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span className="truncate">{errorMessage}</span>
             </div>
           )}
 
           {successMessage && (
-            <div className="mt-2 mb-5 flex items-start gap-3 rounded-xl border border-muz-accent/30 bg-muz-accent/10 p-3.5 text-sm text-muz-accent animate-in fade-in duration-200">
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-              <div className="leading-snug">{successMessage}</div>
+            <div className="mb-4 flex items-center gap-2 rounded-xl border border-muz-accent/30 bg-muz-accent/10 px-3 py-2 text-xs text-muz-accent">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <span className="truncate">{successMessage}</span>
             </div>
           )}
 
-          {/* Sign In Form */}
+          {/* Sign In Form (2 input rows + button) */}
           {mode === 'signin' && (
-            <form onSubmit={handleSignIn} className="space-y-4 pt-1">
+            <form onSubmit={handleSignIn} className="space-y-3.5">
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muz-muted">
-                  Email Address
+                <label className="mb-1 block text-xs font-medium text-slate-300">
+                  Email
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muz-muted" />
@@ -367,25 +494,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="pianist@example.com"
+                    placeholder="you@example.com"
                     required
                     autoComplete="email"
-                    className="w-full rounded-xl border border-slate-700 bg-slate-900/90 py-2.5 pl-10 pr-4 text-sm text-white placeholder-slate-500 transition-colors focus:border-muz-accent focus:outline-none focus:ring-1 focus:ring-muz-accent"
+                    className="h-10 w-full rounded-xl border border-slate-700/80 bg-slate-900/80 pl-10 pr-3.5 text-sm text-white placeholder-slate-500 transition-colors focus:border-muz-accent focus:outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <div className="mb-1.5 flex items-center justify-between">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-muz-muted">
-                    Password
-                  </label>
+                <div className="mb-1 flex items-center justify-between">
+                  <label className="text-xs font-medium text-slate-300">Password</label>
                   <button
                     type="button"
                     onClick={() => handleModeChange('forgot')}
-                    className="text-xs text-muz-accent hover:underline focus:outline-none"
+                    className="text-xs text-muz-accent hover:underline"
                   >
-                    Forgot password?
+                    Forgot?
                   </button>
                 </div>
                 <div className="relative">
@@ -397,47 +522,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                     placeholder="••••••••"
                     required
                     autoComplete="current-password"
-                    className="w-full rounded-xl border border-slate-700 bg-slate-900/90 py-2.5 pl-10 pr-10 text-sm text-white placeholder-slate-500 transition-colors focus:border-muz-accent focus:outline-none focus:ring-1 focus:ring-muz-accent"
+                    className="h-10 w-full rounded-xl border border-slate-700/80 bg-slate-900/80 pl-10 pr-10 text-sm text-white placeholder-slate-500 transition-colors focus:border-muz-accent focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muz-muted hover:text-white"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muz-muted hover:text-white"
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between text-xs text-muz-muted">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-muz-accent focus:ring-muz-accent"
-                  />
-                  <span>Keep me signed in</span>
-                </label>
-                <button
-                  type="button"
-                  onClick={() => handleModeChange('magic')}
-                  className="hover:text-muz-accent transition-colors"
-                >
-                  Sign in with Magic Link
-                </button>
-              </div>
-
               <button
                 type="submit"
                 disabled={loading}
-                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-muz-accent to-muz-accentStrong py-3 text-sm font-semibold text-slate-950 shadow-glow transition hover:opacity-95 disabled:opacity-50"
+                className="mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-muz-accent to-muz-accentStrong text-sm font-semibold text-slate-950 shadow-glow transition hover:opacity-95 disabled:opacity-50"
               >
                 {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Signing in...</span>
-                  </>
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <>
                     <span>Sign In</span>
@@ -445,199 +548,116 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                   </>
                 )}
               </button>
-
-              {/* Separated Sign Up Link - No slider */}
-              <div className="pt-3 text-center text-sm text-muz-muted">
-                <span>Don&apos;t have an account? </span>
-                <button
-                  type="button"
-                  onClick={() => handleModeChange('signup')}
-                  className="font-semibold text-muz-accent transition-colors hover:underline hover:text-emerald-300 ml-1"
-                >
-                  Sign up
-                </button>
-              </div>
             </form>
           )}
 
-          {/* Sign Up Form */}
+          {/* Sign Up Form (2x2 grid = exact same 2 input rows + button height as Sign In) */}
           {mode === 'signup' && (
-            <form onSubmit={handleSignUp} className="space-y-4 pt-1">
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muz-muted">
-                  Display / Pianist Name
-                </label>
-                <div className="relative">
-                  <UserIcon className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muz-muted" />
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="e.g. Rachmaninoff"
-                    className="w-full rounded-xl border border-slate-700 bg-slate-900/90 py-2.5 pl-10 pr-4 text-sm text-white placeholder-slate-500 transition-colors focus:border-muz-accent focus:outline-none focus:ring-1 focus:ring-muz-accent"
-                  />
+            <form onSubmit={handleSignUp} className="space-y-3.5">
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-300">
+                    Username
+                  </label>
+                  <div className="relative">
+                    <UserIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muz-muted" />
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Name"
+                      autoComplete="username"
+                      className="h-10 w-full rounded-xl border border-slate-700/80 bg-slate-900/80 pl-9 pr-2.5 text-sm text-white placeholder-slate-500 transition-colors focus:border-muz-accent focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-300">
+                    Email
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muz-muted" />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@email.com"
+                      required
+                      autoComplete="email"
+                      className="h-10 w-full rounded-xl border border-slate-700/80 bg-slate-900/80 pl-9 pr-2.5 text-sm text-white placeholder-slate-500 transition-colors focus:border-muz-accent focus:outline-none"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muz-muted">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muz-muted" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="pianist@example.com"
-                    required
-                    autoComplete="email"
-                    className="w-full rounded-xl border border-slate-700 bg-slate-900/90 py-2.5 pl-10 pr-4 text-sm text-white placeholder-slate-500 transition-colors focus:border-muz-accent focus:outline-none focus:ring-1 focus:ring-muz-accent"
-                  />
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-300">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muz-muted" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="6+ chars"
+                      required
+                      autoComplete="new-password"
+                      className="h-10 w-full rounded-xl border border-slate-700/80 bg-slate-900/80 pl-9 pr-8 text-sm text-white placeholder-slate-500 transition-colors focus:border-muz-accent focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muz-muted hover:text-white"
+                    >
+                      {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muz-muted">
-                  Password (min. 6 characters)
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muz-muted" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    autoComplete="new-password"
-                    className="w-full rounded-xl border border-slate-700 bg-slate-900/90 py-2.5 pl-10 pr-10 text-sm text-white placeholder-slate-500 transition-colors focus:border-muz-accent focus:outline-none focus:ring-1 focus:ring-muz-accent"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muz-muted hover:text-white"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muz-muted">
-                  Confirm Password
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muz-muted" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    autoComplete="new-password"
-                    className="w-full rounded-xl border border-slate-700 bg-slate-900/90 py-2.5 pl-10 pr-4 text-sm text-white placeholder-slate-500 transition-colors focus:border-muz-accent focus:outline-none focus:ring-1 focus:ring-muz-accent"
-                  />
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-300">
+                    Confirm
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muz-muted" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Repeat"
+                      required
+                      autoComplete="new-password"
+                      className="h-10 w-full rounded-xl border border-slate-700/80 bg-slate-900/80 pl-9 pr-2.5 text-sm text-white placeholder-slate-500 transition-colors focus:border-muz-accent focus:outline-none"
+                    />
+                  </div>
                 </div>
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-muz-accent to-muz-accentStrong py-3 text-sm font-semibold text-slate-950 shadow-glow transition hover:opacity-95 disabled:opacity-50"
+                className="mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-muz-accent to-muz-accentStrong text-sm font-semibold text-slate-950 shadow-glow transition hover:opacity-95 disabled:opacity-50"
               >
                 {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Creating account...</span>
-                  </>
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <>
-                    <span>Create Free Account</span>
+                    <span>Create Account</span>
                     <ArrowRight className="h-4 w-4" />
                   </>
                 )}
               </button>
-
-              {/* Separated Sign In Link - No slider */}
-              <div className="pt-3 text-center text-sm text-muz-muted">
-                <span>Already have an account? </span>
-                <button
-                  type="button"
-                  onClick={() => handleModeChange('signin')}
-                  className="font-semibold text-muz-accent transition-colors hover:underline hover:text-emerald-300 ml-1"
-                >
-                  Sign in
-                </button>
-              </div>
             </form>
           )}
 
           {/* Forgot Password Form */}
           {mode === 'forgot' && (
-            <form onSubmit={handleForgotPassword} className="space-y-4 pt-1">
+            <form onSubmit={handleForgotPassword} className="space-y-3.5">
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muz-muted">
-                  Registered Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muz-muted" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="pianist@example.com"
-                    required
-                    className="w-full rounded-xl border border-slate-700 bg-slate-900/90 py-2.5 pl-10 pr-4 text-sm text-white placeholder-slate-500 transition-colors focus:border-muz-accent focus:outline-none focus:ring-1 focus:ring-muz-accent"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-muz-accent to-muz-accentStrong py-3 text-sm font-semibold text-slate-950 shadow-glow transition hover:opacity-95 disabled:opacity-50"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Sending link...</span>
-                  </>
-                ) : (
-                  <>
-                    <KeyRound className="h-4 w-4" />
-                    <span>Send Reset Instructions</span>
-                  </>
-                )}
-              </button>
-
-              <div className="pt-3 flex flex-col items-center gap-2.5 text-center text-sm text-muz-muted">
-                <button
-                  type="button"
-                  onClick={() => handleModeChange('signin')}
-                  className="flex items-center justify-center gap-2 text-xs text-muz-muted hover:text-white transition-colors"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                  <span>Back to sign in</span>
-                </button>
-                <div className="text-xs">
-                  <span>Don&apos;t have an account? </span>
-                  <button
-                    type="button"
-                    onClick={() => handleModeChange('signup')}
-                    className="font-semibold text-muz-accent hover:underline hover:text-emerald-300 ml-1"
-                  >
-                    Sign up
-                  </button>
-                </div>
-              </div>
-            </form>
-          )}
-
-          {/* Magic Link Form */}
-          {mode === 'magic' && (
-            <form onSubmit={handleMagicLink} className="space-y-4 pt-1">
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muz-muted">
+                <label className="mb-1 block text-xs font-medium text-slate-300">
                   Email Address
                 </label>
                 <div className="relative">
@@ -646,9 +666,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="pianist@example.com"
+                    placeholder="you@example.com"
                     required
-                    className="w-full rounded-xl border border-slate-700 bg-slate-900/90 py-2.5 pl-10 pr-4 text-sm text-white placeholder-slate-500 transition-colors focus:border-muz-accent focus:outline-none focus:ring-1 focus:ring-muz-accent"
+                    className="h-10 w-full rounded-xl border border-slate-700/80 bg-slate-900/80 pl-10 pr-3.5 text-sm text-white placeholder-slate-500 transition-colors focus:border-muz-accent focus:outline-none"
                   />
                 </div>
               </div>
@@ -656,84 +676,44 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
               <button
                 type="submit"
                 disabled={loading}
-                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-muz-accent to-muz-accentStrong py-3 text-sm font-semibold text-slate-950 shadow-glow transition hover:opacity-95 disabled:opacity-50"
+                className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-muz-accent to-muz-accentStrong text-sm font-semibold text-slate-950 shadow-glow transition hover:opacity-95 disabled:opacity-50"
               >
                 {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Sending magic link...</span>
-                  </>
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <>
-                    <Sparkles className="h-4 w-4" />
-                    <span>Send Magic Link</span>
-                  </>
+                  <span>Send Reset Link</span>
                 )}
               </button>
 
-              <div className="pt-3 flex flex-col items-center gap-2.5 text-center text-sm text-muz-muted">
-                <button
-                  type="button"
-                  onClick={() => handleModeChange('signin')}
-                  className="flex items-center justify-center gap-2 text-xs text-muz-muted hover:text-white transition-colors"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                  <span>Back to standard password login</span>
-                </button>
-                <div className="text-xs">
-                  <span>Don&apos;t have an account? </span>
-                  <button
-                    type="button"
-                    onClick={() => handleModeChange('signup')}
-                    className="font-semibold text-muz-accent hover:underline hover:text-emerald-300 ml-1"
-                  >
-                    Sign up
-                  </button>
-                </div>
-              </div>
+              <button
+                type="button"
+                onClick={() => handleModeChange('signin')}
+                className="flex w-full items-center justify-center gap-1.5 pt-1 text-xs text-muz-muted hover:text-white transition-colors"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span>Back to Sign In</span>
+              </button>
             </form>
           )}
 
-          {/* Quick Demo Access Divider */}
-          <div className="relative my-6">
+          {/* Divider & Guest Button */}
+          <div className="relative my-4">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-slate-800" />
             </div>
             <div className="relative flex justify-center text-xs">
-              <span className="bg-muz-panel px-3 text-muz-muted flex items-center gap-1.5">
-                <Music2 className="h-3 w-3 text-muz-accent" />
-                <span>Instant Practice Access</span>
-              </span>
+              <span className="bg-muz-panel px-2.5 text-muz-muted">or</span>
             </div>
           </div>
 
-          {/* 1-Click Guest / Demo Session */}
           <button
             type="button"
             onClick={handleDemoSignIn}
-            className="group flex w-full items-center justify-between rounded-xl border border-slate-700/80 bg-slate-900/60 p-3.5 text-left text-sm transition-all hover:border-muz-accent/50 hover:bg-slate-800/80"
+            className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/60 text-xs font-medium text-slate-200 transition hover:border-muz-accent/50 hover:bg-slate-800/80 hover:text-white"
           >
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400 group-hover:bg-muz-accent/15 group-hover:text-muz-accent transition-colors">
-                <Flame className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="font-semibold text-slate-200 group-hover:text-white">Explore as Virtuoso Guest</p>
-                <p className="text-xs text-muz-muted">Try practice HUD & 14-day streak without sign-up</p>
-              </div>
-            </div>
-            <ArrowRight className="h-4 w-4 text-muz-muted group-hover:translate-x-0.5 group-hover:text-muz-accent transition-all" />
+            <span>Continue as Guest</span>
+            <ArrowRight className="h-3.5 w-3.5 text-muz-accent" />
           </button>
-        </div>
-
-        {/* Security / Technology Badge */}
-        <div className="mt-6 flex items-center justify-center gap-4 text-xs text-muz-muted">
-          <span className="inline-flex items-center gap-1.5">
-            <ShieldCheck className="h-3.5 w-3.5 text-muz-accent" />
-            Supabase Auth Protected
-          </span>
-          <span>•</span>
-          <span>Client-side inference only</span>
         </div>
       </div>
     </div>
