@@ -7,6 +7,9 @@ import {
   EyeOff,
   ArrowRight,
   Music,
+  Music2,
+  Music3,
+  Music4,
   AlertCircle,
   CheckCircle2,
   Loader2,
@@ -19,6 +22,10 @@ type AuthMode = 'signin' | 'signup' | 'forgot';
 interface LoginPageProps {
   onSuccess?: () => void;
 }
+
+// White key x-offsets and black key positions for a 3-octave wireframe piano wave
+const WHITE_KEY_INDICES = Array.from({ length: 22 }, (_, i) => i);
+const BLACK_KEY_OFFSETS = [0, 1, 3, 4, 5, 7, 8, 10, 11, 12, 14, 15, 17, 18, 19];
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
   const {
@@ -130,19 +137,292 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
     if (onSuccess) onSuccess();
   };
 
+  // Helper to compute smooth wave Y offset for the wireframe piano keys
+  const getWaveY = (x: number) =>
+    Math.sin((x / 1440) * Math.PI * 2.2) * 28 +
+    Math.cos((x / 1440) * Math.PI * 1.1) * 12;
+
   return (
     <div className="relative flex h-dvh w-full items-center justify-center overflow-hidden bg-muz-bg px-4 text-muz-text selection:bg-muz-accent selection:text-slate-950">
-      {/* Subtle Ambient Glow */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      {/* Subtle Musical Background Accents & Edge Glows */}
+      <div className="pointer-events-none absolute inset-0 select-none overflow-hidden" aria-hidden="true">
+        {/* Core & Edge Soft Glowing Musical Accents */}
         <div className="absolute -top-36 left-1/2 h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-muz-accent/10 blur-[130px]" />
         <div className="absolute -bottom-36 left-1/3 h-[360px] w-[360px] rounded-full bg-sky-500/10 blur-[120px]" />
+        <div className="animate-edge-glow absolute -left-24 -top-24 h-72 w-72 rounded-full bg-muz-accent/10 blur-[100px]" />
+        <div className="animate-edge-glow-delayed absolute -bottom-24 -right-24 h-80 w-80 rounded-full bg-sky-400/10 blur-[110px]" />
+        <div className="animate-edge-glow-delayed absolute -right-20 top-1/4 h-56 w-56 rounded-full bg-emerald-400/8 blur-[95px]" />
+        <div className="animate-edge-glow absolute -left-20 bottom-1/4 h-56 w-56 rounded-full bg-sky-500/8 blur-[95px]" />
+
+        {/* Soft Glowing Corner Acoustic Resonance Arcs */}
+        <svg
+          className="animate-edge-glow absolute -left-12 -top-12 h-64 w-64 text-muz-accent/15"
+          viewBox="0 0 200 200"
+          fill="none"
+        >
+          <circle cx="0" cy="0" r="70" stroke="currentColor" strokeWidth="0.75" strokeDasharray="4 6" />
+          <circle cx="0" cy="0" r="110" stroke="currentColor" strokeWidth="0.6" />
+          <circle cx="0" cy="0" r="150" stroke="currentColor" strokeWidth="0.4" strokeDasharray="2 8" />
+        </svg>
+
+        <svg
+          className="animate-edge-glow-delayed absolute -bottom-12 -right-12 h-64 w-64 text-sky-400/15"
+          viewBox="0 0 200 200"
+          fill="none"
+        >
+          <circle cx="200" cy="200" r="70" stroke="currentColor" strokeWidth="0.75" strokeDasharray="4 6" />
+          <circle cx="200" cy="200" r="110" stroke="currentColor" strokeWidth="0.6" />
+          <circle cx="200" cy="200" r="150" stroke="currentColor" strokeWidth="0.4" strokeDasharray="2 8" />
+        </svg>
+
+        {/* Subtle Drifting Stave Lines (Upper & Mid Ribbon) */}
+        <svg
+          className="animate-staff-wave absolute -left-[5%] top-[10%] h-[260px] w-[110%]"
+          viewBox="0 0 1440 260"
+          fill="none"
+          preserveAspectRatio="none"
+        >
+          <defs>
+            <linearGradient id="staveGradPrimary" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#73e0a9" stopOpacity="0" />
+              <stop offset="20%" stopColor="#73e0a9" stopOpacity="0.16" />
+              <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.1" />
+              <stop offset="80%" stopColor="#73e0a9" stopOpacity="0.16" />
+              <stop offset="100%" stopColor="#73e0a9" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {[0, 12, 24, 36, 48].map((offset) => (
+            <path
+              key={`upper-stave-${offset}`}
+              d={`M -40 ${90 + offset} C 320 ${35 + offset}, 680 ${150 + offset}, 1060 ${70 + offset} C 1260 ${30 + offset}, 1380 ${95 + offset}, 1480 ${80 + offset}`}
+              stroke="url(#staveGradPrimary)"
+              strokeWidth="1"
+            />
+          ))}
+          {/* Subtle Measure Barlines & Harmonic Nodes on Stave */}
+          <line x1="280" y1="73" x2="280" y2="121" stroke="#73e0a9" strokeOpacity="0.12" strokeWidth="1" />
+          <line x1="1150" y1="58" x2="1150" y2="106" stroke="#38bdf8" strokeOpacity="0.12" strokeWidth="1" />
+          <circle cx="220" cy="88" r="3" fill="#73e0a9" fillOpacity="0.22" />
+          <circle cx="340" cy="103" r="2.5" fill="#38bdf8" fillOpacity="0.2" />
+          <circle cx="1090" cy="79" r="3" fill="#73e0a9" fillOpacity="0.22" />
+          <circle cx="1210" cy="94" r="2.5" fill="#38bdf8" fillOpacity="0.18" />
+        </svg>
+
+        {/* Secondary Counter-Drifting Stave Lines */}
+        <svg
+          className="animate-staff-wave-slow absolute -left-[5%] bottom-[16%] h-[220px] w-[110%]"
+          viewBox="0 0 1440 220"
+          fill="none"
+          preserveAspectRatio="none"
+        >
+          <defs>
+            <linearGradient id="staveGradSecondary" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#38bdf8" stopOpacity="0" />
+              <stop offset="25%" stopColor="#38bdf8" stopOpacity="0.13" />
+              <stop offset="50%" stopColor="#73e0a9" stopOpacity="0.08" />
+              <stop offset="75%" stopColor="#73e0a9" stopOpacity="0.14" />
+              <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {[0, 11, 22, 33, 44].map((offset) => (
+            <path
+              key={`lower-stave-${offset}`}
+              d={`M -40 ${110 + offset} C 380 ${165 + offset}, 760 ${45 + offset}, 1140 ${125 + offset} C 1300 ${155 + offset}, 1400 ${105 + offset}, 1480 ${115 + offset}`}
+              stroke="url(#staveGradSecondary)"
+              strokeWidth="0.9"
+            />
+          ))}
+        </svg>
+
+        {/* Minimalist Wireframe Piano Key Wave with Slow Floating Physics */}
+        <svg
+          className="animate-piano-wave absolute -left-[4%] bottom-[3%] h-[190px] w-[108%]"
+          viewBox="0 0 1440 200"
+          fill="none"
+          preserveAspectRatio="none"
+        >
+          <defs>
+            <linearGradient id="pianoWireframeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#73e0a9" stopOpacity="0" />
+              <stop offset="15%" stopColor="#73e0a9" stopOpacity="0.22" />
+              <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.16" />
+              <stop offset="85%" stopColor="#73e0a9" stopOpacity="0.22" />
+              <stop offset="100%" stopColor="#73e0a9" stopOpacity="0" />
+            </linearGradient>
+            <linearGradient id="blackKeyFillGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#73e0a9" stopOpacity="0.12" />
+              <stop offset="100%" stopColor="#070b14" stopOpacity="0.35" />
+            </linearGradient>
+          </defs>
+
+          {/* Upper and Lower Continuous Wave Rails */}
+          <path
+            d={`M ${WHITE_KEY_INDICES.map((i) => {
+              const x = 60 + i * 60;
+              const y = 68 + getWaveY(x);
+              return `${i === 0 ? '' : 'L '}${x} ${y.toFixed(1)}`;
+            }).join(' ')}`}
+            stroke="url(#pianoWireframeGrad)"
+            strokeWidth="1"
+          />
+          <path
+            d={`M ${WHITE_KEY_INDICES.map((i) => {
+              const x = 42 + i * 60;
+              const y = 148 + getWaveY(x) * 1.08;
+              return `${i === 0 ? '' : 'L '}${x} ${y.toFixed(1)}`;
+            }).join(' ')}`}
+            stroke="url(#pianoWireframeGrad)"
+            strokeWidth="1.1"
+          />
+          <path
+            d={`M ${WHITE_KEY_INDICES.map((i) => {
+              const x = 42 + i * 60;
+              const y = 155 + getWaveY(x) * 1.08;
+              return `${i === 0 ? '' : 'L '}${x} ${y.toFixed(1)}`;
+            }).join(' ')}`}
+            stroke="url(#pianoWireframeGrad)"
+            strokeWidth="0.6"
+            strokeDasharray="3 5"
+          />
+
+          {/* White Key Wireframe Divisions & Lip Ticks */}
+          {WHITE_KEY_INDICES.map((i) => {
+            const xTop = 60 + i * 60;
+            const yTop = 68 + getWaveY(xTop);
+            const xBot = 42 + i * 60;
+            const yBot = 148 + getWaveY(xTop) * 1.08;
+            return (
+              <g key={`wk-${i}`}>
+                <line
+                  x1={xTop}
+                  y1={yTop}
+                  x2={xBot}
+                  y2={yBot}
+                  stroke="url(#pianoWireframeGrad)"
+                  strokeWidth="0.85"
+                />
+                <line
+                  x1={xBot}
+                  y1={yBot}
+                  x2={xBot}
+                  y2={yBot + 7}
+                  stroke="url(#pianoWireframeGrad)"
+                  strokeWidth="0.85"
+                />
+              </g>
+            );
+          })}
+
+          {/* Raised Minimalist Wireframe Black Keys */}
+          {BLACK_KEY_OFFSETS.map((keyIdx) => {
+            const xTop = 60 + (keyIdx + 0.68) * 60;
+            const yTop = 64 + getWaveY(xTop);
+            const xBot = 50 + (keyIdx + 0.68) * 60;
+            const yBot = 112 + getWaveY(xTop) * 1.04;
+            const w = 22;
+            const hLift = 6;
+
+            return (
+              <g key={`bk-${keyIdx}`}>
+                {/* 3D Top Face of Black Key */}
+                <polygon
+                  points={`${xTop},${yTop - hLift} ${xTop + w},${yTop - hLift + 1.5} ${xBot + w},${yBot - hLift + 1.5} ${xBot},${yBot - hLift}`}
+                  fill="url(#blackKeyFillGrad)"
+                  stroke="url(#pianoWireframeGrad)"
+                  strokeWidth="0.95"
+                />
+                {/* Front Bevel Wireframe Lines */}
+                <line
+                  x1={xBot}
+                  y1={yBot - hLift}
+                  x2={xBot}
+                  y2={yBot}
+                  stroke="url(#pianoWireframeGrad)"
+                  strokeWidth="0.8"
+                />
+                <line
+                  x1={xBot + w}
+                  y1={yBot - hLift + 1.5}
+                  x2={xBot + w}
+                  y2={yBot + 1.5}
+                  stroke="url(#pianoWireframeGrad)"
+                  strokeWidth="0.8"
+                />
+                <line
+                  x1={xBot}
+                  y1={yBot}
+                  x2={xBot + w}
+                  y2={yBot + 1.5}
+                  stroke="url(#pianoWireframeGrad)"
+                  strokeWidth="0.8"
+                />
+              </g>
+            );
+          })}
+        </svg>
+
+        {/* Small Floating Music Notes (Slow Floating Physics around Perimeter) */}
+        <div className="animate-music-drift-1 absolute left-[10%] top-[18%] text-muz-accent/30 drop-shadow-[0_0_10px_rgba(115,224,169,0.35)]">
+          <Music className="h-4 w-4" />
+        </div>
+        <div className="animate-music-drift-2 absolute right-[12%] top-[16%] text-sky-400/30 drop-shadow-[0_0_10px_rgba(56,189,248,0.35)]">
+          <Music2 className="h-5 w-5" />
+        </div>
+        <div className="animate-music-drift-3 absolute left-[15%] bottom-[24%] text-muz-accent/25 drop-shadow-[0_0_8px_rgba(115,224,169,0.3)]">
+          <Music3 className="h-4 w-4" />
+        </div>
+        <div className="animate-music-drift-4 absolute right-[14%] bottom-[26%] text-sky-300/25 drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]">
+          <Music4 className="h-4 w-4" />
+        </div>
+        <span className="animate-music-drift-5 absolute left-[24%] top-[11%] font-serif text-lg text-muz-accent/25 drop-shadow-[0_0_8px_rgba(115,224,169,0.3)]">
+          𝄞
+        </span>
+        <span className="animate-music-drift-6 absolute right-[23%] top-[28%] text-sm text-sky-300/25 drop-shadow-[0_0_8px_rgba(56,189,248,0.25)]">
+          ♫
+        </span>
+        <span className="animate-music-drift-2 absolute left-[7%] top-[48%] text-xs text-muz-accent/25 drop-shadow-[0_0_6px_rgba(115,224,169,0.25)]">
+          ♪
+        </span>
+        <span className="animate-music-drift-5 absolute right-[8%] top-[52%] text-sm text-muz-accent/25 drop-shadow-[0_0_6px_rgba(115,224,169,0.25)]">
+          ♬
+        </span>
+
+        {/* Salt-and-Pepper Ambient Particles & Soft Glowing Edge Micro-Touches */}
+        <span className="animate-pulse absolute left-[6%] top-[26%] h-1.5 w-1.5 rounded-full bg-muz-accent/40 shadow-[0_0_8px_#73e0a9]" />
+        <span className="animate-pulse absolute right-[7%] top-[22%] h-1 w-1 rounded-full bg-sky-400/45 shadow-[0_0_8px_#38bdf8]" />
+        <span className="animate-pulse absolute left-[19%] bottom-[16%] h-1 w-1 rounded-full bg-muz-accent/35 shadow-[0_0_6px_#73e0a9]" />
+        <span className="animate-pulse absolute right-[20%] bottom-[14%] h-1.5 w-1.5 rounded-full bg-sky-300/35 shadow-[0_0_8px_#38bdf8]" />
+        <span className=" absolute left-[29%] top-[36%] h-1 w-1 rounded-full bg-slate-400/20" />
+        <span className="absolute right-[28%] top-[40%] h-1 w-1 rounded-full bg-slate-400/20" />
+        <span className="absolute left-[12%] bottom-[38%] h-0.5 w-0.5 rounded-full bg-slate-300/25" />
+        <span className="absolute right-[11%] bottom-[42%] h-0.5 w-0.5 rounded-full bg-slate-300/25" />
+
+        {/* Subtle Edge Equalizer Glow Micro-Accents */}
+        <div className=" hidden sm:flex items-end gap-1 absolute bottom-6 left-7 h-5 opacity-35">
+          <span className="animate-eq-1 w-0.5 rounded-full bg-muz-accent shadow-[0_0_6px_#73e0a9]" />
+          <span className="animate-eq-2 w-0.5 rounded-full bg-muz-accent shadow-[0_0_6px_#73e0a9]" />
+          <span className="animate-eq-3 w-0.5 rounded-full bg-sky-400 shadow-[0_0_6px_#38bdf8]" />
+          <span className="animate-eq-4 w-0.5 rounded-full bg-muz-accent shadow-[0_0_6px_#73e0a9]" />
+          <span className="animate-eq-5 w-0.5 rounded-full bg-sky-400 shadow-[0_0_6px_#38bdf8]" />
+        </div>
+        <div className="hidden sm:flex items-end gap-1 absolute top-6 right-7 h-5 opacity-30">
+          <span className="animate-eq-3 w-0.5 rounded-full bg-sky-400 shadow-[0_0_6px_#38bdf8]" />
+          <span className="animate-eq-1 w-0.5 rounded-full bg-muz-accent shadow-[0_0_6px_#73e0a9]" />
+          <span className="animate-eq-5 w-0.5 rounded-full bg-muz-accent shadow-[0_0_6px_#73e0a9]" />
+          <span className="animate-eq-2 w-0.5 rounded-full bg-sky-400 shadow-[0_0_6px_#38bdf8]" />
+        </div>
       </div>
 
       <div className="relative z-10 w-full max-w-[400px]">
-        {/* Minimal Brand Header */}
+        {/* Minimal Brand Header with App Name Cleanly Above Form */}
         <div className="mb-5 text-center">
-          <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-800 bg-muz-panel shadow-glow">
-            <Music className="h-5 w-5 text-muz-accent" />
+          <div className="mb-2.5 inline-flex items-center gap-2.5 rounded-2xl border border-slate-800/90 bg-muz-panel/90 px-3.5 py-1.5 shadow-glow backdrop-blur-md">
+            <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-muz-accent/15 text-muz-accent">
+              <Music className="h-4 w-4" />
+            </div>
+            <span className="text-sm font-extrabold uppercase tracking-[0.28em] text-white">
+              MUZ
+            </span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">
             {mode === 'signin' && 'Welcome back'}
