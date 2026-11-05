@@ -133,3 +133,34 @@ textarea {
 .animate-piano-wave { animation: piano-wave-float 16s ease-in-out infinite; }
 .animate-edge-glow { animation: edge-glow-pulse 8s ease-in-out infinite; }
 .animate-edge-glow-delayed { animation: edge-glow-pulse 10s ease-in-out infinite 4s; }
+
+/* Interactive Gamification Animations */
+@keyframes node-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+
+.animate-node-shake {
+  animation: node-shake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes flame-flicker {
+  0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.95; }
+  25% { transform: scale(1.08) rotate(-2deg); opacity: 1; }
+  50% { transform: scale(0.96) rotate(1deg); opacity: 0.9; }
+  75% { transform: scale(1.05) rotate(-1deg); opacity: 1; }
+}
+
+.animate-flame {
+  animation: flame-flicker 2s ease-in-out infinite;
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

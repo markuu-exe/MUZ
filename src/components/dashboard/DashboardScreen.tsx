@@ -9,6 +9,17 @@ import {
   Piano,
   Settings,
   UserRound,
+  Play,
+  RotateCcw,
+  Sparkles,
+  ShieldAlert,
+  CheckCircle2,
+  Sliders,
+  Volume2,
+  Camera,
+  Layers,
+  ChevronRight,
+  Flame,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useDashboardData } from '../../hooks/useDashboardData';
@@ -25,33 +36,36 @@ import {
 } from '../../lib/dashboard/curriculum';
 import DashboardHud from './DashboardHud';
 import SkillTreeView from './SkillTreeView';
+import ProfileAnalyticsView from './ProfileAnalyticsView';
 
-const NAV: Array<{ id: DashboardView; label: string; icon: typeof GitBranch }> = [
+interface NavItem {
+  id: DashboardView;
+  label: string;
+  icon: typeof GitBranch;
+  badge?: string;
+}
+
+const NAV_ITEMS: NavItem[] = [
   { id: 'skill-tree', label: 'Skill Tree', icon: GitBranch },
   { id: 'lessons', label: 'Lessons', icon: BookOpen },
-  { id: 'profile', label: 'Profile', icon: UserRound },
+  { id: 'profile', label: 'Profile & Analytics', icon: UserRound },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
-
-const KIND_LABEL: Record<CurriculumNode['kind'], string> = {
-  theory: 'Theory',
-  practice: 'Practice',
-  rhythm: 'Rhythm',
-};
 
 export default function DashboardScreen() {
   const { user, profile, isDemo, signOut } = useAuth();
   const data = useDashboardData(profile, isDemo);
   const [view, setView] = useState<DashboardView>('skill-tree');
-  const [banner, setBanner] = useState<string | null>(null);
+  const [banner, setBanner] = useState<{ message: string; type: 'warning' | 'error' | 'info' } | null>(null);
   const [shakingId, setShakingId] = useState<string | null>(null);
   const [selected, setSelected] = useState<CurriculumNode | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<NodeStatus | null>(null);
+  const [lessonFilter, setLessonFilter] = useState<'all' | 'theory' | 'practice' | 'rhythm'>('all');
 
-  const hearts = profile?.hearts ?? 5;
-  const streak = profile?.current_streak ?? 0;
-  const exp = profile?.exp ?? 0;
-  const name = displayNameFromProfile(profile, user?.email);
+  const hearts = profile?.hearts ?? 4;
+  const streak = profile?.current_streak ?? 7;
+  const exp = profile?.exp ?? 1240;
+  const username = displayNameFromProfile(profile, user?.email);
   const progressMeta = expProgress(exp);
   const regen = useHeartRegen(profile?.id ?? user?.id, hearts);
 
@@ -71,17 +85,24 @@ export default function DashboardScreen() {
     return null;
   }, [data.lessons, data.progress, exp]);
 
+  // Click handler for Skill Tree & Lesson nodes
   const handleSelect = (lesson: CurriculumNode, status: NodeStatus) => {
     if (status === 'locked') {
       setSelected(null);
       setSelectedStatus(null);
       setShakingId(lesson.id);
-      window.setTimeout(() => setShakingId(null), 520);
-      const reason =
-        exp < (lesson.required_exp ?? 0)
-          ? `Requires ${lesson.required_exp} EXP before this node unlocks.`
-          : 'Complete the previous node before this lesson can be opened.';
-      setBanner(`${lesson.title} is locked. ${reason}`);
+      window.setTimeout(() => setShakingId(null), 500);
+
+      const requiredExp = lesson.required_exp ?? 0;
+      let reason = 'You must complete the prerequisite lesson nodes to unlock this pathway.';
+      if (exp < requiredExp) {
+        reason = `Requires ${requiredExp} EXP before this node can be unlocked (Current: ${exp} EXP).`;
+      }
+
+      setBanner({
+        message: `Node Locked: "${lesson.title}". ${reason}`,
+        type: 'warning',
+      });
       return;
     }
 
@@ -89,8 +110,11 @@ export default function DashboardScreen() {
       setSelected(null);
       setSelectedStatus(null);
       setShakingId(lesson.id);
-      window.setTimeout(() => setShakingId(null), 520);
-      setBanner('Practice drills stay disabled until a heart restores. Theory lessons remain free.');
+      window.setTimeout(() => setShakingId(null), 500);
+      setBanner({
+        message: 'No Stamina Hearts remaining! Complete a free Theory unit or wait for your heart regeneration.',
+        type: 'error',
+      });
       return;
     }
 
@@ -99,26 +123,40 @@ export default function DashboardScreen() {
     setSelectedStatus(status);
   };
 
-  const startLabel = selected
-    ? hearts === 0 && selected.kind === 'theory'
-      ? `Start ${selected.title} (Free)`
-      : selectedStatus === 'mastered'
-        ? `Replay ${selected.title}`
-        : `Start ${selected.title}`
-    : 'Start node';
+  // Filtered lessons for Lessons view
+  const filteredLessons = useMemo(() => {
+    if (lessonFilter === 'all') return data.lessons;
+    return data.lessons.filter((l) => l.kind === lessonFilter);
+  }, [data.lessons, lessonFilter]);
 
   return (
-    <div className="flex min-h-screen bg-[#0b0e18] text-white">
-      <aside className="flex w-[232px] shrink-0 flex-col border-r border-white/10 bg-[#10131d] px-4 py-5">
-        <div className="mb-8 flex items-center gap-2 px-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500 text-white">
-            <Music2 className="h-4 w-4" />
+    <div className="flex h-screen w-full overflow-hidden bg-[#070b14] text-slate-100 font-sans select-none">
+      {/* =========================================================================
+          LEFT-ALIGNED VERTICAL SIDEBAR
+          ========================================================================= */}
+      <aside className="flex w-[260px] shrink-0 flex-col border-r border-slate-800/90 bg-[#0c1220] px-4 py-6 shadow-2xl">
+        {/* App Branding & Logo */}
+        <div className="mb-8 flex items-center gap-3 px-2">
+          <div className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-tr from-violet-600 to-fuchsia-600 text-white shadow-[0_0_20px_rgba(139,92,246,0.5)]">
+            <Piano className="h-5 w-5" />
           </div>
-          <span className="text-lg font-bold tracking-[0.18em]">MUZ</span>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xl font-black tracking-widest text-white">MUZ</span>
+              <span className="rounded-md border border-violet-500/40 bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-violet-300">
+                PRO
+              </span>
+            </div>
+            <p className="text-[11px] font-medium text-slate-400">Piano Instruction</p>
+          </div>
         </div>
 
-        <nav className="flex flex-1 flex-col gap-1">
-          {NAV.map((item) => {
+        {/* Sidebar Navigation Links */}
+        <nav className="flex flex-1 flex-col gap-1.5">
+          <p className="px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+            Navigation
+          </p>
+          {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const active = view === item.id;
             return (
@@ -127,76 +165,152 @@ export default function DashboardScreen() {
                 type="button"
                 onClick={() => {
                   setView(item.id);
-                  if (item.id === 'settings') {
+                  if (item.id === 'settings' || item.id === 'profile') {
                     setSelected(null);
                     setSelectedStatus(null);
                   }
                 }}
                 className={cn(
-                  'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition',
-                  active ? 'bg-white/10 text-white' : 'text-white/55 hover:bg-white/5 hover:text-white',
+                  'group flex items-center justify-between rounded-2xl px-3.5 py-3 text-sm font-semibold transition-all duration-200',
+                  active
+                    ? 'border border-violet-500/40 bg-gradient-to-r from-violet-600/25 to-purple-600/10 text-white shadow-[0_0_15px_rgba(139,92,246,0.2)]'
+                    : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100',
                 )}
               >
-                <Icon className="h-4 w-4" />
-                {item.label}
+                <div className="flex items-center gap-3">
+                  <div
+                    className={cn(
+                      'flex h-8 w-8 items-center justify-center rounded-xl transition-colors',
+                      active ? 'bg-violet-600 text-white' : 'bg-slate-800/80 text-slate-400 group-hover:text-slate-200',
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <span>{item.label}</span>
+                </div>
+
+                {active && (
+                  <span className="h-2 w-2 rounded-full bg-violet-400 shadow-[0_0_8px_#a78bfa]" />
+                )}
               </button>
             );
           })}
         </nav>
 
-        <div className="mt-auto flex items-center gap-3 rounded-xl px-2 py-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-sm font-bold">
-            {name.charAt(0).toUpperCase()}
-          </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">{name}</p>
-            <p className="truncate text-[11px] text-white/45">{progressMeta.label}</p>
+        {/* User Profile Snippet (Bottom of Sidebar) */}
+        <div className="mt-auto border-t border-slate-800/80 pt-4">
+          <div className="flex items-center justify-between rounded-2xl border border-slate-800/80 bg-slate-900/80 p-3 shadow-md">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-violet-600 to-fuchsia-600 text-sm font-extrabold text-white shadow-md">
+                {username.charAt(0).toUpperCase()}
+                <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-slate-900 bg-emerald-500" />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-xs font-bold text-white">{username}</p>
+                <p className="truncate text-[10px] font-semibold text-violet-300">
+                  {progressMeta.label}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => void signOut()}
+              title="Sign out of MUZ"
+              className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-700/60 text-slate-400 hover:border-rose-500/50 hover:bg-rose-500/10 hover:text-rose-400 transition-colors"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-white/10 px-8 py-4">
-          <h1 className="text-lg font-semibold tracking-tight">Dashboard</h1>
-          <DashboardHud hearts={hearts} streak={streak} exp={exp} />
+      {/* =========================================================================
+          MAIN APPLICATION WORKSPACE (TOP HEADER & VIEWPORT)
+          ========================================================================= */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#070b14]">
+        {/* TOP GAMIFICATION HEADER */}
+        <header className="flex h-20 shrink-0 items-center justify-between border-b border-slate-800/90 bg-[#0c1220]/90 px-8 backdrop-blur-md">
+          <div className="flex items-center gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-[0.2em] text-violet-400">
+                  Desktop Studio
+                </span>
+                {isDemo && (
+                  <span className="rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-300">
+                    Guest Demo
+                  </span>
+                )}
+              </div>
+              <h1 className="text-xl font-black tracking-tight text-white capitalize">
+                {view === 'skill-tree'
+                  ? 'Piano Skill Tree'
+                  : view === 'profile'
+                    ? 'Profile & Performance Telemetry'
+                    : view === 'lessons'
+                      ? 'Piano Curriculum Catalog'
+                      : 'Studio Settings'}
+              </h1>
+            </div>
+          </div>
+
+          {/* Top Gamification Metrics (Hearts, Streak, EXP Bar) */}
+          <DashboardHud
+            hearts={hearts}
+            streak={streak}
+            exp={exp}
+            nextHeartLabel={regen.label}
+          />
         </header>
 
-        {hearts === 0 ? (
-          <div className="flex items-center justify-between gap-4 border-b border-rose-500/30 bg-gradient-to-r from-rose-500/20 to-fuchsia-500/10 px-8 py-3">
+        {/* Global Warning / Locked Node Notification Banner */}
+        {banner && (
+          <div
+            role="alert"
+            className={cn(
+              'flex items-center justify-between border-b px-8 py-3 text-sm font-semibold transition-all',
+              banner.type === 'warning' &&
+                'border-amber-500/30 bg-gradient-to-r from-amber-500/15 via-slate-900 to-amber-500/10 text-amber-200',
+              banner.type === 'error' &&
+                'border-rose-500/30 bg-gradient-to-r from-rose-500/15 via-slate-900 to-rose-500/10 text-rose-200',
+              banner.type === 'info' &&
+                'border-violet-500/30 bg-gradient-to-r from-violet-500/15 via-slate-900 to-violet-500/10 text-violet-200',
+            )}
+          >
             <div className="flex items-center gap-3">
-              <Heart className="h-4 w-4 fill-rose-400 text-rose-400" />
-              <div>
-                <p className="text-sm font-semibold text-rose-100">You are out of Hearts!</p>
-                <p className="text-xs text-rose-100/70">
-                  Complete a Theory lesson to earn a heart back instantly.
-                </p>
-              </div>
+              <AlertTriangle className="h-5 w-5 shrink-0" />
+              <span>{banner.message}</span>
             </div>
-            <span className="rounded-full bg-rose-500 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white">
-              Next heart in {regen.label}
+            <button
+              type="button"
+              onClick={() => setBanner(null)}
+              className="rounded-lg px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-white"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        {/* Depleted Stamina Notification Bar */}
+        {hearts === 0 && !banner && (
+          <div className="flex items-center justify-between border-b border-rose-500/30 bg-rose-500/15 px-8 py-2.5 text-xs text-rose-100">
+            <div className="flex items-center gap-2 font-medium">
+              <Heart className="h-4 w-4 fill-rose-500 text-rose-500" />
+              <span>
+                <strong>0 Hearts remaining:</strong> Practice drills are locked. Play a Theory lesson to recover stamina immediately.
+              </span>
+            </div>
+            <span className="font-bold uppercase tracking-wider text-rose-300">
+              Next Heart in {regen.label}
             </span>
           </div>
-        ) : null}
+        )}
 
+        {/* Scrollable Main Content Container */}
         <main className="relative flex-1 overflow-y-auto px-8 py-8">
-          {banner ? (
-            <div
-              role="alert"
-              className="mx-auto mb-6 max-w-2xl rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100"
-            >
-              {banner}
-            </div>
-          ) : null}
-
-          {data.loading ? (
-            <div className="mx-auto max-w-2xl space-y-4">
-              <div className="h-24 animate-pulse rounded-2xl bg-white/5" />
-              <div className="mx-auto h-12 w-72 animate-pulse rounded-full bg-white/5" />
-              <div className="mx-auto h-12 w-72 animate-pulse rounded-full bg-white/5" />
-            </div>
-          ) : null}
-
-          {!data.loading && view === 'skill-tree' ? (
+          {/* VIEW 1: SKILL TREE PROGRESSION (Default State) */}
+          {view === 'skill-tree' && (
             <SkillTreeView
               lessons={data.lessons}
               progress={data.progress}
@@ -206,30 +320,52 @@ export default function DashboardScreen() {
               selectedId={selected?.id ?? null}
               onSelect={handleSelect}
             />
-          ) : null}
+          )}
 
-          {!data.loading && view === 'lessons' ? (
-            <section className="mx-auto max-w-3xl">
-              <div className="mb-6 flex items-end justify-between gap-4">
+          {/* VIEW 2: PROFILE & ANALYTICS DASHBOARD */}
+          {view === 'profile' && (
+            <ProfileAnalyticsView
+              profile={profile}
+              userEmail={user?.email}
+              masteredCount={masteredCount}
+              totalLessons={data.lessons.length}
+            />
+          )}
+
+          {/* VIEW 3: LESSONS CATALOG */}
+          {view === 'lessons' && (
+            <div className="mx-auto max-w-4xl space-y-6 pb-28">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="text-2xl font-semibold">Lessons</h2>
-                  <p className="mt-1 text-sm text-white/50">
-                    Piano curriculum nodes, gated by mastery and EXP.
+                  <h2 className="text-2xl font-bold text-white">Interactive Lesson Catalog</h2>
+                  <p className="text-sm text-slate-400">
+                    All piano curriculum nodes organized by learning modality and progression gates.
                   </p>
                 </div>
-                {currentNode ? (
-                  <button
-                    type="button"
-                    onClick={() => handleSelect(currentNode, 'current')}
-                    className="rounded-xl bg-violet-500 px-4 py-2 text-sm font-semibold hover:bg-violet-400"
-                  >
-                    Continue {currentNode.title}
-                  </button>
-                ) : null}
+
+                {/* Filter buttons */}
+                <div className="flex items-center gap-1.5 rounded-2xl border border-slate-800 bg-slate-900/90 p-1">
+                  {(['all', 'theory', 'practice', 'rhythm'] as const).map((filter) => (
+                    <button
+                      key={filter}
+                      type="button"
+                      onClick={() => setLessonFilter(filter)}
+                      className={cn(
+                        'rounded-xl px-3 py-1.5 text-xs font-bold capitalize transition-all',
+                        lessonFilter === filter
+                          ? 'bg-violet-600 text-white shadow-sm'
+                          : 'text-slate-400 hover:text-slate-200',
+                      )}
+                    >
+                      {filter}
+                    </button>
+                  ))}
+                </div>
               </div>
+
               <div className="space-y-3">
-                {data.lessons.map((lesson, _index, all) => {
-                  const moduleLessons = all
+                {filteredLessons.map((lesson) => {
+                  const moduleLessons = data.lessons
                     .filter((item) => item.module_index === lesson.module_index)
                     .sort((a, b) => a.node_index - b.node_index);
                   const status = nodeStatus(
@@ -240,202 +376,203 @@ export default function DashboardScreen() {
                     exp,
                     data.lessons,
                   );
+
                   return (
-                    <button
+                    <div
                       key={lesson.id}
-                      type="button"
                       onClick={() => handleSelect(lesson, status)}
-                      className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-[#151826] px-5 py-4 text-left transition hover:border-white/20"
+                      className={cn(
+                        'flex cursor-pointer items-center justify-between rounded-2xl border p-5 transition-all duration-200',
+                        status === 'mastered' &&
+                          'border-emerald-500/40 bg-slate-900/80 hover:border-emerald-500/70',
+                        status === 'current' &&
+                          'border-violet-400/80 bg-gradient-to-r from-violet-950/40 to-slate-900 shadow-md hover:border-violet-400',
+                        status === 'locked' &&
+                          'border-slate-800/80 bg-slate-950/60 opacity-60 hover:opacity-85',
+                      )}
                     >
-                      <div className="min-w-0">
-                        <p className="text-[11px] uppercase tracking-[0.16em] text-white/35">
-                          Module {lesson.module_index} · Node {lesson.node_index}
-                        </p>
-                        <p className="mt-1 text-sm font-semibold">{lesson.title}</p>
-                        <p className="mt-1 text-xs text-white/45">{lesson.description}</p>
+                      <div className="min-w-0 pr-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            Module {lesson.module_index} · Node {lesson.node_index}
+                          </span>
+                          <span className="rounded-full border border-slate-700 bg-slate-800 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-300">
+                            {lesson.kind}
+                          </span>
+                        </div>
+                        <h3 className="mt-1 text-base font-bold text-white">{lesson.title}</h3>
+                        <p className="mt-0.5 text-xs text-slate-400">{lesson.description}</p>
                       </div>
-                      <div className="ml-4 flex shrink-0 flex-col items-end gap-1">
-                        <span className="text-[11px] uppercase tracking-wide text-white/40">
-                          {KIND_LABEL[lesson.kind]}
-                        </span>
+
+                      <div className="shrink-0 text-right">
                         <span
                           className={cn(
-                            'rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize',
-                            status === 'mastered' && 'bg-emerald-400/15 text-emerald-300',
-                            status === 'current' && 'bg-violet-400/15 text-violet-200',
-                            status === 'locked' && 'bg-white/5 text-white/40',
+                            'inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider',
+                            status === 'mastered' && 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
+                            status === 'current' && 'bg-violet-500/20 text-violet-300 border border-violet-500/40',
+                            status === 'locked' && 'bg-slate-800 text-slate-400 border border-slate-700',
                           )}
                         >
+                          {status === 'mastered' && <CheckCircle2 className="h-3.5 w-3.5" />}
                           {status}
                         </span>
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
-            </section>
-          ) : null}
+            </div>
+          )}
 
-          {!data.loading && view === 'profile' ? (
-            <section className="mx-auto max-w-3xl space-y-4">
-              <article className="overflow-hidden rounded-2xl border border-white/10 bg-[#151826]">
-                <div className="h-20 bg-gradient-to-r from-violet-600/40 via-fuchsia-500/20 to-transparent" />
-                <div className="-mt-8 flex items-end gap-4 px-6 pb-6">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-[#151826] bg-gradient-to-br from-violet-500 to-fuchsia-500 text-xl font-bold">
-                    {name.charAt(0).toUpperCase()}
+          {/* VIEW 4: SETTINGS */}
+          {view === 'settings' && (
+            <div className="mx-auto max-w-2xl space-y-6 pb-28">
+              <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-xl">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-600/20 text-violet-400">
+                    <Sliders className="h-5 w-5" />
                   </div>
-                  <div className="pb-1">
-                    <h2 className="text-xl font-semibold">{name}</h2>
-                    <p className="text-sm text-white/50">{progressMeta.label}</p>
-                    <p className="text-xs text-white/35">{user?.email}</p>
+                  <div>
+                    <h2 className="text-lg font-bold text-white">Audio & Posture Calibration</h2>
+                    <p className="text-xs text-slate-400">Configure your local sensors and acoustic analysis.</p>
                   </div>
                 </div>
-              </article>
 
-              <article className="rounded-2xl border border-white/10 bg-[#151826] p-5">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-white/60">EXP toward next tier</span>
-                  <span className="font-semibold tabular-nums">
-                    {exp}/{progressMeta.nextAt} XP
-                  </span>
-                </div>
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full rounded-full bg-violet-400"
-                    style={{ width: `${progressMeta.percent}%` }}
-                  />
-                </div>
-              </article>
+                <div className="mt-6 space-y-4 border-t border-slate-800/80 pt-6">
+                  <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+                    <div className="flex items-center gap-3">
+                      <Volume2 className="h-5 w-5 text-violet-400" />
+                      <div>
+                        <p className="text-sm font-semibold text-white">Chromagram Pitch Tracking</p>
+                        <p className="text-xs text-slate-400">Browser WASM pitch latch window (400ms buffer).</p>
+                      </div>
+                    </div>
+                    <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-400 border border-emerald-500/30">
+                      Active
+                    </span>
+                  </div>
 
-              <div className="grid gap-4 md:grid-cols-4">
-                <article className="rounded-2xl border border-white/10 bg-[#151826] p-5">
-                  <p className="text-xs uppercase tracking-wide text-white/45">Hearts</p>
-                  <p className="mt-2 text-2xl font-semibold">{hearts}/5</p>
-                </article>
-                <article className="rounded-2xl border border-white/10 bg-[#151826] p-5">
-                  <p className="text-xs uppercase tracking-wide text-white/45">Streak</p>
-                  <p className="mt-2 text-2xl font-semibold">{streak} days</p>
-                </article>
-                <article className="rounded-2xl border border-white/10 bg-[#151826] p-5">
-                  <p className="text-xs uppercase tracking-wide text-white/45">EXP</p>
-                  <p className="mt-2 text-2xl font-semibold">{exp.toLocaleString()}</p>
-                </article>
-                <article className="rounded-2xl border border-white/10 bg-[#151826] p-5">
-                  <p className="text-xs uppercase tracking-wide text-white/45">Nodes mastered</p>
-                  <p className="mt-2 text-2xl font-semibold">
-                    {masteredCount}/{data.lessons.length}
-                  </p>
-                </article>
+                  <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+                    <div className="flex items-center gap-3">
+                      <Camera className="h-5 w-5 text-emerald-400" />
+                      <div>
+                        <p className="text-sm font-semibold text-white">MediaPipe Hand & Wrist Pose Lock</p>
+                        <p className="text-xs text-slate-400">Ergonomic verification for piano practice posture.</p>
+                      </div>
+                    </div>
+                    <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-400 border border-emerald-500/30">
+                      Enabled
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+                    <div className="flex items-center gap-3">
+                      <Layers className="h-5 w-5 text-cyan-400" />
+                      <div>
+                        <p className="text-sm font-semibold text-white">Active Instrument Track</p>
+                        <p className="text-xs text-slate-400">Curriculum is calibrated for 88-key Acoustic Piano.</p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-slate-300">Acoustic Piano</span>
+                  </div>
+                </div>
               </div>
 
-              <article className="rounded-2xl border border-white/10 bg-[#151826] p-5">
-                <div className="flex items-center gap-3">
-                  <Piano className="h-5 w-5 text-violet-300" />
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-white/45">Instrument focus</p>
-                    <p className="mt-1 text-lg font-semibold capitalize">
-                      {profile?.instrument_focus ?? 'piano'}
-                    </p>
-                    <p className="mt-1 text-sm text-white/45">
-                      Curriculum is locked to piano for this release.
-                    </p>
-                  </div>
-                </div>
-              </article>
-
-              {currentNode ? (
-                <article className="flex items-center justify-between rounded-2xl border border-violet-400/30 bg-violet-500/10 p-5">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.16em] text-violet-300">Continue learning</p>
-                    <p className="mt-1 text-lg font-semibold">{currentNode.title}</p>
-                    <p className="mt-1 text-sm text-white/55">{currentNode.description}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setView('skill-tree');
-                      handleSelect(currentNode, 'current');
-                    }}
-                    className="rounded-xl bg-violet-500 px-4 py-2.5 text-sm font-semibold hover:bg-violet-400"
-                  >
-                    Open node
-                  </button>
-                </article>
-              ) : null}
-            </section>
-          ) : null}
-
-          {view === 'settings' ? (
-            <section className="mx-auto max-w-xl space-y-4">
-              <article className="rounded-2xl border border-white/10 bg-[#151826] p-6">
-                <h2 className="text-xl font-semibold">Settings</h2>
-                <p className="mt-2 text-sm text-white/50">
-                  Piano is the only instrument track available. Alternate instruments stay disabled.
+              {/* Account Management & Sign Out */}
+              <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-xl">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">
+                  Account & Session
+                </h3>
+                <p className="mt-1 text-xs text-slate-400">
+                  Logged in as <strong className="text-white">{user?.email || username}</strong>
                 </p>
-                {isDemo ? (
-                  <p className="mt-4 rounded-xl border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
-                    Guest demo session — progress is local until you create an account.
-                  </p>
-                ) : null}
-                {data.usingFallback && !isDemo ? (
-                  <p className="mt-4 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/60">
-                    Lesson catalog is using the built-in piano curriculum until the remote table is populated.
-                  </p>
-                ) : null}
+
                 <button
                   type="button"
                   onClick={() => void signOut()}
-                  className="mt-6 inline-flex items-center gap-2 rounded-xl border border-white/15 px-4 py-2.5 text-sm hover:border-rose-400/40 hover:text-rose-300"
+                  className="mt-5 inline-flex items-center gap-2 rounded-xl border border-rose-500/40 bg-rose-500/10 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-rose-300 hover:bg-rose-500/20 transition-all"
                 >
                   <LogOut className="h-4 w-4" />
-                  Sign out
+                  Sign Out of MUZ
                 </button>
-              </article>
-            </section>
-          ) : null}
+              </div>
+            </div>
+          )}
 
-          {selected && view !== 'settings' ? (
-            <div className="pointer-events-none sticky bottom-6 z-20 mx-auto max-w-xl">
-              <div className="pointer-events-auto rounded-2xl border border-violet-400/40 bg-[#161427] p-5 shadow-[0_16px_50px_rgba(0,0,0,0.45)]">
-                {hearts === 0 && selected.kind === 'theory' ? (
-                  <div className="mb-3 flex items-start gap-2 text-amber-200">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <div>
-                      <p className="text-sm font-semibold">Theory lessons are free</p>
-                      <p className="mt-1 text-xs text-amber-100/80">
-                        Theory lessons do not cost hearts to play. Learn now to instantly recover a heart.
-                      </p>
-                    </div>
-                  </div>
-                ) : null}
+          {/* =========================================================================
+              SELECTED NODE INTERACTIVE TRAY / DRAWER
+              ========================================================================= */}
+          {selected && (
+            <div className="pointer-events-none fixed bottom-8 left-1/2 z-30 w-full max-w-xl -translate-x-1/2 px-4">
+              <div className="pointer-events-auto rounded-3xl border border-violet-500/50 bg-[#0d1322]/95 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.65)] backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-200">
                 <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-violet-300">
-                      {KIND_LABEL[selected.kind]}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full border border-violet-500/40 bg-violet-500/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-300">
+                        {selected.kind} Unit
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        Module {selected.module_index} · Node {selected.node_index}
+                      </span>
+                    </div>
+
+                    <h3 className="mt-2 text-xl font-bold text-white">{selected.title}</h3>
+                    <p className="mt-1 text-sm text-slate-300 leading-relaxed">
+                      {selected.description}
                     </p>
-                    <h3 className="mt-1 text-lg font-semibold">{selected.title}</h3>
-                    <p className="mt-1 text-sm text-white/55">{selected.description}</p>
                   </div>
+
                   <button
                     type="button"
                     onClick={() => {
                       setSelected(null);
                       setSelectedStatus(null);
                     }}
-                    className="text-xs text-white/50 hover:text-white"
+                    className="rounded-lg p-1 text-slate-400 hover:text-white"
                   >
-                    Close
+                    ✕
                   </button>
                 </div>
-                <button
-                  type="button"
-                  className="mt-4 rounded-xl bg-violet-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-400"
-                >
-                  {startLabel}
-                </button>
+
+                <div className="mt-5 flex items-center justify-between border-t border-slate-800/80 pt-4">
+                  <div className="flex items-center gap-3 text-xs text-slate-300">
+                    <span className="flex items-center gap-1">
+                      <Sparkles className="h-3.5 w-3.5 text-violet-400" />
+                      +{selected.required_exp ? Math.max(50, Math.round(selected.required_exp / 4)) : 50} EXP
+                    </span>
+                    <span>·</span>
+                    <span className="flex items-center gap-1">
+                      <Heart className="h-3.5 w-3.5 text-rose-400" />
+                      {selected.kind === 'theory' ? 'Free Stamina' : '1 Heart Cost'}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBanner({
+                        message: `Starting ${selected.title} practice session... Launching dual-stream audio & pose engine.`,
+                        type: 'info',
+                      });
+                    }}
+                    className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(139,92,246,0.4)] hover:brightness-110 active:scale-95 transition-all"
+                  >
+                    {selectedStatus === 'mastered' ? (
+                      <>
+                        <RotateCcw className="h-4 w-4" />
+                        Replay Lesson
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-4 w-4 fill-white" />
+                        Start Lesson
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
-          ) : null}
+          )}
         </main>
       </div>
     </div>

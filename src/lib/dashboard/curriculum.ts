@@ -65,8 +65,10 @@ export const DEMO_CURRICULUM: CurriculumNode[] = [
     title: 'Simple Chords',
     description: 'Build C, G, and F major triads from stacked thirds.',
     required_exp: 220,
-    payload: { lessonType: 'theory' },
+    payload: { lessonType: 'theory', unitCount: 4, unitCompleted: 0 },
     kind: 'theory',
+    unitCount: 4,
+    unitCompleted: 0,
   },
   {
     id: 'pno-mod1-node5',
@@ -76,19 +78,75 @@ export const DEMO_CURRICULUM: CurriculumNode[] = [
     title: 'Chord Progressions',
     description: 'Practice I–V–vi–IV with both hands and posture lock.',
     required_exp: 350,
-    payload: { lessonType: 'practice' },
+    payload: { lessonType: 'practice', unitCount: 3, unitCompleted: 0 },
     kind: 'practice',
+    unitCount: 3,
+    unitCompleted: 0,
   },
   {
     id: 'pno-mod2-node1',
     instrument: 'piano',
     module_index: 2,
     node_index: 1,
-    title: 'Hands Together',
-    description: 'Coordinate independent left-hand accompaniment with a right-hand melody.',
+    title: 'Hands Together Coordination',
+    description: 'Coordinate independent left-hand bass lines with right-hand melodic phrases.',
     required_exp: 500,
-    payload: { lessonType: 'practice' },
+    payload: { lessonType: 'practice', unitCount: 4, unitCompleted: 0 },
     kind: 'practice',
+    unitCount: 4,
+    unitCompleted: 0,
+  },
+  {
+    id: 'pno-mod2-node2',
+    instrument: 'piano',
+    module_index: 2,
+    node_index: 2,
+    title: 'Broken Chords & Arpeggios',
+    description: 'Roll fluid arpeggios across octaves while keeping strict pulse timing.',
+    required_exp: 700,
+    payload: { lessonType: 'practice', unitCount: 3, unitCompleted: 0 },
+    kind: 'practice',
+    unitCount: 3,
+    unitCompleted: 0,
+  },
+  {
+    id: 'pno-mod2-node3',
+    instrument: 'piano',
+    module_index: 2,
+    node_index: 3,
+    title: 'Syncopated Rhythm Flow',
+    description: 'Practice off-beat accent patterns and swing meter pulse latching.',
+    required_exp: 950,
+    payload: { lessonType: 'rhythm', unitCount: 4, unitCompleted: 0 },
+    kind: 'rhythm',
+    unitCount: 4,
+    unitCompleted: 0,
+  },
+  {
+    id: 'pno-mod3-node1',
+    instrument: 'piano',
+    module_index: 3,
+    node_index: 1,
+    title: 'Bach Two-Part Contrapuntal Study',
+    description: 'Master independent polyphonic voices and precise Baroque ornamentation.',
+    required_exp: 1400,
+    payload: { lessonType: 'practice', unitCount: 4, unitCompleted: 0 },
+    kind: 'practice',
+    unitCount: 4,
+    unitCompleted: 0,
+  },
+  {
+    id: 'pno-mod3-node2',
+    instrument: 'piano',
+    module_index: 3,
+    node_index: 2,
+    title: 'High-Tempo Virtuoso Scales',
+    description: 'Achieve 140+ BPM clean scalar velocity across two octaves.',
+    required_exp: 1800,
+    payload: { lessonType: 'practice', unitCount: 5, unitCompleted: 0 },
+    kind: 'practice',
+    unitCount: 5,
+    unitCompleted: 0,
   },
 ];
 
@@ -100,12 +158,16 @@ export const DEMO_PROGRESS: Record<string, Pick<UserProgress, 'lesson_id' | 'com
 
 export const MODULE_COPY: Record<number, { title: string; blurb: string }> = {
   1: {
-    title: 'Fundamentals of Keyboard Mastery',
+    title: 'Module 1: Fundamentals of Keyboard Mastery',
     blurb: 'Learn keys, stave lines, and essential finger drills.',
   },
   2: {
-    title: 'Harmony and Two-Hand Coordination',
+    title: 'Module 2: Harmony and Two-Hand Coordination',
     blurb: 'Unlock after finishing Module 1. Hands-together piano fluency.',
+  },
+  3: {
+    title: 'Module 3: Advanced Polyphony & Velocity',
+    blurb: 'Counterpoint independence and fast tempo acoustic performance.',
   },
 };
 
@@ -121,8 +183,8 @@ export function inferLessonKind(lesson: Lesson): LessonKind {
   const raw = String(payload.lessonType ?? payload.type ?? '').toLowerCase();
   if (raw === 'theory' || raw === 'practice' || raw === 'rhythm') return raw;
   const title = lesson.title.toLowerCase();
-  if (title.includes('rhythm') || title.includes('finger')) return 'rhythm';
-  if (title.includes('scale') || title.includes('chord progression') || title.includes('practice')) {
+  if (title.includes('rhythm') || title.includes('finger') || title.includes('syncopat')) return 'rhythm';
+  if (title.includes('scale') || title.includes('chord progression') || title.includes('practice') || title.includes('hands') || title.includes('bach')) {
     return 'practice';
   }
   return 'theory';
