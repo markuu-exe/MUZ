@@ -69,6 +69,108 @@ export interface Database {
         };
         Relationships: [];
       };
+      user_progress: {
+        Row: {
+          id: string;
+          user_id: string;
+          lesson_id: string;
+          completed: boolean;
+          accuracy_percentage: number;
+          posture_stability_score: number;
+          unlocked_at: string;
+          completed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          lesson_id: string;
+          completed?: boolean;
+          accuracy_percentage?: number;
+          posture_stability_score?: number;
+          unlocked_at?: string;
+          completed_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          lesson_id?: string;
+          completed?: boolean;
+          accuracy_percentage?: number;
+          posture_stability_score?: number;
+          unlocked_at?: string;
+          completed_at?: string | null;
+        };
+        Relationships: [];
+      };
+      performance_records: {
+        Row: {
+          id: string;
+          user_id: string;
+          lesson_id: string;
+          session_timestamp: string;
+          pitch_accuracy: number;
+          rhythm_consistency: number;
+          posture_score: number;
+          drill_duration_sec: number;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          lesson_id: string;
+          session_timestamp?: string;
+          pitch_accuracy: number;
+          rhythm_consistency: number;
+          posture_score: number;
+          drill_duration_sec: number;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          lesson_id?: string;
+          session_timestamp?: string;
+          pitch_accuracy?: number;
+          rhythm_consistency?: number;
+          posture_score?: number;
+          drill_duration_sec?: number;
+        };
+        Relationships: [];
+      };
+      achievements: {
+        Row: {
+          id: string;
+          title: string;
+          exp_reward: number;
+        };
+        Insert: {
+          id: string;
+          title: string;
+          exp_reward?: number;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          exp_reward?: number;
+        };
+        Relationships: [];
+      };
+      user_achievements: {
+        Row: {
+          user_id: string;
+          achievement_id: string;
+          unlocked_at: string;
+        };
+        Insert: {
+          user_id: string;
+          achievement_id: string;
+          unlocked_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          achievement_id?: string;
+          unlocked_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
