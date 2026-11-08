@@ -11,7 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@mediapipe/tasks-vision": "^1.1.0",
+    "@mediapipe/tasks-vision": "1.1.0",
     "@supabase/supabase-js": "^2.117.3",
     "chart.js": "^4.5.1",
     "clsx": "^2.1.1",
