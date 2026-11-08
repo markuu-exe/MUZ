@@ -1,0 +1,4 @@
+project_id = "muz"
+
+[db.seed]
+sql_paths = ["./seed.sql"]
