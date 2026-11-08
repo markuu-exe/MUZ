@@ -11,17 +11,6 @@ export interface PoseLandmark extends Vector3D {
   visibility?: number;
 }
 
-export interface PostureMeasurement {
-  elbowAngle: number;
-  wristAngle: number;
-  elbowValid: boolean;
-  wristValid: boolean;
-  shoulder: PoseLandmark;
-  elbow: PoseLandmark;
-  wrist: PoseLandmark;
-  indexRoot: PoseLandmark;
-}
-
 export interface ChordTemplate {
   name: string;
   tones: number[];
