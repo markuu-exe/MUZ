@@ -119,9 +119,6 @@ ctx.onmessage = async (event: MessageEvent<PostureWorkerRequest>) => {
       return;
     case 'CLEAR_CALIBRATION':
       analyzer?.clearCalibration();
-      if (typeof message.frame.close === 'function') {
-        message.frame.close();
-      }
       return;
     case 'RESTORE_CALIBRATION':
       analyzer?.restoreCalibration({
