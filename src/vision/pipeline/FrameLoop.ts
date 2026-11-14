@@ -2,7 +2,11 @@ import { Emitter } from '../core/Emitter';
 import type { PostureWorkerRequest, PostureWorkerResponse } from '../posture/workerProtocol';
 
 export type FrameLoopEvents = {
-  result: Extract<PostureWorkerResponse, { type: 'RESULT' }>;
+  /**
+   * Display time of the analysed video frame on the performance clock, captured
+   * from requestVideoFrameCallback for HUD interpolation.
+   */
+  result: Extract<PostureWorkerResponse, { type: 'RESULT' }> & { captureTimeMs: number };
   error: Extract<PostureWorkerResponse, { type: 'ERROR' }>;
   ready: Extract<PostureWorkerResponse, { type: 'READY' }>;
   stopped: Extract<PostureWorkerResponse, { type: 'STOPPED' }>;
@@ -24,6 +28,7 @@ export class FrameLoop extends Emitter<FrameLoopEvents> {
   private readonly now: () => number;
   private running = false;
   private awaitingResult = false;
+  private inFlightCaptureMs = 0;
   private callbackId: number | null = null;
   private disposed = false;
 
@@ -72,7 +77,7 @@ export class FrameLoop extends Emitter<FrameLoopEvents> {
     this.callbackId = this.video.requestVideoFrameCallback(this.onVideoFrame);
   }
 
-  private onVideoFrame = async (_now: number, metadata: VideoFrameCallbackMetadata): Promise<void> => {
+  private onVideoFrame = async (now: number, metadata: VideoFrameCallbackMetadata): Promise<void> => {
     this.callbackId = null;
     if (!this.running) return;
     this.schedule();
@@ -85,6 +90,7 @@ export class FrameLoop extends Emitter<FrameLoopEvents> {
     }
 
     this.awaitingResult = true;
+    this.inFlightCaptureMs = metadata.expectedDisplayTime || now;
     const message: Extract<PostureWorkerRequest, { type: 'PROCESS' }> = {
       type: 'PROCESS',
       frame,
@@ -100,7 +106,7 @@ export class FrameLoop extends Emitter<FrameLoopEvents> {
     }
     switch (message.type) {
       case 'RESULT':
-        this.emit('result', message);
+        this.emit('result', Object.assign(message, { captureTimeMs: this.inFlightCaptureMs }));
         break;
       case 'ERROR':
         this.emit('error', message);
