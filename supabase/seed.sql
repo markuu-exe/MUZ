@@ -1,6 +1,6 @@
 -- Piano curriculum and badge catalog.
 -- Safe to re-run: existing lesson and achievement rows are updated in place.
--- Chord targets match CHORD_TEMPLATES in src/lib/audio/chromagram.ts (C, G, Am, F).
+-- Chord targets are parsed by src/audio/chords/vocabulary.ts (any "C", "Am", "G_Maj" style name).
 -- Note targets match src/lib/audio/noteFrequencies.ts.
 
 insert into public.lessons (
