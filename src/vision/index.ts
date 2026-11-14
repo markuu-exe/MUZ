@@ -12,3 +12,4 @@ export type { VisionErrorCode } from './errors/VisionError';
 export * from './posture';
 export { FrameLoop } from './pipeline/FrameLoop';
 export type { FrameLoopEvents, FrameLoopOptions } from './pipeline/FrameLoop';
+export * from './hud';
