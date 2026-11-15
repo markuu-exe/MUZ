@@ -14,7 +14,6 @@ import {
   Calendar,
   ShieldCheck,
   Piano,
-  Info,
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -29,9 +28,15 @@ import {
   Filler,
   type ChartOptions,
 } from 'chart.js';
-import { Line, Bar } from 'react-chartjs-2';
+import { Line } from 'react-chartjs-2';
 import type { UserProfile } from '../../types/auth.types';
-import { expProgress } from '../../lib/dashboard/curriculum';
+import type { PerformanceRecord } from '../../types/database.types';
+import { DEMO_CURRICULUM, expProgress } from '../../lib/dashboard/curriculum';
+import {
+  evaluateAchievements,
+  type AchievementCategory,
+  type EvaluatedAchievement,
+} from '../../lib/gamification';
 
 // Register ChartJS modules
 ChartJS.register(
@@ -53,19 +58,47 @@ interface ProfileAnalyticsViewProps {
   userEmail?: string | null;
   masteredCount: number;
   totalLessons: number;
+  exp?: number;
+  streak?: number;
+  longestStreak?: number;
+  badges?: EvaluatedAchievement[];
+  performanceRecords?: PerformanceRecord[];
 }
 
-interface Achievement {
-  id: string;
-  title: string;
-  description: string;
-  category: 'streak' | 'accuracy' | 'theory' | 'posture' | 'technique';
-  unlocked: boolean;
-  unlockedAt?: string;
-  progressText?: string;
-  progressPercent?: number;
-  icon: typeof Trophy;
-  color: string;
+const CATEGORY_STYLE: Record<
+  AchievementCategory,
+  { icon: typeof Trophy; color: string }
+> = {
+  streak: {
+    icon: Flame,
+    color: 'text-amber-400 bg-amber-500/15 border-amber-500/40',
+  },
+  accuracy: {
+    icon: Target,
+    color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/40',
+  },
+  theory: {
+    icon: Award,
+    color: 'text-violet-400 bg-violet-500/15 border-violet-500/40',
+  },
+  posture: {
+    icon: ShieldCheck,
+    color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/40',
+  },
+  technique: {
+    icon: Music,
+    color: 'text-sky-400 bg-sky-500/15 border-sky-500/40',
+  },
+};
+
+function formatUnlockedDate(iso: string | null): string {
+  if (!iso) return 'Unlocked';
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return 'Unlocked';
+  return `Unlocked ${parsed.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  })}`;
 }
 
 export default function ProfileAnalyticsView({
@@ -73,53 +106,89 @@ export default function ProfileAnalyticsView({
   userEmail,
   masteredCount,
   totalLessons,
+  exp: expOverride,
+  streak: streakOverride,
+  longestStreak: longestStreakOverride,
+  badges: badgesOverride,
+  performanceRecords = [],
 }: ProfileAnalyticsViewProps) {
   const [range, setRange] = useState<DateRange>('7d');
 
-  const exp = profile?.exp ?? 1240;
-  const streak = profile?.current_streak ?? 7;
+  const exp = expOverride ?? profile?.exp ?? 1240;
+  const streak = streakOverride ?? profile?.current_streak ?? 7;
+  const longestStreak = Math.max(streak, longestStreakOverride ?? 14);
   const username = profile?.username || userEmail?.split('@')[0] || 'VirtuosoPianist';
   const tier = expProgress(exp);
 
-  // Dynamic statistics based on selected date range
+  // Use provided evaluated badges or compute from current props
+  const achievements = useMemo<EvaluatedAchievement[]>(() => {
+    if (badgesOverride && badgesOverride.length > 0) {
+      return badgesOverride;
+    }
+    const synthCompleted = DEMO_CURRICULUM.slice(0, Math.max(0, masteredCount)).map((l) => l.id);
+    return evaluateAchievements({
+      exp,
+      currentStreak: streak,
+      longestStreak,
+      completedLessonIds: synthCompleted,
+      lessons: DEMO_CURRICULUM,
+      performanceRecords,
+      bestAccuracyPercent: masteredCount > 0 ? 100 : 0,
+      bestPostureScore: masteredCount > 0 ? 96 : 0,
+      bestRhythmConsistency: masteredCount > 0 ? 94 : 0,
+    }).badges;
+  }, [badgesOverride, exp, streak, longestStreak, masteredCount, performanceRecords]);
+
+  const unlockedCount = useMemo(
+    () => achievements.filter((a) => a.unlocked).length,
+    [achievements],
+  );
+
+  // Dynamic statistics based on selected date range & live progression
   const summaryStats = useMemo(() => {
+    const extraMinutes = Math.round(
+      performanceRecords.reduce((acc, r) => acc + (r.drill_duration_sec || 0), 0) / 60,
+    );
+    const completionPct =
+      totalLessons > 0 ? Math.round((masteredCount / totalLessons) * 100) : 0;
+
     switch (range) {
       case '7d':
         return {
-          practiceTime: '14.2 hrs',
-          practiceSub: '+2.4 hrs vs previous week',
-          lessonsComplete: `${Math.min(12, masteredCount || 10)} Nodes`,
-          lessonsSub: '8 completed this week',
-          longestStreak: '14 Days',
-          longestSub: `Current: ${streak} Days active`,
+          practiceTime: `${(14.2 + extraMinutes / 60).toFixed(1)} hrs`,
+          practiceSub: `+${Math.max(2.4, +(extraMinutes / 60 + 2.4).toFixed(1))} hrs vs previous week`,
+          lessonsComplete: `${masteredCount} Nodes`,
+          lessonsSub: `${Math.min(masteredCount, 8)} completed this week`,
+          longestStreak: `${longestStreak} Days`,
+          longestSub: `Current: ${streak} ${streak === 1 ? 'Day' : 'Days'} active`,
           avgDevSpeed: '116 BPM',
           avgSpeedSub: '+6 BPM tempo velocity',
         };
       case '30d':
         return {
-          practiceTime: '48.5 hrs',
+          practiceTime: `${(48.5 + extraMinutes / 60).toFixed(1)} hrs`,
           practiceSub: '+11.2 hrs vs last month',
-          lessonsComplete: `${Math.min(28, (masteredCount || 10) * 2)} Nodes`,
-          lessonsSub: 'Active curriculum progression',
-          longestStreak: '14 Days',
-          longestSub: 'Achieved Oct 24',
+          lessonsComplete: `${masteredCount} / ${totalLessons} Nodes`,
+          lessonsSub: `Active curriculum progression (${completionPct}%)`,
+          longestStreak: `${longestStreak} Days`,
+          longestSub: `Current: ${streak} ${streak === 1 ? 'Day' : 'Days'} active`,
           avgDevSpeed: '108 BPM',
           avgSpeedSub: 'Consistent metric velocity',
         };
       case 'all':
       default:
         return {
-          practiceTime: '142.8 hrs',
+          practiceTime: `${(142.8 + extraMinutes / 60).toFixed(1)} hrs`,
           practiceSub: 'Total lifetime practice',
-          lessonsComplete: `${masteredCount || 14} / ${totalLessons || 24} Nodes`,
-          lessonsSub: 'Curriculum completion: 58%',
-          longestStreak: '14 Days',
+          lessonsComplete: `${masteredCount} / ${totalLessons} Nodes`,
+          lessonsSub: `Curriculum completion: ${completionPct}%`,
+          longestStreak: `${longestStreak} Days`,
           longestSub: 'All-time personal record',
           avgDevSpeed: '102 BPM',
           avgSpeedSub: 'Overall mean tempo speed',
         };
     }
-  }, [range, masteredCount, totalLessons, streak]);
+  }, [range, masteredCount, totalLessons, streak, longestStreak, performanceRecords]);
 
   // Chart datasets adjusted for selected date range
   const chartDatasets = useMemo(() => {
@@ -164,7 +233,7 @@ export default function ProfileAnalyticsView({
           labels,
           data: [92, 94, 95, 97],
           average: '95.1%',
-          note: 'Elbow 85°-105° posture verified',
+          note: 'Elbow 80°-110° posture verified',
         },
       };
     } else {
@@ -285,94 +354,6 @@ export default function ProfileAnalyticsView({
     ],
   };
 
-  // Milestone Achievements with distinct Unlocked vs Locked visual states
-  const achievements: Achievement[] = [
-    {
-      id: 'ach-1',
-      title: '7-Day Streak',
-      description: 'Logged consecutive practice sessions for 7 days without interruption.',
-      category: 'streak',
-      unlocked: true,
-      unlockedAt: 'Unlocked Nov 2',
-      icon: Flame,
-      color: 'text-amber-400 bg-amber-500/15 border-amber-500/40',
-    },
-    {
-      id: 'ach-2',
-      title: 'Perfect Score',
-      description: 'Achieved 100% pitch accuracy on an entire practice drill.',
-      category: 'accuracy',
-      unlocked: true,
-      unlockedAt: 'Unlocked Oct 29',
-      icon: Target,
-      color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/40',
-    },
-    {
-      id: 'ach-3',
-      title: 'Theory Master',
-      description: 'Completed all 5 core keyboard theory and stave reading units.',
-      category: 'theory',
-      unlocked: true,
-      unlockedAt: 'Unlocked Oct 22',
-      icon: Award,
-      color: 'text-violet-400 bg-violet-500/15 border-violet-500/40',
-    },
-    {
-      id: 'ach-4',
-      title: 'Metronome Master',
-      description: 'Kept note latency jitter under 15ms over 60 continuous seconds.',
-      category: 'technique',
-      unlocked: true,
-      unlockedAt: 'Unlocked Nov 1',
-      icon: Music,
-      color: 'text-sky-400 bg-sky-500/15 border-sky-500/40',
-    },
-    {
-      id: 'ach-5',
-      title: 'Posture Perfectionist',
-      description: 'Maintained 95%+ posture compliance over 10 consecutive sessions.',
-      category: 'posture',
-      unlocked: false,
-      progressText: '7 of 10 sessions logged',
-      progressPercent: 70,
-      icon: ShieldCheck,
-      color: 'text-emerald-400',
-    },
-    {
-      id: 'ach-6',
-      title: 'Polyphonic Prodigy',
-      description: 'Execute a four-bar two-hand independent harmony drill.',
-      category: 'technique',
-      unlocked: false,
-      progressText: 'Prerequisite: Module 2 Node 1',
-      progressPercent: 40,
-      icon: Piano,
-      color: 'text-violet-400',
-    },
-    {
-      id: 'ach-7',
-      title: 'Velocity Virtuoso',
-      description: 'Perform a full C-Major octave run at 140 BPM with zero dropped notes.',
-      category: 'technique',
-      unlocked: false,
-      progressText: 'Best tempo: 116 BPM',
-      progressPercent: 65,
-      icon: Zap,
-      color: 'text-amber-400',
-    },
-    {
-      id: 'ach-8',
-      title: 'Grand Maestro',
-      description: 'Master all 24 curriculum nodes and achieve Gold tier standing.',
-      category: 'theory',
-      unlocked: false,
-      progressText: `${masteredCount || 10} / ${totalLessons || 24} nodes mastered`,
-      progressPercent: Math.round(((masteredCount || 10) / (totalLessons || 24)) * 100),
-      icon: Trophy,
-      color: 'text-rose-400',
-    },
-  ];
-
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 pb-32">
       {/* 1. Profile Hero & Date Range Filter Section */}
@@ -396,11 +377,13 @@ export default function ProfileAnalyticsView({
                   {tier.label}
                 </span>
                 <span className="rounded-full border border-slate-700 bg-slate-800/80 px-2.5 py-0.5 text-xs text-slate-300">
+                  <Piano className="mr-1 inline h-3 w-3" />
                   Acoustic Piano
                 </span>
               </div>
               <p className="mt-1 text-sm text-slate-400">
-                {userEmail || `${username.toLowerCase()}@muz-practice.ai`} · Member of MUZ Studio
+                {userEmail || `${username.toLowerCase()}@muz-practice.ai`} ·{' '}
+                <strong className="text-violet-300">{exp.toLocaleString()} XP</strong> Total
               </p>
             </div>
           </div>
@@ -597,30 +580,32 @@ export default function ProfileAnalyticsView({
         </div>
       </section>
 
-      {/* 4. Achievements Section */}
+      {/* 4. Milestone Achievement Badges Section */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold text-white">Milestone Achievements</h2>
             <p className="text-xs text-slate-400">
-              Badges earned through consistent practice, pitch accuracy, and motor discipline.
+              Badges earned through daily practice streaks, EXP milestones, pitch accuracy, and ergonomic posture.
             </p>
           </div>
-          <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-300">
-            {achievements.filter((a) => a.unlocked).length} / {achievements.length} Unlocked
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3.5 py-1 text-xs font-bold text-amber-300">
+            <Trophy className="h-3.5 w-3.5 text-amber-400" />
+            {unlockedCount} / {achievements.length} Unlocked
           </span>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {achievements.map((badge) => {
-            const Icon = badge.icon;
+            const catStyle = CATEGORY_STYLE[badge.category] ?? CATEGORY_STYLE.theory;
+            const Icon = catStyle.icon;
             return (
               <div
                 key={badge.id}
                 className={`relative flex flex-col justify-between overflow-hidden rounded-2xl border p-5 transition-all ${
                   badge.unlocked
                     ? 'border-amber-500/40 bg-gradient-to-br from-amber-500/10 via-slate-900 to-slate-950 shadow-[0_4px_20px_rgba(245,158,11,0.12)] hover:border-amber-400/70 hover:scale-[1.02]'
-                    : 'border-slate-800/80 bg-slate-950/70 opacity-65 hover:opacity-85'
+                    : 'border-slate-800/80 bg-slate-950/70 opacity-70 hover:opacity-90'
                 }`}
               >
                 <div>
@@ -628,29 +613,34 @@ export default function ProfileAnalyticsView({
                     <div
                       className={`flex h-11 w-11 items-center justify-center rounded-xl border ${
                         badge.unlocked
-                          ? badge.color
+                          ? catStyle.color
                           : 'border-slate-800 bg-slate-900 text-slate-600'
                       }`}
                     >
                       <Icon className="h-5 w-5" />
                     </div>
 
-                    {badge.unlocked ? (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-300">
-                        <CheckCircle2 className="h-3 w-3" />
-                        Unlocked
+                    <div className="flex flex-col items-end gap-1">
+                      {badge.unlocked ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-300">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Unlocked
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-800 px-2 py-0.5 text-[10px] font-semibold text-slate-400">
+                          <Lock className="h-3 w-3" />
+                          Locked
+                        </span>
+                      )}
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-violet-300">
+                        <Sparkles className="h-2.5 w-2.5" />+{badge.expReward} XP
                       </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-800 px-2 py-0.5 text-[10px] font-semibold text-slate-400">
-                        <Lock className="h-3 w-3" />
-                        Locked
-                      </span>
-                    )}
+                    </div>
                   </div>
 
                   <h3
                     className={`mt-3 text-sm font-bold ${
-                      badge.unlocked ? 'text-white' : 'text-slate-400'
+                      badge.unlocked ? 'text-white' : 'text-slate-300'
                     }`}
                   >
                     {badge.title}
@@ -662,25 +652,22 @@ export default function ProfileAnalyticsView({
 
                 <div className="mt-4 pt-3 border-t border-slate-800/80">
                   {badge.unlocked ? (
-                    <span className="text-[11px] font-semibold text-amber-400/90">
-                      {badge.unlockedAt}
-                    </span>
+                    <div className="flex items-center justify-between text-[11px] font-semibold text-amber-400/90">
+                      <span>{formatUnlockedDate(badge.unlockedAt)}</span>
+                      <span>+{badge.expReward} EXP Earned</span>
+                    </div>
                   ) : (
                     <div>
                       <div className="flex justify-between text-[11px] text-slate-400">
-                        <span className="truncate">{badge.progressText}</span>
-                        {badge.progressPercent !== undefined && (
-                          <span className="font-semibold tabular-nums">{badge.progressPercent}%</span>
-                        )}
+                        <span className="truncate pr-2">{badge.progressText}</span>
+                        <span className="font-semibold tabular-nums">{badge.progressPercent}%</span>
                       </div>
-                      {badge.progressPercent !== undefined && (
-                        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
-                          <div
-                            className="h-full rounded-full bg-slate-500"
-                            style={{ width: `${badge.progressPercent}%` }}
-                          />
-                        </div>
-                      )}
+                      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
+                        <div
+                          className="h-full rounded-full bg-violet-500/70 transition-all duration-300"
+                          style={{ width: `${badge.progressPercent}%` }}
+                        />
+                      </div>
                     </div>
                   )}
                 </div>

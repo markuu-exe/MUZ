@@ -5,38 +5,37 @@ import {
   GitBranch,
   Heart,
   LogOut,
-  Music2,
   Piano,
   Settings,
   UserRound,
   Play,
   RotateCcw,
   Sparkles,
-  ShieldAlert,
   CheckCircle2,
   Sliders,
   Volume2,
   Camera,
   Layers,
-  ChevronRight,
-  Flame,
+  Trophy,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useDashboardData } from '../../hooks/useDashboardData';
+import { useGamification } from '../../hooks/useGamification';
 import { useHeartRegen } from '../../hooks/useHeartRegen';
 import { cn } from '../../lib/cn';
 import {
   displayNameFromProfile,
   expProgress,
-  groupByModule,
   nodeStatus,
   type CurriculumNode,
   type DashboardView,
   type NodeStatus,
 } from '../../lib/dashboard/curriculum';
+import { canStartLessonWithHearts, nodeBaseExpReward } from '../../lib/gamification';
 import DashboardHud from './DashboardHud';
 import SkillTreeView from './SkillTreeView';
 import ProfileAnalyticsView from './ProfileAnalyticsView';
+import LessonSessionModal from './LessonSessionModal';
 
 interface NavItem {
   id: DashboardView;
@@ -53,37 +52,55 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export default function DashboardScreen() {
-  const { user, profile, isDemo, signOut } = useAuth();
+  const { user, profile, isDemo, signOut, refreshProfile } = useAuth();
   const data = useDashboardData(profile, isDemo);
+  const gamification = useGamification(
+    profile,
+    isDemo,
+    data.lessons,
+    data.progress,
+    refreshProfile,
+  );
+
   const [view, setView] = useState<DashboardView>('skill-tree');
-  const [banner, setBanner] = useState<{ message: string; type: 'warning' | 'error' | 'info' } | null>(null);
+  const [banner, setBanner] = useState<{
+    message: string;
+    type: 'warning' | 'error' | 'info';
+  } | null>(null);
   const [shakingId, setShakingId] = useState<string | null>(null);
   const [selected, setSelected] = useState<CurriculumNode | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<NodeStatus | null>(null);
+  const [activeSessionNode, setActiveSessionNode] = useState<CurriculumNode | null>(null);
   const [lessonFilter, setLessonFilter] = useState<'all' | 'theory' | 'practice' | 'rhythm'>('all');
 
-  const hearts = profile?.hearts ?? 4;
-  const streak = profile?.current_streak ?? 7;
-  const exp = profile?.exp ?? 1240;
+  const { hearts, currentStreak: streak, exp, progressMap } = gamification;
   const username = displayNameFromProfile(profile, user?.email);
   const progressMeta = expProgress(exp);
-  const regen = useHeartRegen(profile?.id ?? user?.id, hearts);
-
-  const masteredCount = useMemo(
-    () => data.lessons.filter((lesson) => data.progress[lesson.id]?.completed).length,
-    [data.lessons, data.progress],
+  const regen = useHeartRegen(
+    profile?.id ?? user?.id,
+    hearts,
+    (restoredCount) => {
+      gamification.restoreHearts(restoredCount, 'regen');
+      setBanner({
+        message: `+${restoredCount} Stamina Heart regenerated! You now have ${Math.min(5, hearts + restoredCount)}/5 Hearts.`,
+        type: 'info',
+      });
+    },
   );
 
-  const currentNode = useMemo(() => {
-    const modules = groupByModule(data.lessons);
-    for (const group of modules) {
-      const found = group.lessons.find((lesson, index) => {
-        return nodeStatus(lesson, index, group.lessons, data.progress, exp, data.lessons) === 'current';
-      });
-      if (found) return found;
-    }
-    return null;
-  }, [data.lessons, data.progress, exp]);
+  const masteredCount = useMemo(
+    () => data.lessons.filter((lesson) => progressMap[lesson.id]?.completed).length,
+    [data.lessons, progressMap],
+  );
+
+  // First unlocked Theory lesson (used for instant 0-heart recovery)
+  const recoveryTheoryLesson = useMemo(() => {
+    return (
+      data.lessons.find((l) => l.kind === 'theory' && progressMap[l.id]?.completed) ??
+      data.lessons.find((l) => l.kind === 'theory') ??
+      null
+    );
+  }, [data.lessons, progressMap]);
 
   // Click handler for Skill Tree & Lesson nodes
   const handleSelect = (lesson: CurriculumNode, status: NodeStatus) => {
@@ -106,13 +123,16 @@ export default function DashboardScreen() {
       return;
     }
 
-    if (hearts === 0 && lesson.kind !== 'theory') {
+    const heartCheck = canStartLessonWithHearts(hearts, lesson.kind);
+    if (!heartCheck.allowed) {
       setSelected(null);
       setSelectedStatus(null);
       setShakingId(lesson.id);
       window.setTimeout(() => setShakingId(null), 500);
       setBanner({
-        message: 'No Stamina Hearts remaining! Complete a free Theory unit or wait for your heart regeneration.',
+        message:
+          heartCheck.reason ??
+          'No Stamina Hearts remaining! Complete a free Theory unit or wait for your heart regeneration.',
         type: 'error',
       });
       return;
@@ -181,7 +201,9 @@ export default function DashboardScreen() {
                   <div
                     className={cn(
                       'flex h-8 w-8 items-center justify-center rounded-xl transition-colors',
-                      active ? 'bg-violet-600 text-white' : 'bg-slate-800/80 text-slate-400 group-hover:text-slate-200',
+                      active
+                        ? 'bg-violet-600 text-white'
+                        : 'bg-slate-800/80 text-slate-400 group-hover:text-slate-200',
                     )}
                   >
                     <Icon className="h-4 w-4" />
@@ -261,8 +283,32 @@ export default function DashboardScreen() {
             streak={streak}
             exp={exp}
             nextHeartLabel={regen.label}
+            practicedToday={gamification.practicedToday}
+            streakAtRisk={gamification.streakAtRisk}
           />
         </header>
+
+        {/* Newly Unlocked Achievement Banner */}
+        {gamification.newlyUnlockedBadges.length > 0 && (
+          <div className="flex items-center justify-between border-b border-amber-500/40 bg-gradient-to-r from-amber-500/20 via-slate-900 to-amber-500/15 px-8 py-3 text-sm font-semibold text-amber-200">
+            <div className="flex items-center gap-3">
+              <Trophy className="h-5 w-5 shrink-0 text-amber-400" />
+              <span>
+                Achievement Unlocked:{' '}
+                {gamification.newlyUnlockedBadges
+                  .map((b) => `"${b.title}" (+${b.expReward} XP)`)
+                  .join(', ')}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={gamification.dismissNewlyUnlockedBadges}
+              className="rounded-lg px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-amber-300 hover:text-white"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {/* Global Warning / Locked Node Notification Banner */}
         {banner && (
@@ -295,11 +341,23 @@ export default function DashboardScreen() {
         {/* Depleted Stamina Notification Bar */}
         {hearts === 0 && !banner && (
           <div className="flex items-center justify-between border-b border-rose-500/30 bg-rose-500/15 px-8 py-2.5 text-xs text-rose-100">
-            <div className="flex items-center gap-2 font-medium">
+            <div className="flex items-center gap-3 font-medium">
               <Heart className="h-4 w-4 fill-rose-500 text-rose-500" />
               <span>
-                <strong>0 Hearts remaining:</strong> Practice drills are locked. Play a Theory lesson to recover stamina immediately.
+                <strong>0 Hearts remaining:</strong> Practice drills are locked. Play a free Theory lesson (≥80%) to recover +1 Heart immediately.
               </span>
+              {recoveryTheoryLesson && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelected(recoveryTheoryLesson);
+                    setActiveSessionNode(recoveryTheoryLesson);
+                  }}
+                  className="rounded-lg border border-emerald-400/40 bg-emerald-500/20 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-200 hover:bg-emerald-500/30"
+                >
+                  Start Free Theory Lesson
+                </button>
+              )}
             </div>
             <span className="font-bold uppercase tracking-wider text-rose-300">
               Next Heart in {regen.label}
@@ -313,7 +371,7 @@ export default function DashboardScreen() {
           {view === 'skill-tree' && (
             <SkillTreeView
               lessons={data.lessons}
-              progress={data.progress}
+              progress={progressMap}
               exp={exp}
               hearts={hearts}
               shakingId={shakingId}
@@ -329,6 +387,11 @@ export default function DashboardScreen() {
               userEmail={user?.email}
               masteredCount={masteredCount}
               totalLessons={data.lessons.length}
+              exp={exp}
+              streak={streak}
+              longestStreak={gamification.longestStreak}
+              badges={gamification.badges}
+              performanceRecords={gamification.performanceRecords}
             />
           )}
 
@@ -372,7 +435,7 @@ export default function DashboardScreen() {
                     lesson,
                     moduleLessons.findIndex((item) => item.id === lesson.id),
                     moduleLessons,
-                    data.progress,
+                    progressMap,
                     exp,
                     data.lessons,
                   );
@@ -408,9 +471,12 @@ export default function DashboardScreen() {
                         <span
                           className={cn(
                             'inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider',
-                            status === 'mastered' && 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
-                            status === 'current' && 'bg-violet-500/20 text-violet-300 border border-violet-500/40',
-                            status === 'locked' && 'bg-slate-800 text-slate-400 border border-slate-700',
+                            status === 'mastered' &&
+                              'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
+                            status === 'current' &&
+                              'bg-violet-500/20 text-violet-300 border border-violet-500/40',
+                            status === 'locked' &&
+                              'bg-slate-800 text-slate-400 border border-slate-700',
                           )}
                         >
                           {status === 'mastered' && <CheckCircle2 className="h-3.5 w-3.5" />}
@@ -434,7 +500,9 @@ export default function DashboardScreen() {
                   </div>
                   <div>
                     <h2 className="text-lg font-bold text-white">Audio & Posture Calibration</h2>
-                    <p className="text-xs text-slate-400">Configure your local sensors and acoustic analysis.</p>
+                    <p className="text-xs text-slate-400">
+                      Configure your local sensors and acoustic analysis.
+                    </p>
                   </div>
                 </div>
 
@@ -443,8 +511,12 @@ export default function DashboardScreen() {
                     <div className="flex items-center gap-3">
                       <Volume2 className="h-5 w-5 text-violet-400" />
                       <div>
-                        <p className="text-sm font-semibold text-white">Chromagram Pitch Tracking</p>
-                        <p className="text-xs text-slate-400">Browser WASM pitch latch window (400ms buffer).</p>
+                        <p className="text-sm font-semibold text-white">
+                          Chromagram Pitch Tracking
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          Browser WASM pitch latch window (400ms buffer).
+                        </p>
                       </div>
                     </div>
                     <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-400 border border-emerald-500/30">
@@ -456,8 +528,12 @@ export default function DashboardScreen() {
                     <div className="flex items-center gap-3">
                       <Camera className="h-5 w-5 text-emerald-400" />
                       <div>
-                        <p className="text-sm font-semibold text-white">MediaPipe Hand & Wrist Pose Lock</p>
-                        <p className="text-xs text-slate-400">Ergonomic verification for piano practice posture.</p>
+                        <p className="text-sm font-semibold text-white">
+                          MediaPipe Hand & Wrist Pose Lock
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          Ergonomic verification for piano practice posture.
+                        </p>
                       </div>
                     </div>
                     <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-400 border border-emerald-500/30">
@@ -470,7 +546,9 @@ export default function DashboardScreen() {
                       <Layers className="h-5 w-5 text-cyan-400" />
                       <div>
                         <p className="text-sm font-semibold text-white">Active Instrument Track</p>
-                        <p className="text-xs text-slate-400">Curriculum is calibrated for 88-key Acoustic Piano.</p>
+                        <p className="text-xs text-slate-400">
+                          Curriculum is calibrated for 88-key Acoustic Piano.
+                        </p>
                       </div>
                     </div>
                     <span className="text-xs font-bold text-slate-300">Acoustic Piano</span>
@@ -538,22 +616,22 @@ export default function DashboardScreen() {
                   <div className="flex items-center gap-3 text-xs text-slate-300">
                     <span className="flex items-center gap-1">
                       <Sparkles className="h-3.5 w-3.5 text-violet-400" />
-                      +{selected.required_exp ? Math.max(50, Math.round(selected.required_exp / 4)) : 50} EXP
+                      +{nodeBaseExpReward(selected)} EXP
                     </span>
                     <span>·</span>
                     <span className="flex items-center gap-1">
                       <Heart className="h-3.5 w-3.5 text-rose-400" />
-                      {selected.kind === 'theory' ? 'Free Stamina' : '1 Heart Cost'}
+                      {selected.kind === 'theory'
+                        ? 'Free Stamina (+1 Heart ≥80%)'
+                        : '1 Heart at Risk'}
                     </span>
                   </div>
 
                   <button
                     type="button"
                     onClick={() => {
-                      setBanner({
-                        message: `Starting ${selected.title} practice session... Launching dual-stream audio & pose engine.`,
-                        type: 'info',
-                      });
+                      setBanner(null);
+                      setActiveSessionNode(selected);
                     }}
                     className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(139,92,246,0.4)] hover:brightness-110 active:scale-95 transition-all"
                   >
@@ -575,6 +653,34 @@ export default function DashboardScreen() {
           )}
         </main>
       </div>
+
+      {/* =========================================================================
+          INTERACTIVE LESSON / PRACTICE / RHYTHM SESSION MODAL
+          ========================================================================= */}
+      {activeSessionNode && (
+        <LessonSessionModal
+          lesson={activeSessionNode}
+          hearts={hearts}
+          streak={streak}
+          exp={exp}
+          nextHeartLabel={regen.label}
+          onClose={() => {
+            setActiveSessionNode(null);
+            setSelected(null);
+            setSelectedStatus(null);
+          }}
+          onComplete={(params) => gamification.completeLessonSession(params)}
+          onLoseHeart={(reason) => gamification.depleteHeartForDrill(reason)}
+          onSwitchToTheory={
+            recoveryTheoryLesson
+              ? () => {
+                  setActiveSessionNode(recoveryTheoryLesson);
+                  setSelected(recoveryTheoryLesson);
+                }
+              : undefined
+          }
+        />
+      )}
     </div>
   );
 }

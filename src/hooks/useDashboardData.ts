@@ -24,9 +24,14 @@ function asProgressMap(
     if (!row.lesson_id) continue;
     map[row.lesson_id] = {
       id: row.id ?? row.lesson_id,
-      profile_id: row.profile_id ?? '',
+      user_id: row.user_id ?? row.profile_id ?? '',
+      profile_id: row.profile_id ?? row.user_id ?? '',
       lesson_id: row.lesson_id,
       completed: Boolean(row.completed),
+      accuracy_percentage: row.accuracy_percentage ?? (row.completed ? 100 : 0),
+      posture_stability_score: row.posture_stability_score ?? (row.completed ? 94 : 0),
+      unlocked_at: row.unlocked_at ?? row.created_at ?? null,
+      completed_at: row.completed_at ?? row.updated_at ?? null,
       created_at: row.created_at ?? null,
       updated_at: row.updated_at ?? null,
     };
@@ -54,15 +59,28 @@ export function useDashboardData(profile: UserProfile | null, isDemo: boolean): 
     const load = async () => {
       setLoading(true);
       try {
-        const [{ data: lessonRows, error: lessonError }, progressResult] = await Promise.all([
-          supabase.from('lessons').select('*').eq('instrument', 'piano').order('module_index').order('node_index'),
-          supabase.from('user_progress').select('*').eq('profile_id', profile.id),
+        const [{ data: lessonRows, error: lessonError }, progressByUser] = await Promise.all([
+          supabase
+            .from('lessons')
+            .select('*')
+            .eq('instrument', 'piano')
+            .order('module_index')
+            .order('node_index'),
+          supabase.from('user_progress').select('*').eq('user_id', profile.id),
         ]);
 
         if (cancelled) return;
 
+        let remoteProgress = (progressByUser.data ?? []) as UserProgress[];
+        if (progressByUser.error && remoteProgress.length === 0) {
+          const fallbackProgress = await supabase
+            .from('user_progress')
+            .select('*')
+            .eq('profile_id', profile.id);
+          remoteProgress = (fallbackProgress.data ?? []) as UserProgress[];
+        }
+
         const remoteLessons = lessonRows ?? [];
-        const remoteProgress = (progressResult.data ?? []) as UserProgress[];
 
         if (lessonError || remoteLessons.length === 0) {
           setLessons(DEMO_CURRICULUM);
@@ -71,8 +89,13 @@ export function useDashboardData(profile: UserProfile | null, isDemo: boolean): 
           return;
         }
 
-        setLessons(remoteLessons.map((lesson) => toCurriculumNode(lesson)));
-        setProgress(asProgressMap(remoteProgress));
+        const progressMap = asProgressMap(remoteProgress);
+        setLessons(
+          remoteLessons.map((lesson) =>
+            toCurriculumNode(lesson, progressMap[lesson.id] as UserProgress | undefined),
+          ),
+        );
+        setProgress(progressMap);
         setUsingFallback(false);
       } catch {
         if (cancelled) return;
