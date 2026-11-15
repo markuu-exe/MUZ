@@ -18,6 +18,21 @@ import { HUD_STRIDE, type PostureWorkerRequest, type PostureWorkerResponse } fro
 const ctx = self as unknown as {
   postMessage(message: PostureWorkerResponse, transfer: Transferable[]): void;
   onmessage: ((event: MessageEvent<PostureWorkerRequest>) => void) | null;
+  import?: (url: string) => Promise<void>;
+};
+
+// MediaPipe loads its wasm loader with importScripts, which throws in a module
+// worker; its fallback then import()s the loader, but the loader is a UMD
+// script whose top-level `var ModuleFactory` stays module-scoped that way, so
+// `self.ModuleFactory` is never set ("ModuleFactory not set.", KAN-248). The
+// resolver checks for a `self.import` hook before falling back, so give it one
+// that evaluates the loader in the worker's global scope. Indirect eval is
+// required: only global-scope evaluation turns the loader's `var` declarations
+// into the globals MediaPipe reads.
+ctx.import = async (url: string) => {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status}`);
+  (0, eval)(await res.text());
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
