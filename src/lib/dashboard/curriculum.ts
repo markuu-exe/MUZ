@@ -1,3 +1,13 @@
+/**
+ * Dashboard view of the course (COURSE-2).
+ *
+ * The curriculum now comes from src/content (the same source that generates
+ * supabase/seed.sql), so the offline/demo tree and the database can no longer
+ * disagree. Lesson kind is derived from the payload's stages, never guessed
+ * from the title.
+ */
+import { COURSE_LESSONS, COURSE_UNITS, TIERS, lessonBadge, lessonExp } from '../../content';
+import { isLessonPayload, type Tier } from '../../types/lesson.types';
 import type { Lesson, UserProgress } from '../../types/database.types';
 import type { UserProfile } from '../../types/auth.types';
 
@@ -5,10 +15,20 @@ export type LessonKind = 'theory' | 'practice' | 'rhythm';
 export type NodeStatus = 'mastered' | 'current' | 'locked';
 export type DashboardView = 'skill-tree' | 'lessons' | 'profile' | 'settings';
 
+/** Minimal progress row the dashboard needs. */
+export type ProgressLike = Pick<UserProgress, 'lesson_id' | 'completed'> &
+  Partial<Pick<UserProgress, 'accuracy_percentage' | 'posture_stability_score'>>;
+export type ProgressMap = Record<string, UserProgress | ProgressLike>;
+
 export interface CurriculumNode extends Lesson {
   kind: LessonKind;
+  tier: Tier | null;
+  isCheckpoint: boolean;
+  /** Stages in the lesson (shown as "x of y units"). */
   unitCount?: number;
   unitCompleted?: number;
+  /** EXP awarded on completion. */
+  expReward: number;
 }
 
 export const DEMO_PROFILE_OVERRIDES = {
@@ -17,160 +37,6 @@ export const DEMO_PROFILE_OVERRIDES = {
   hearts: 4,
 } as const;
 
-export const DEMO_CURRICULUM: CurriculumNode[] = [
-  {
-    id: 'pno-mod1-node1',
-    instrument: 'piano',
-    module_index: 1,
-    node_index: 1,
-    title: 'Note Reading',
-    description: 'Identify notes on the treble stave and match them to piano keys.',
-    required_exp: 0,
-    payload: { lessonType: 'theory', unitCount: 4, unitCompleted: 4 },
-    kind: 'theory',
-    unitCount: 4,
-    unitCompleted: 4,
-  },
-  {
-    id: 'pno-mod1-node2',
-    instrument: 'piano',
-    module_index: 1,
-    node_index: 2,
-    title: 'Basic Scales',
-    description: 'Play C major with consistent finger numbering and even timing.',
-    required_exp: 50,
-    payload: { lessonType: 'practice', unitCount: 3, unitCompleted: 3 },
-    kind: 'practice',
-    unitCount: 3,
-    unitCompleted: 3,
-  },
-  {
-    id: 'pno-mod1-node3',
-    instrument: 'piano',
-    module_index: 1,
-    node_index: 3,
-    title: 'Finger Positioning',
-    description: 'Hold a relaxed curved-hand posture while tapping the home-position rhythm.',
-    required_exp: 120,
-    payload: { lessonType: 'rhythm', unitCount: 5, unitCompleted: 2 },
-    kind: 'rhythm',
-    unitCount: 5,
-    unitCompleted: 2,
-  },
-  {
-    id: 'pno-mod1-node4',
-    instrument: 'piano',
-    module_index: 1,
-    node_index: 4,
-    title: 'Simple Chords',
-    description: 'Build C, G, and F major triads from stacked thirds.',
-    required_exp: 220,
-    payload: { lessonType: 'theory', unitCount: 4, unitCompleted: 0 },
-    kind: 'theory',
-    unitCount: 4,
-    unitCompleted: 0,
-  },
-  {
-    id: 'pno-mod1-node5',
-    instrument: 'piano',
-    module_index: 1,
-    node_index: 5,
-    title: 'Chord Progressions',
-    description: 'Practice I–V–vi–IV with both hands and posture lock.',
-    required_exp: 350,
-    payload: { lessonType: 'practice', unitCount: 3, unitCompleted: 0 },
-    kind: 'practice',
-    unitCount: 3,
-    unitCompleted: 0,
-  },
-  {
-    id: 'pno-mod2-node1',
-    instrument: 'piano',
-    module_index: 2,
-    node_index: 1,
-    title: 'Hands Together Coordination',
-    description: 'Coordinate independent left-hand bass lines with right-hand melodic phrases.',
-    required_exp: 500,
-    payload: { lessonType: 'practice', unitCount: 4, unitCompleted: 0 },
-    kind: 'practice',
-    unitCount: 4,
-    unitCompleted: 0,
-  },
-  {
-    id: 'pno-mod2-node2',
-    instrument: 'piano',
-    module_index: 2,
-    node_index: 2,
-    title: 'Broken Chords & Arpeggios',
-    description: 'Roll fluid arpeggios across octaves while keeping strict pulse timing.',
-    required_exp: 700,
-    payload: { lessonType: 'practice', unitCount: 3, unitCompleted: 0 },
-    kind: 'practice',
-    unitCount: 3,
-    unitCompleted: 0,
-  },
-  {
-    id: 'pno-mod2-node3',
-    instrument: 'piano',
-    module_index: 2,
-    node_index: 3,
-    title: 'Syncopated Rhythm Flow',
-    description: 'Practice off-beat accent patterns and swing meter pulse latching.',
-    required_exp: 950,
-    payload: { lessonType: 'rhythm', unitCount: 4, unitCompleted: 0 },
-    kind: 'rhythm',
-    unitCount: 4,
-    unitCompleted: 0,
-  },
-  {
-    id: 'pno-mod3-node1',
-    instrument: 'piano',
-    module_index: 3,
-    node_index: 1,
-    title: 'Bach Two-Part Contrapuntal Study',
-    description: 'Master independent polyphonic voices and precise Baroque ornamentation.',
-    required_exp: 1400,
-    payload: { lessonType: 'practice', unitCount: 4, unitCompleted: 0 },
-    kind: 'practice',
-    unitCount: 4,
-    unitCompleted: 0,
-  },
-  {
-    id: 'pno-mod3-node2',
-    instrument: 'piano',
-    module_index: 3,
-    node_index: 2,
-    title: 'High-Tempo Virtuoso Scales',
-    description: 'Achieve 140+ BPM clean scalar velocity across two octaves.',
-    required_exp: 1800,
-    payload: { lessonType: 'practice', unitCount: 5, unitCompleted: 0 },
-    kind: 'practice',
-    unitCount: 5,
-    unitCompleted: 0,
-  },
-];
-
-export const DEMO_PROGRESS: Record<string, Pick<UserProgress, 'lesson_id' | 'completed'>> = {
-  'pno-mod1-node1': { lesson_id: 'pno-mod1-node1', completed: true },
-  'pno-mod1-node2': { lesson_id: 'pno-mod1-node2', completed: true },
-  'pno-mod1-node3': { lesson_id: 'pno-mod1-node3', completed: false },
-};
-
-export const MODULE_COPY: Record<number, { title: string; blurb: string }> = {
-  1: {
-    title: 'Module 1: Fundamentals of Keyboard Mastery',
-    blurb: 'Learn keys, stave lines, and essential finger drills.',
-  },
-  2: {
-    title: 'Module 2: Harmony and Two-Hand Coordination',
-    blurb: 'Unlock after finishing Module 1. Hands-together piano fluency.',
-  },
-  3: {
-    title: 'Module 3: Advanced Polyphony & Velocity',
-    blurb: 'Counterpoint independence and fast tempo acoustic performance.',
-  },
-};
-
 function asRecord(payload: Lesson['payload']): Record<string, unknown> {
   if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
     return payload as Record<string, unknown>;
@@ -178,36 +44,58 @@ function asRecord(payload: Lesson['payload']): Record<string, unknown> {
   return {};
 }
 
+/** Kind from the v2 payload; legacy payloads fall back to their `lessonType`, else theory. */
 export function inferLessonKind(lesson: Lesson): LessonKind {
-  const payload = asRecord(lesson.payload);
-  const raw = String(payload.lessonType ?? payload.type ?? '').toLowerCase();
+  if (isLessonPayload(lesson.payload)) return lessonBadge(lesson.payload);
+  const raw = String(asRecord(lesson.payload).lessonType ?? '').toLowerCase();
   if (raw === 'theory' || raw === 'practice' || raw === 'rhythm') return raw;
-  const title = lesson.title.toLowerCase();
-  if (title.includes('rhythm') || title.includes('finger') || title.includes('syncopat')) return 'rhythm';
-  if (title.includes('scale') || title.includes('chord progression') || title.includes('practice') || title.includes('hands') || title.includes('bach')) {
-    return 'practice';
-  }
   return 'theory';
 }
 
-export function toCurriculumNode(lesson: Lesson, progress?: UserProgress): CurriculumNode {
-  const payload = asRecord(lesson.payload);
-  const kind = inferLessonKind(lesson);
-  const unitCount = typeof payload.unitCount === 'number' ? payload.unitCount : undefined;
-  const unitCompleted =
-    typeof payload.unitCompleted === 'number'
-      ? payload.unitCompleted
-      : progress?.completed
-        ? unitCount
-        : undefined;
-
+export function toCurriculumNode(lesson: Lesson, progress?: ProgressLike): CurriculumNode {
+  const payload = isLessonPayload(lesson.payload) ? lesson.payload : null;
+  const unitCount = payload ? payload.stages.length : undefined;
   return {
     ...lesson,
-    kind,
+    kind: inferLessonKind(lesson),
+    tier: payload?.tier ?? null,
+    isCheckpoint: payload?.isCheckpoint ?? false,
     unitCount,
-    unitCompleted,
+    unitCompleted: progress?.completed ? unitCount : 0,
+    expReward: payload ? lessonExp(payload) : 50,
   };
 }
+
+/** The bundled course as dashboard nodes (offline / demo / empty database). */
+export const DEMO_CURRICULUM: CurriculumNode[] = COURSE_LESSONS.map((row) => toCurriculumNode(row as unknown as Lesson));
+
+/** Unit titles for the skill tree, from src/content. */
+export const MODULE_COPY: Record<number, { title: string; blurb: string; tier: Tier }> = Object.fromEntries(
+  COURSE_UNITS.map((u) => [
+    u.index,
+    { title: `Unit ${u.index}: ${u.title}`, blurb: `${TIERS[u.tier].label} · ${u.blurb}`, tier: u.tier },
+  ]),
+);
+
+/**
+ * Demo progress: mark lessons complete in course order while their cumulative
+ * EXP fits inside the demo profile's EXP, so each demo persona sees a plausible tree.
+ */
+export function demoProgressForExp(exp: number): Record<string, ProgressLike> {
+  const out: Record<string, ProgressLike> = {};
+  let spent = 0;
+  for (const node of DEMO_CURRICULUM) {
+    if (spent + node.expReward > exp) break;
+    spent += node.expReward;
+    out[node.id] = { lesson_id: node.id, completed: true, accuracy_percentage: 100 };
+  }
+  return out;
+}
+
+/** Kept for existing imports: the first two lessons completed. */
+export const DEMO_PROGRESS: Record<string, ProgressLike> = Object.fromEntries(
+  DEMO_CURRICULUM.slice(0, 2).map((n) => [n.id, { lesson_id: n.id, completed: true, accuracy_percentage: 100 }]),
+);
 
 export function learnerTier(exp: number): { label: string; nextAt: number; currentFloor: number } {
   if (exp >= 4000) return { label: 'Platinum Tier Learner', nextAt: 4000, currentFloor: 4000 };
@@ -235,7 +123,7 @@ export function nodeStatus(
   lesson: CurriculumNode,
   indexInModule: number,
   moduleLessons: CurriculumNode[],
-  progress: Record<string, UserProgress | Pick<UserProgress, 'lesson_id' | 'completed'>>,
+  progress: ProgressMap,
   exp: number,
   catalog: CurriculumNode[] = moduleLessons,
 ): NodeStatus {
