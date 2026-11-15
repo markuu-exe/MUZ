@@ -36,9 +36,17 @@ import {
 } from '../../lib/dashboard/curriculum';
 import DashboardHud from './DashboardHud';
 import SkillTreeView from './SkillTreeView';
-import LessonPlayer from '../lesson/LessonPlayer';
-import { isLessonPayload } from '../../types/lesson.types';
+import LessonPlayer, { type LessonSaveFeedback } from '../lesson/LessonPlayer';
+import { isLessonPayload, type LessonPayload } from '../../types/lesson.types';
 import ProfileAnalyticsView from './ProfileAnalyticsView';
+import PlacementModal from './PlacementModal';
+import { lessonExp } from '../../content';
+import type { LessonResult } from '../../lesson/types';
+import { supabase } from '../../lib/supabase/client';
+import { PLACEMENT_METADATA_KEY } from '../../lib/progress/placement';
+import { saveLessonResult } from '../../lib/progress/saveLessonResult';
+import { displayedStreak, toLocalDate } from '../../lib/progress/streak';
+import { persistRegeneratedHearts, savePlacement, supabaseProgressStore } from '../../lib/progress/supabaseStore';
 
 interface NavItem {
   id: DashboardView;
@@ -55,7 +63,7 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export default function DashboardScreen() {
-  const { user, profile, isDemo, signOut } = useAuth();
+  const { user, profile, isDemo, signOut, refreshProfile } = useAuth();
   const data = useDashboardData(profile, isDemo);
   const [view, setView] = useState<DashboardView>('skill-tree');
   const [banner, setBanner] = useState<{ message: string; type: 'warning' | 'error' | 'info' } | null>(null);
@@ -64,13 +72,57 @@ export default function DashboardScreen() {
   const [selectedStatus, setSelectedStatus] = useState<NodeStatus | null>(null);
   const [activeLesson, setActiveLesson] = useState<CurriculumNode | null>(null);
   const [lessonFilter, setLessonFilter] = useState<'all' | 'theory' | 'practice' | 'rhythm'>('all');
+  const [placementDone, setPlacementDone] = useState(false);
 
   const hearts = profile?.hearts ?? 4;
-  const streak = profile?.current_streak ?? 7;
+  const streak = profile
+    ? displayedStreak(profile.current_streak, profile.last_activity_date, toLocalDate(new Date()))
+    : 7;
   const exp = profile?.exp ?? 1240;
   const username = displayNameFromProfile(profile, user?.email);
   const progressMeta = expProgress(exp);
-  const regen = useHeartRegen(profile?.id ?? user?.id, hearts);
+  const regen = useHeartRegen(profile?.id ?? user?.id, hearts, {
+    onRegenerate:
+      isDemo || !profile
+        ? undefined
+        : async (to, from) => {
+            const written = await persistRegeneratedHearts(supabase, profile.id, from, to);
+            await refreshProfile();
+            return written;
+          },
+  });
+
+  // COURSE-6: ask a new learner where to start, once, when the course is in the database.
+  const needsPlacement =
+    !isDemo &&
+    Boolean(profile) &&
+    !placementDone &&
+    !data.loading &&
+    !data.usingFallback &&
+    Object.keys(data.progress).length === 0 &&
+    !user?.user_metadata?.[PLACEMENT_METADATA_KEY];
+
+  const choosePlacement = async (startUnit: number) => {
+    if (!profile) return;
+    await savePlacement(supabase, profile.id, startUnit, data.lessons);
+    setPlacementDone(true);
+    await refreshProfile();
+    data.reload();
+  };
+
+  // COURSE-6: save each finished run; demo mode saves nothing.
+  const handleLessonComplete = async (lesson: CurriculumNode, result: LessonResult): Promise<LessonSaveFeedback> => {
+    if (isDemo || !profile) return { note: 'Demo mode: results are not saved.' };
+    const payload = lesson.payload as unknown as LessonPayload;
+    const applied = await saveLessonResult(supabaseProgressStore(supabase), {
+      userId: profile.id,
+      lesson: { passMark: payload.settings.passMark, expReward: lessonExp(payload) },
+      result,
+    });
+    await refreshProfile();
+    data.reload();
+    return { note: applied.note, expAwarded: applied.expGained };
+  };
 
   const masteredCount = useMemo(
     () => data.lessons.filter((lesson) => data.progress[lesson.id]?.completed).length,
@@ -591,9 +643,12 @@ export default function DashboardScreen() {
           title={activeLesson.title}
           payload={activeLesson.payload}
           hearts={hearts}
+          onComplete={(result) => handleLessonComplete(activeLesson, result)}
           onClose={() => setActiveLesson(null)}
         />
       )}
+
+      {needsPlacement && <PlacementModal onChoose={choosePlacement} />}
     </div>
   );
 }
