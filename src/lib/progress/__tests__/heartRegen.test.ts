@@ -48,4 +48,7 @@ describe('msUntilNextHeart', () => {
   it('is a full period when the timer has not started', () => {
     expect(msUntilNextHeart({ hearts: 4, anchorMs: null }, T0)).toBe(P);
   });
+  it('never exceeds a full period when the clock read is older than the timer start', () => {
+    expect(msUntilNextHeart({ hearts: 4, anchorMs: T0 + 5000 }, T0)).toBe(P);
+  });
 });

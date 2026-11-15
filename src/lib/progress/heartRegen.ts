@@ -25,5 +25,5 @@ export function regenStep(state: RegenState, nowMs: number, periodMs = HEART_REG
 export function msUntilNextHeart(state: RegenState, nowMs: number, periodMs = HEART_REGEN_MS): number {
   if (state.hearts >= MAX_HEARTS) return 0;
   if (state.anchorMs === null) return periodMs;
-  return Math.max(0, periodMs - (nowMs - state.anchorMs));
+  return Math.min(periodMs, Math.max(0, periodMs - (nowMs - state.anchorMs)));
 }

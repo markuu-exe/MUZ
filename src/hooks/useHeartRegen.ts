@@ -41,7 +41,9 @@ export interface HeartRegenOptions {
 }
 
 export function useHeartRegen(userId: string | undefined, hearts: number, { onRegenerate }: HeartRegenOptions = {}) {
-  const storageKey = `muz-heart-regen-${userId ?? 'guest'}`;
+  // v2: the old key held a first-visit time that was never cleared; reading it as a
+  // timer start would refill hearts for every period since that first visit.
+  const storageKey = `muz-heart-regen-v2-${userId ?? 'guest'}`;
   const [now, setNow] = useState(() => Date.now());
   const [anchorMs, setAnchorMs] = useState<number | null>(() => readAnchor(storageKey));
   const inFlight = useRef(false);
@@ -59,7 +61,10 @@ export function useHeartRegen(userId: string | undefined, hearts: number, { onRe
 
   useEffect(() => {
     if (inFlight.current) return;
-    const step = regenStep({ hearts, anchorMs }, now);
+    // Read the clock here, not the `now` state: `now` stops ticking while hearts are full,
+    // so a timer started from it after a heart is lost would begin in the past.
+    const t = Date.now();
+    const step = regenStep({ hearts, anchorMs }, t);
 
     if (step.gained === 0) {
       if (step.anchorMs !== anchorMs) {
@@ -70,7 +75,7 @@ export function useHeartRegen(userId: string | undefined, hearts: number, { onRe
     }
 
     const persist = onRegenerateRef.current;
-    if (!persist || now < retryAt.current) return;
+    if (!persist || t < retryAt.current) return;
     inFlight.current = true;
     void persist(step.hearts, hearts)
       .then((written) => {
