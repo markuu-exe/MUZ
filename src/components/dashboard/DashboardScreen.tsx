@@ -36,6 +36,8 @@ import {
 } from '../../lib/dashboard/curriculum';
 import DashboardHud from './DashboardHud';
 import SkillTreeView from './SkillTreeView';
+import LessonPlayer from '../lesson/LessonPlayer';
+import { isLessonPayload } from '../../types/lesson.types';
 import ProfileAnalyticsView from './ProfileAnalyticsView';
 
 interface NavItem {
@@ -60,6 +62,7 @@ export default function DashboardScreen() {
   const [shakingId, setShakingId] = useState<string | null>(null);
   const [selected, setSelected] = useState<CurriculumNode | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<NodeStatus | null>(null);
+  const [activeLesson, setActiveLesson] = useState<CurriculumNode | null>(null);
   const [lessonFilter, setLessonFilter] = useState<'all' | 'theory' | 'practice' | 'rhythm'>('all');
 
   const hearts = profile?.hearts ?? 4;
@@ -106,7 +109,7 @@ export default function DashboardScreen() {
       return;
     }
 
-    if (hearts === 0 && lesson.kind !== 'theory') {
+    if (hearts === 0 && lesson.kind === 'practice') {
       setSelected(null);
       setSelectedStatus(null);
       setShakingId(lesson.id);
@@ -538,22 +541,26 @@ export default function DashboardScreen() {
                   <div className="flex items-center gap-3 text-xs text-slate-300">
                     <span className="flex items-center gap-1">
                       <Sparkles className="h-3.5 w-3.5 text-violet-400" />
-                      +{selected.required_exp ? Math.max(50, Math.round(selected.required_exp / 4)) : 50} EXP
+                      +{selected.expReward} EXP
                     </span>
                     <span>·</span>
                     <span className="flex items-center gap-1">
                       <Heart className="h-3.5 w-3.5 text-rose-400" />
-                      {selected.kind === 'theory' ? 'Free Stamina' : '1 Heart Cost'}
+                      {selected.kind === 'practice' ? 'Uses hearts' : 'Free stamina'}
                     </span>
                   </div>
 
                   <button
                     type="button"
                     onClick={() => {
-                      setBanner({
-                        message: `Starting ${selected.title} practice session... Launching dual-stream audio & pose engine.`,
-                        type: 'info',
-                      });
+                      if (!isLessonPayload(selected.payload)) {
+                        setBanner({ message: 'This lesson has no playable content yet.', type: 'warning' });
+                        return;
+                      }
+                      setBanner(null);
+                      setActiveLesson(selected);
+                      setSelected(null);
+                      setSelectedStatus(null);
                     }}
                     className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(139,92,246,0.4)] hover:brightness-110 active:scale-95 transition-all"
                   >
@@ -575,6 +582,18 @@ export default function DashboardScreen() {
           )}
         </main>
       </div>
+
+      {/* COURSE-3: the lesson player covers the dashboard while a lesson is open. */}
+      {activeLesson && isLessonPayload(activeLesson.payload) && (
+        <LessonPlayer
+          key={activeLesson.id}
+          lessonId={activeLesson.id}
+          title={activeLesson.title}
+          payload={activeLesson.payload}
+          hearts={hearts}
+          onClose={() => setActiveLesson(null)}
+        />
+      )}
     </div>
   );
 }

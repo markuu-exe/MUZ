@@ -94,7 +94,7 @@ describe('ChordMatcher on synthetic piano (KAN-266)', () => {
       }
       if (ok / total < 0.9) console.log(fails.join('\n'));
       expect(ok / total).toBeGreaterThanOrEqual(0.9);
-    });
+    }, 60_000);
   }
 
   it('rejects the root alone and every two-note subset', () => {

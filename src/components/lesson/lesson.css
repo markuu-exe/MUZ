@@ -1,0 +1,28 @@
+/* COURSE-3: animations used by the lesson player and its exercise views. */
+@keyframes muz-pop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+@keyframes muz-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+@keyframes muz-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes muz-float-up {
+  0% { opacity: 0; transform: translateY(8px) scale(0.9); }
+  20% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-26px) scale(1); }
+}
+.muz-pop { animation: muz-pop 0.28s ease-out both; }
+.muz-shake { animation: muz-shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+.muz-rise { animation: muz-rise 0.22s ease-out both; }
+.muz-float-up { animation: muz-float-up 0.7s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .muz-pop, .muz-shake, .muz-rise { animation: none; }
+}
