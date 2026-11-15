@@ -27,6 +27,14 @@ import LessonResults from './LessonResults';
 import { PracticeRigProvider } from './practice/PracticeRigContext';
 import './lesson.css';
 
+/** What a saved run reports back: a note for the results screen and the EXP actually granted. */
+export interface LessonSaveFeedback {
+  note?: string | null;
+  expAwarded?: number;
+}
+
+type LessonCompleteReturn = void | string | LessonSaveFeedback;
+
 export interface LessonPlayerProps {
   lessonId: string;
   title: string;
@@ -36,9 +44,10 @@ export interface LessonPlayerProps {
   registry?: ExerciseRegistry;
   /**
    * Called once each time a run ends (passed, failed, out of hearts, or quit).
-   * COURSE-6 saves the result here. May return a short note for the results screen.
+   * COURSE-6 saves the result here. May return a short note, or a note plus the EXP
+   * actually granted (EXP is only given on first mastery), for the results screen.
    */
-  onComplete?: (result: LessonResult) => void | string | Promise<void | string>;
+  onComplete?: (result: LessonResult) => LessonCompleteReturn | Promise<LessonCompleteReturn>;
   onClose: () => void;
 }
 
@@ -68,6 +77,7 @@ export default function LessonPlayer({
   const [pending, setPending] = useState<ExerciseOutcome | null>(null);
   const [confirmQuit, setConfirmQuit] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [savedExp, setSavedExp] = useState<number | null>(null);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
   const reported = useRef<LessonRunState | null>(null);
@@ -88,8 +98,14 @@ export default function LessonPlayer({
     if (!result || reported.current === run) return;
     reported.current = run;
     void Promise.resolve(onCompleteRef.current?.(result)).then(
-      (message) => {
-        if (mounted.current && typeof message === 'string') setNote(message);
+      (feedback) => {
+        if (!mounted.current || !feedback) return;
+        if (typeof feedback === 'string') {
+          setNote(feedback);
+          return;
+        }
+        if (feedback.note) setNote(feedback.note);
+        if (typeof feedback.expAwarded === 'number') setSavedExp(feedback.expAwarded);
       },
       () => {
         if (mounted.current) setNote('Your result could not be saved.');
@@ -137,6 +153,7 @@ export default function LessonPlayer({
 
   const retry = () => {
     setNote(null);
+    setSavedExp(null);
     setPending(null);
     setRun(createLessonRun(lessonId, payload, result?.heartsEnd ?? hearts, Date.now()));
   };
@@ -200,7 +217,13 @@ export default function LessonPlayer({
       {/* Body */}
       <main className="flex-1 overflow-y-auto px-6 py-8">
         {result ? (
-          <LessonResults title={title} result={result} note={note} onRetry={retry} onClose={onClose} />
+          <LessonResults
+            title={title}
+            result={savedExp === null ? result : { ...result, expAwarded: savedExp }}
+            note={note}
+            onRetry={retry}
+            onClose={onClose}
+          />
         ) : (
           item &&
           entry &&
