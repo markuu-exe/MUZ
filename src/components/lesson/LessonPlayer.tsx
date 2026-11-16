@@ -113,7 +113,15 @@ export default function LessonPlayer({
     );
   }, [result, run]);
 
+  /** Hearts the current exercise has spent but not yet reported (T-06). */
+  const inFlightHeartsLost = useRef(0);
+  const reportHeartsSpent = useCallback((heartsLostSoFar: number) => {
+    inFlightHeartsLost.current = heartsLostSoFar;
+  }, []);
+
   const advance = useCallback((outcome: ExerciseOutcome) => {
+    // The outcome carries the exercise's hearts, so drop the in-flight count or it would be charged twice.
+    inFlightHeartsLost.current = 0;
     setPending(null);
     setRun((s) => submitOutcome(s, outcome, Date.now()));
   }, []);
@@ -145,13 +153,14 @@ export default function LessonPlayer({
       onClose();
       return;
     }
-    const ended = quitLesson(run, Date.now());
+    const ended = quitLesson(run, Date.now(), inFlightHeartsLost.current);
     reported.current = ended;
     void Promise.resolve(onCompleteRef.current?.(buildLessonResult(ended))).catch(() => undefined);
     onClose();
   };
 
   const retry = () => {
+    inFlightHeartsLost.current = 0;
     setNote(null);
     setSavedExp(null);
     setPending(null);
@@ -248,6 +257,7 @@ export default function LessonPlayer({
                     hearts={run.hearts}
                     submitted={pending !== null}
                     onOutcome={handleOutcome}
+                    onHeartsSpent={reportHeartsSpent}
                   />
                 </div>
               </PracticeRigProvider>
