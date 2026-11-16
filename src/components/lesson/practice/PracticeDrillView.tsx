@@ -30,21 +30,12 @@ function targetTitle(target: DrillTarget): string {
   return target.kind === 'note' ? `Play ${targetLabel(target)}` : `Play the ${targetLabel(target)} chord`;
 }
 
-export default function PracticeDrillView({
-  exercise,
-  settings,
-  hearts,
-  onOutcome,
-  onHeartLost,
-  onHeartsSpent,
-}: ExerciseViewProps<DrillExercise>) {
+export default function PracticeDrillView({ exercise, settings, hearts, onOutcome, onHeartsSpent }: ExerciseViewProps<DrillExercise>) {
   const { rig, state } = usePracticeRig();
   const targets = useMemo(() => drillTargets(exercise), [exercise]);
   const [ended, setEnded] = useState<{ passed: boolean; stats: DrillStats } | null>(null);
   const onOutcomeRef = useRef(onOutcome);
   onOutcomeRef.current = onOutcome;
-  const onHeartLostRef = useRef(onHeartLost);
-  onHeartLostRef.current = onHeartLost;
   const onHeartsSpentRef = useRef(onHeartsSpent);
   onHeartsSpentRef.current = onHeartsSpent;
 
@@ -61,7 +52,6 @@ export default function PracticeDrillView({
     suspended: !ready,
     onComplete: (stats) => setEnded({ passed: true, stats }),
     onLocked: (stats) => setEnded({ passed: false, stats }),
-    onHeartLost: (e) => onHeartLostRef.current?.(e.reason),
   });
 
   // Arm as soon as the camera, the pose model and the microphone are all live.
