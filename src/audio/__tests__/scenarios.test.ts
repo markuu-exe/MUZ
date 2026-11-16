@@ -51,7 +51,9 @@ function rate(cases: Array<() => AttemptKind | 'none'>, want: AttemptKind): numb
   return cases.filter((c) => c() === want).length / cases.length;
 }
 
-describe('Attempt-level acceptance (KAN-266 + KAN-267)', () => {
+// These render and analyse hundreds of synthetic chords; single cases take 2–9 s
+// on a team laptop, so the 5 s default timeout fails them under full-suite load.
+describe('Attempt-level acceptance (KAN-266 + KAN-267)', { timeout: 60_000 }, () => {
   it('correct chord, every inversion, octaves 3–4, 48 and 44.1 kHz: ≥ 95 % pass', () => {
     const cases: Array<() => AttemptKind | 'none'> = [];
     for (const t of LESSONS)

@@ -34,10 +34,16 @@ import {
 import { canStartLessonWithHearts, nodeBaseExpReward } from '../../lib/gamification';
 import DashboardHud from './DashboardHud';
 import SkillTreeView from './SkillTreeView';
-import LessonPlayer from '../lesson/LessonPlayer';
-import { isLessonPayload } from '../../types/lesson.types';
+import LessonPlayer, { type LessonSaveFeedback } from '../lesson/LessonPlayer';
+import { isLessonPayload, type LessonPayload } from '../../types/lesson.types';
 import ProfileAnalyticsView from './ProfileAnalyticsView';
-import LessonSessionModal from './LessonSessionModal';
+import PlacementModal from './PlacementModal';
+import { lessonExp } from '../../content';
+import type { LessonResult } from '../../lesson/types';
+import { supabase } from '../../lib/supabase/client';
+import { PLACEMENT_METADATA_KEY } from '../../lib/progress/placement';
+import { saveLessonResult } from '../../lib/progress/saveLessonResult';
+import { savePlacement, supabaseProgressStore } from '../../lib/progress/supabaseStore';
 
 interface NavItem {
   id: DashboardView;
@@ -74,6 +80,7 @@ export default function DashboardScreen() {
   const [selectedStatus, setSelectedStatus] = useState<NodeStatus | null>(null);
   const [activeLesson, setActiveLesson] = useState<CurriculumNode | null>(null);
   const [lessonFilter, setLessonFilter] = useState<'all' | 'theory' | 'practice' | 'rhythm'>('all');
+  const [placementDone, setPlacementDone] = useState(false);
 
   const { hearts, currentStreak: streak, exp, progressMap } = gamification;
   const username = displayNameFromProfile(profile, user?.email);
@@ -90,6 +97,61 @@ export default function DashboardScreen() {
     },
     gamification.lastHeartUpdate,
   );
+
+  // COURSE-6: ask a new learner where to start, once, when the course is in the database.
+  const needsPlacement =
+    !isDemo &&
+    Boolean(profile) &&
+    !placementDone &&
+    !data.loading &&
+    !data.usingFallback &&
+    Object.keys(data.progress).length === 0 &&
+    !user?.user_metadata?.[PLACEMENT_METADATA_KEY];
+
+  const choosePlacement = async (startUnit: number) => {
+    if (!profile) return;
+    await savePlacement(supabase, profile.id, startUnit, data.lessons);
+    setPlacementDone(true);
+    await refreshProfile();
+    data.reload();
+  };
+
+  // COURSE-6: save each finished run; demo mode updates local gamification only.
+  const handleLessonComplete = async (
+    lesson: CurriculumNode,
+    result: LessonResult,
+  ): Promise<LessonSaveFeedback> => {
+    if (result.passed) {
+      gamification.completeLessonSession({
+        lesson,
+        accuracyPercent: result.accuracy,
+        rhythmConsistency: result.metrics.rhythmConsistency || 95,
+        postureScore: result.metrics.postureScore || 95,
+        durationSec: result.durationSec || 45,
+        heartsEnd: result.heartsEnd,
+        heartRestoredOverride: result.heartRestored,
+      });
+    } else if (result.heartRestored) {
+      gamification.restoreHearts(1, 'theory-quiz');
+    }
+
+    if (isDemo || !profile) return { note: 'Demo mode: results are not saved.' };
+    const payload = lesson.payload as unknown as LessonPayload;
+    // Lost hearts were already persisted as they happened via onHeartLost,
+    // so only pass any heart restoration delta to saveLessonResult.
+    const adjustedResult: LessonResult = {
+      ...result,
+      heartsStart: result.heartsEnd - (result.heartRestored ? 1 : 0),
+    };
+    const applied = await saveLessonResult(supabaseProgressStore(supabase), {
+      userId: profile.id,
+      lesson: { passMark: payload.settings.passMark, expReward: lessonExp(payload) },
+      result: adjustedResult,
+    });
+    await refreshProfile();
+    data.reload();
+    return { note: applied.note, expAwarded: applied.expGained };
+  };
 
   const masteredCount = useMemo(
     () => data.lessons.filter((lesson) => progressMap[lesson.id]?.completed).length,
@@ -670,25 +732,12 @@ export default function DashboardScreen() {
           onHeartLost={(reason) => {
             gamification.depleteHeartForDrill(reason);
           }}
-          onComplete={(result) => {
-            if (result.passed) {
-              gamification.completeLessonSession({
-                lesson: activeLesson,
-                accuracyPercent: result.accuracy,
-                rhythmConsistency: result.metrics.rhythmConsistency || 95,
-                postureScore: result.metrics.postureScore || 95,
-                durationSec: result.durationSec || 45,
-                heartsEnd: result.heartsEnd,
-                heartRestoredOverride: result.heartRestored,
-              });
-              data.reload();
-            } else if (result.heartRestored) {
-              gamification.restoreHearts(1, 'theory-quiz');
-            }
-          }}
+          onComplete={(result) => handleLessonComplete(activeLesson, result)}
           onClose={() => setActiveLesson(null)}
         />
       )}
+
+      {needsPlacement && <PlacementModal onChoose={choosePlacement} />}
     </div>
   );
 }

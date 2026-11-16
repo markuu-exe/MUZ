@@ -1,3 +1,8 @@
+/**
+ * COURSE-6: heart regeneration that persists across sessions via `profiles.last_heart_update`
+ * and localStorage. The countdown runs while hearts < 5; when a 15-minute period completes,
+ * `onRegenerate` restores the heart(s) and advances the timer anchor.
+ */
 import { useEffect, useRef, useState } from 'react';
 import {
   computePassiveHeartRegen,
@@ -13,22 +18,38 @@ function formatCountdown(ms: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
+export type LegacyRegenCallback = (
+  restoredCount: number,
+  nextHearts: number,
+  nextStartedAtMs: number | null,
+) => void;
+
+export interface HeartRegenOptions {
+  /** Persist the regenerated hearts; resolve true if they were written. Omit to only show the countdown (demo). */
+  onRegenerate?: (to: number, from: number, nextStartedAtMs: number | null) => Promise<boolean> | boolean | void;
+  /** Optional database `profiles.last_heart_update` ISO timestamp. */
+  lastHeartUpdate?: string | null;
+}
+
 export function useHeartRegen(
   userId: string | undefined,
   hearts: number,
-  onRegenerate?: (
-    restoredCount: number,
-    nextHearts: number,
-    nextStartedAtMs: number | null,
-  ) => void,
-  lastHeartUpdate?: string | null,
+  optionsOrCallback?: LegacyRegenCallback | HeartRegenOptions,
+  lastHeartUpdateArg?: string | null,
 ) {
   const storageKey = `muz-heart-regen-${userId ?? 'guest'}`;
   const clampedHearts = clampHearts(hearts);
   const [now, setNow] = useState(() => Date.now());
   const prevHeartsRef = useRef<number>(clampedHearts);
-  const onRegenRef = useRef(onRegenerate);
-  onRegenRef.current = onRegenerate;
+  const inFlight = useRef(false);
+
+  const isCallback = typeof optionsOrCallback === 'function';
+  const lastHeartUpdate = isCallback
+    ? lastHeartUpdateArg
+    : (optionsOrCallback?.lastHeartUpdate ?? lastHeartUpdateArg);
+
+  const callbackRef = useRef(optionsOrCallback);
+  callbackRef.current = optionsOrCallback;
 
   const parsedLastUpdateMs = lastHeartUpdate ? Date.parse(lastHeartUpdate) : NaN;
   const validDbAnchorMs = Number.isFinite(parsedLastUpdateMs) ? parsedLastUpdateMs : null;
@@ -71,6 +92,8 @@ export function useHeartRegen(
       const currentNow = Date.now();
       setNow(currentNow);
 
+      if (inFlight.current) return;
+
       const raw = window.localStorage.getItem(storageKey);
       const startedAt =
         validDbAnchorMs !== null ? validDbAnchorMs : raw ? Number(raw) : currentNow;
@@ -82,12 +105,34 @@ export function useHeartRegen(
       );
 
       if (calc.restoredCount > 0) {
-        if (calc.nextStartedAtMs === null) {
-          window.localStorage.removeItem(storageKey);
+        const updateLocalAnchor = () => {
+          if (calc.nextStartedAtMs === null) {
+            window.localStorage.removeItem(storageKey);
+          } else {
+            window.localStorage.setItem(storageKey, String(calc.nextStartedAtMs));
+          }
+        };
+
+        const handler = callbackRef.current;
+        if (typeof handler === 'function') {
+          updateLocalAnchor();
+          handler(calc.restoredCount, calc.hearts, calc.nextStartedAtMs);
+        } else if (handler?.onRegenerate) {
+          inFlight.current = true;
+          void Promise.resolve(
+            handler.onRegenerate(calc.hearts, clampedHearts, calc.nextStartedAtMs),
+          )
+            .then((written) => {
+              if (written !== false) {
+                updateLocalAnchor();
+              }
+            })
+            .finally(() => {
+              inFlight.current = false;
+            });
         } else {
-          window.localStorage.setItem(storageKey, String(calc.nextStartedAtMs));
+          updateLocalAnchor();
         }
-        onRegenRef.current?.(calc.restoredCount, calc.hearts, calc.nextStartedAtMs);
       }
     };
 

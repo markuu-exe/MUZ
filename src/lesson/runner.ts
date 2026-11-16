@@ -114,10 +114,17 @@ export function submitOutcome(state: LessonRunState, outcome: ExerciseOutcome, n
   return guardHearts(next, nowMs);
 }
 
-/** Leave the lesson early. Nothing is awarded. */
-export function quitLesson(state: LessonRunState, nowMs: number): LessonRunState {
+/**
+ * Leave the lesson early. Nothing is awarded.
+ *
+ * `unreportedHeartsLost`: hearts the current exercise has already spent but not
+ * yet reported through an outcome (a drill in progress). They stay lost
+ * (SRS 3.1.2.4); hearts from finished exercises are already in `state.hearts`.
+ */
+export function quitLesson(state: LessonRunState, nowMs: number, unreportedHeartsLost = 0): LessonRunState {
   if (state.status !== 'running') return state;
-  return { ...state, status: 'quit', finishedAtMs: nowMs };
+  const hearts = Math.max(0, state.hearts - Math.max(0, unreportedHeartsLost));
+  return { ...state, hearts, status: 'quit', finishedAtMs: nowMs };
 }
 
 function guardHearts(state: LessonRunState, nowMs: number): LessonRunState {

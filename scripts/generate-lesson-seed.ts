@@ -75,7 +75,9 @@ export function applyBlock(seedSql: string, block: string): string {
 
 function main() {
   const check = process.argv.includes('--check');
-  const current = fs.readFileSync(seedPath, 'utf8');
+  // Compare as LF: with core.autocrlf=true (Windows) git checks seed.sql out
+  // as CRLF while the generator emits LF, which would fail --check on a clean tree.
+  const current = fs.readFileSync(seedPath, 'utf8').replace(/\r\n/g, '\n');
   const next = applyBlock(current, buildLessonBlock());
   if (check) {
     if (current !== next) {

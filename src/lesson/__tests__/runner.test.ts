@@ -88,6 +88,36 @@ describe('lesson runner', () => {
     expect(r.heartsEnd).toBe(4);
   });
 
+  // T-06 (SRS 3.1.2.4): hearts lost inside a drill that has not reported its
+  // outcome yet must stay lost when the learner quits.
+  it('keeps hearts lost in an unfinished drill when the learner quits', () => {
+    const payload = payloadOf('pno-mod1-node2'); // learn, check, play
+    let s = createLessonRun('pno-mod1-node2', payload, 5, 0);
+    while (currentItem(s)?.stage !== 'play') s = submitOutcome(s, PASS, 1);
+    const r = buildLessonResult(quitLesson(s, 2, 2));
+    expect(r.status).toBe('quit');
+    expect(r.heartsEnd).toBe(3);
+    expect(r.heartsLost).toBe(2);
+  });
+
+  it('adds in-drill losses on quit to hearts already spent on finished drills', () => {
+    const payload = payloadOf('pno-mod4-node3'); // learn, check, play(G), play(F)
+    let s = createLessonRun('pno-mod4-node3', payload, 5, 0);
+    while (currentItem(s)?.stage !== 'play') s = submitOutcome(s, PASS, 1);
+    s = submitOutcome(s, { passed: true, score: 1, heartsLost: 2 }, 2); // first drill finished: 3 left
+    expect(currentItem(s)?.stage).toBe('play');
+    const r = buildLessonResult(quitLesson(s, 3, 1)); // second drill lost 1 before quit
+    expect(r.heartsEnd).toBe(2);
+    expect(r.heartsLost).toBe(3);
+  });
+
+  it('never takes hearts below 0 on quit', () => {
+    const payload = payloadOf('pno-mod1-node2');
+    let s = createLessonRun('pno-mod1-node2', payload, 1, 0);
+    while (currentItem(s)?.stage !== 'play') s = submitOutcome(s, PASS, 1);
+    expect(buildLessonResult(quitLesson(s, 2, 3)).heartsEnd).toBe(0);
+  });
+
   it('awards nothing on quit', () => {
     const r = buildLessonResult(quitLesson(createLessonRun('q', payloadOf('pno-mod1-node1'), 5, 0), 10_000));
     expect(r.status).toBe('quit');
