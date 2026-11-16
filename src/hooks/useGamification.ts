@@ -25,6 +25,7 @@ import {
 interface StoredGamificationState {
   exp: number;
   hearts: number;
+  lastHeartUpdate?: string | null;
   currentStreak: number;
   longestStreak: number;
   lastActivityDate: string | null;
@@ -42,6 +43,8 @@ export interface CompleteLessonParams {
   rhythmConsistency?: number;
   postureScore?: number;
   durationSec?: number;
+  heartsEnd?: number;
+  heartRestoredOverride?: boolean;
 }
 
 export interface SessionCompletionSummary {
@@ -106,7 +109,10 @@ export function useGamification(
   }, [remoteProgress]);
 
   const [exp, setExp] = useState<number>(() => profile?.exp ?? 1240);
-  const [hearts, setHearts] = useState<number>(() => clampHearts(profile?.hearts ?? 4));
+  const [hearts, setHearts] = useState<number>(() => clampHearts(profile?.hearts ?? MAX_HEARTS));
+  const [lastHeartUpdate, setLastHeartUpdate] = useState<string | null>(
+    () => profile?.last_heart_update ?? null,
+  );
   const [currentStreak, setCurrentStreak] = useState<number>(() => profile?.current_streak ?? 7);
   const [longestStreak, setLongestStreak] = useState<number>(() =>
     Math.max(14, profile?.current_streak ?? 7),
@@ -125,10 +131,26 @@ export function useGamification(
   // Hydrate from profile + localStorage + Supabase tables
   useEffect(() => {
     const stored = readStoredState(userId);
-    const baseExp = stored?.exp ?? profile?.exp ?? 1240;
-    const baseHearts = clampHearts(stored?.hearts ?? profile?.hearts ?? 4);
-    const rawStreak = stored?.currentStreak ?? profile?.current_streak ?? 7;
-    const rawLastDate = stored?.lastActivityDate ?? profile?.last_activity_date ?? null;
+    const baseExp = !isDemo && profile ? profile.exp : (stored?.exp ?? profile?.exp ?? 1240);
+    const baseHearts = clampHearts(
+      !isDemo && profile
+        ? profile.hearts
+        : (stored?.hearts ?? profile?.hearts ?? MAX_HEARTS),
+    );
+    const baseLastHeartUpdate =
+      baseHearts >= MAX_HEARTS
+        ? null
+        : !isDemo && profile
+          ? (profile.last_heart_update ?? stored?.lastHeartUpdate ?? new Date().toISOString())
+          : (stored?.lastHeartUpdate ?? profile?.last_heart_update ?? new Date().toISOString());
+    const rawStreak =
+      !isDemo && profile
+        ? profile.current_streak
+        : (stored?.currentStreak ?? profile?.current_streak ?? 7);
+    const rawLastDate =
+      !isDemo && profile
+        ? profile.last_activity_date
+        : (stored?.lastActivityDate ?? profile?.last_activity_date ?? null);
 
     // Evaluate whether streak is still active or expired due to missed calendar day(s)
     const streakEval = evaluateStreakStatus(rawStreak, rawLastDate);
@@ -146,6 +168,7 @@ export function useGamification(
 
     setExp(baseExp);
     setHearts(baseHearts);
+    setLastHeartUpdate(baseLastHeartUpdate);
     setCurrentStreak(effectiveStreak);
     setLongestStreak(baseLongest);
     setLastActivityDate(rawLastDate);
@@ -210,7 +233,17 @@ export function useGamification(
     return () => {
       cancelled = true;
     };
-  }, [userId, profile?.id, profile?.exp, profile?.hearts, profile?.current_streak, profile?.last_activity_date, isDemo, initialCompletedIds]);
+  }, [
+    userId,
+    profile?.id,
+    profile?.exp,
+    profile?.hearts,
+    profile?.last_heart_update,
+    profile?.current_streak,
+    profile?.last_activity_date,
+    isDemo,
+    initialCompletedIds,
+  ]);
 
   // Evaluate achievement badges against current state
   const achievementEvaluation = useMemo(() => {
@@ -241,9 +274,11 @@ export function useGamification(
 
   // Keep localStorage in sync whenever state changes
   useEffect(() => {
+    if (!isDemo && !profile?.id) return;
     writeStoredState(userId, {
       exp,
       hearts,
+      lastHeartUpdate,
       currentStreak,
       longestStreak,
       lastActivityDate,
@@ -255,9 +290,12 @@ export function useGamification(
       performanceRecords,
     });
   }, [
+    isDemo,
+    profile?.id,
     userId,
     exp,
     hearts,
+    lastHeartUpdate,
     currentStreak,
     longestStreak,
     lastActivityDate,
@@ -293,6 +331,7 @@ export function useGamification(
     async (patch: {
       exp?: number;
       hearts?: number;
+      last_heart_update?: string | null;
       current_streak?: number;
       last_activity_date?: string | null;
     }) => {
@@ -311,22 +350,56 @@ export function useGamification(
     (reason: HeartDepletionReason): HeartDepletionResult => {
       const result = depleteHeart(hearts, reason);
       setHearts(result.hearts);
-      void syncProfileToSupabase({ hearts: result.hearts });
-      return result;
-    },
-    [hearts, syncProfileToSupabase],
-  );
-
-  const restoreHearts = useCallback(
-    (amount = 1, source: HeartRestoreSource = 'regen') => {
-      const result = restoreHeart(hearts, amount, source);
-      if (result.restoredCount > 0) {
-        setHearts(result.hearts);
+      if (result.depleted) {
+        const nowMs = Date.now();
+        const nowIso = new Date(nowMs).toISOString();
+        setLastHeartUpdate(nowIso);
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(`muz-heart-regen-${userId}`, String(nowMs));
+        }
+        void syncProfileToSupabase({ hearts: result.hearts, last_heart_update: nowIso });
+      } else {
         void syncProfileToSupabase({ hearts: result.hearts });
       }
       return result;
     },
-    [hearts, syncProfileToSupabase],
+    [hearts, syncProfileToSupabase, userId],
+  );
+
+  const restoreHearts = useCallback(
+    (
+      amount = 1,
+      source: HeartRestoreSource = 'regen',
+      nextStartedAtMs?: number | null,
+    ) => {
+      const result = restoreHeart(hearts, amount, source);
+      if (result.restoredCount > 0) {
+        const nextUpdateIso =
+          result.hearts >= MAX_HEARTS
+            ? null
+            : typeof nextStartedAtMs === 'number' && Number.isFinite(nextStartedAtMs)
+              ? new Date(nextStartedAtMs).toISOString()
+              : (lastHeartUpdate ?? new Date().toISOString());
+        setHearts(result.hearts);
+        setLastHeartUpdate(nextUpdateIso);
+        if (typeof window !== 'undefined') {
+          if (result.hearts >= MAX_HEARTS) {
+            window.localStorage.removeItem(`muz-heart-regen-${userId}`);
+          } else if (nextUpdateIso) {
+            window.localStorage.setItem(
+              `muz-heart-regen-${userId}`,
+              String(Date.parse(nextUpdateIso)),
+            );
+          }
+        }
+        void syncProfileToSupabase({
+          hearts: result.hearts,
+          last_heart_update: nextUpdateIso,
+        });
+      }
+      return result;
+    },
+    [hearts, lastHeartUpdate, syncProfileToSupabase, userId],
   );
 
   const completeLessonSession = useCallback(
@@ -337,6 +410,8 @@ export function useGamification(
         rhythmConsistency = 95,
         postureScore = 95,
         durationSec = 45,
+        heartsEnd,
+        heartRestoredOverride,
       } = params;
 
       const isReplay = completedIds.includes(lesson.id);
@@ -347,15 +422,24 @@ export function useGamification(
       const nextLongestStreak = Math.max(longestStreak, nextStreak);
       const nextLastActivityDate = streakResult.lastActivityDate;
 
-      // 2. Heart restoration on Theory lessons (quiz >= 80%)
+      // 2. Heart restoration on Theory lessons (quiz >= 80%) or explicit lesson outcome
       const previousHearts = hearts;
-      let nextHearts = hearts;
-      let heartRestored = false;
-      if (lesson.kind === 'theory') {
+      let nextHearts = typeof heartsEnd === 'number' ? clampHearts(heartsEnd) : hearts;
+      let heartRestored = Boolean(heartRestoredOverride);
+      if (typeof heartsEnd !== 'number' && lesson.kind === 'theory') {
         const restoreRes = evaluateTheoryQuizHeartRestore(hearts, accuracyPercent);
         nextHearts = restoreRes.hearts;
         heartRestored = restoreRes.restoredCount > 0;
       }
+
+      const nowMs = Date.now();
+      const nowIso = new Date(nowMs).toISOString();
+      const nextLastHeartUpdate =
+        nextHearts >= MAX_HEARTS
+          ? null
+          : nextHearts < previousHearts
+            ? nowIso
+            : (lastHeartUpdate ?? nowIso);
 
       // 3. Calculate lesson EXP reward
       const expBreakdown = calculateLessonExpReward({
@@ -373,7 +457,6 @@ export function useGamification(
       const nextBestPosture = Math.max(bestPostureScore, postureScore);
       const nextBestRhythm = Math.max(bestRhythmConsistency, rhythmConsistency);
 
-      const nowIso = new Date().toISOString();
       const newRecord: PerformanceRecord = {
         id: `perf-${Date.now()}`,
         user_id: userId,
@@ -410,6 +493,17 @@ export function useGamification(
       // 5. Commit state updates
       setExp(finalExp);
       setHearts(nextHearts);
+      setLastHeartUpdate(nextLastHeartUpdate);
+      if (typeof window !== 'undefined') {
+        if (nextHearts >= MAX_HEARTS) {
+          window.localStorage.removeItem(`muz-heart-regen-${userId}`);
+        } else if (nextLastHeartUpdate) {
+          window.localStorage.setItem(
+            `muz-heart-regen-${userId}`,
+            String(Date.parse(nextLastHeartUpdate)),
+          );
+        }
+      }
       setCurrentStreak(nextStreak);
       setLongestStreak(nextLongestStreak);
       setLastActivityDate(nextLastActivityDate);
@@ -433,6 +527,7 @@ export function useGamification(
               .update({
                 exp: finalExp,
                 hearts: nextHearts,
+                last_heart_update: nextLastHeartUpdate,
                 current_streak: nextStreak,
                 last_activity_date: nextLastActivityDate,
               })
@@ -507,6 +602,7 @@ export function useGamification(
       lastActivityDate,
       longestStreak,
       hearts,
+      lastHeartUpdate,
       bestAccuracyPercent,
       bestPostureScore,
       bestRhythmConsistency,
@@ -528,6 +624,7 @@ export function useGamification(
   return {
     exp,
     hearts: clampHearts(hearts),
+    lastHeartUpdate,
     maxHearts: MAX_HEARTS,
     currentStreak,
     longestStreak,

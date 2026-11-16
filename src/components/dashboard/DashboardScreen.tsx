@@ -81,13 +81,14 @@ export default function DashboardScreen() {
   const regen = useHeartRegen(
     profile?.id ?? user?.id,
     hearts,
-    (restoredCount) => {
-      gamification.restoreHearts(restoredCount, 'regen');
+    (restoredCount, _nextHearts, nextStartedAtMs) => {
+      gamification.restoreHearts(restoredCount, 'regen', nextStartedAtMs);
       setBanner({
         message: `+${restoredCount} Stamina Heart regenerated! You now have ${Math.min(5, hearts + restoredCount)}/5 Hearts.`,
         type: 'info',
       });
     },
+    gamification.lastHeartUpdate,
   );
 
   const masteredCount = useMemo(
@@ -666,6 +667,25 @@ export default function DashboardScreen() {
           title={activeLesson.title}
           payload={activeLesson.payload}
           hearts={hearts}
+          onHeartLost={(reason) => {
+            gamification.depleteHeartForDrill(reason);
+          }}
+          onComplete={(result) => {
+            if (result.passed) {
+              gamification.completeLessonSession({
+                lesson: activeLesson,
+                accuracyPercent: result.accuracy,
+                rhythmConsistency: result.metrics.rhythmConsistency || 95,
+                postureScore: result.metrics.postureScore || 95,
+                durationSec: result.durationSec || 45,
+                heartsEnd: result.heartsEnd,
+                heartRestoredOverride: result.heartRestored,
+              });
+              data.reload();
+            } else if (result.heartRestored) {
+              gamification.restoreHearts(1, 'theory-quiz');
+            }
+          }}
           onClose={() => setActiveLesson(null)}
         />
       )}

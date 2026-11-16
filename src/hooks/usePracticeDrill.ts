@@ -17,6 +17,8 @@ export interface UsePracticeDrillOptions {
   onComplete: (stats: DrillStats) => void;
   /** Hearts reached 0 during the drill. */
   onLocked: (stats: DrillStats) => void;
+  /** Fired each time a heart is lost during the drill. */
+  onHeartLost?: (e: { reason: 'timeout' | 'misses'; hearts: number }) => void;
 }
 
 const UI_INTERVAL_MS = 100;
@@ -63,7 +65,10 @@ export function usePracticeDrill(options: UsePracticeDrillOptions) {
     const drill = new PracticeDrill(targets, { hearts, timeoutMs: timeoutSec * 1000 });
     drillRef.current = drill;
     drill.on('change', refresh);
-    drill.on('heartLost', refresh);
+    drill.on('heartLost', (e) => {
+      refresh();
+      callbacks.current.onHeartLost?.(e);
+    });
     drill.on('complete', (stats) => callbacks.current.onComplete(stats));
     drill.on('locked', (stats) => callbacks.current.onLocked(stats));
     rig.resetAudioAnalysis();

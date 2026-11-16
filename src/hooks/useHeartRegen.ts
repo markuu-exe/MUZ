@@ -16,7 +16,12 @@ function formatCountdown(ms: number): string {
 export function useHeartRegen(
   userId: string | undefined,
   hearts: number,
-  onRegenerate?: (restoredCount: number, nextHearts: number) => void,
+  onRegenerate?: (
+    restoredCount: number,
+    nextHearts: number,
+    nextStartedAtMs: number | null,
+  ) => void,
+  lastHeartUpdate?: string | null,
 ) {
   const storageKey = `muz-heart-regen-${userId ?? 'guest'}`;
   const clampedHearts = clampHearts(hearts);
@@ -25,7 +30,10 @@ export function useHeartRegen(
   const onRegenRef = useRef(onRegenerate);
   onRegenRef.current = onRegenerate;
 
-  // Manage regeneration timer anchor in localStorage when hearts change
+  const parsedLastUpdateMs = lastHeartUpdate ? Date.parse(lastHeartUpdate) : NaN;
+  const validDbAnchorMs = Number.isFinite(parsedLastUpdateMs) ? parsedLastUpdateMs : null;
+
+  // Manage regeneration timer anchor in localStorage when hearts or last_heart_update change
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -35,10 +43,17 @@ export function useHeartRegen(
       return;
     }
 
+    if (validDbAnchorMs !== null) {
+      window.localStorage.setItem(storageKey, String(validDbAnchorMs));
+      setNow(Date.now());
+      prevHeartsRef.current = clampedHearts;
+      return;
+    }
+
     const existingRaw = window.localStorage.getItem(storageKey);
     const prevHearts = prevHeartsRef.current;
 
-    // If hearts just dropped from full (5) or no timer was stored, start a fresh 15m cycle
+    // Fallback when no DB last_heart_update timestamp is provided
     if (!existingRaw || prevHearts >= MAX_HEARTS || clampedHearts < prevHearts) {
       const anchor = Date.now();
       window.localStorage.setItem(storageKey, String(anchor));
@@ -46,7 +61,7 @@ export function useHeartRegen(
     }
 
     prevHeartsRef.current = clampedHearts;
-  }, [clampedHearts, storageKey]);
+  }, [clampedHearts, storageKey, validDbAnchorMs]);
 
   // Tick every second while hearts < 5 and trigger heart restoration when a 15m cycle completes
   useEffect(() => {
@@ -57,7 +72,8 @@ export function useHeartRegen(
       setNow(currentNow);
 
       const raw = window.localStorage.getItem(storageKey);
-      const startedAt = raw ? Number(raw) : currentNow;
+      const startedAt =
+        validDbAnchorMs !== null ? validDbAnchorMs : raw ? Number(raw) : currentNow;
       const calc = computePassiveHeartRegen(
         clampedHearts,
         startedAt,
@@ -71,18 +87,19 @@ export function useHeartRegen(
         } else {
           window.localStorage.setItem(storageKey, String(calc.nextStartedAtMs));
         }
-        onRegenRef.current?.(calc.restoredCount, calc.hearts);
+        onRegenRef.current?.(calc.restoredCount, calc.hearts, calc.nextStartedAtMs);
       }
     };
 
     checkTick();
     const timer = window.setInterval(checkTick, 1000);
     return () => window.clearInterval(timer);
-  }, [clampedHearts, storageKey]);
+  }, [clampedHearts, storageKey, validDbAnchorMs]);
 
   const rawAnchor =
     typeof window === 'undefined' ? null : window.localStorage.getItem(storageKey);
-  const startedAt = rawAnchor ? Number(rawAnchor) : now;
+  const startedAt =
+    validDbAnchorMs !== null ? validDbAnchorMs : rawAnchor ? Number(rawAnchor) : now;
   const calc = computePassiveHeartRegen(
     clampedHearts,
     startedAt,

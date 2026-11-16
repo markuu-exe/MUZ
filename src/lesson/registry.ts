@@ -17,6 +17,8 @@ export interface ExerciseViewProps<T extends Exercise = Exercise> {
   submitted: boolean;
   /** Answer views call this once on Check. Activity views call it when the activity ends. */
   onOutcome: (outcome: ExerciseOutcome) => void;
+  /** Optional callback fired immediately when a heart is lost inside a practice drill. */
+  onHeartLost?: (reason: 'timeout' | 'misses') => void;
 }
 
 export interface ExerciseRegistryEntry {

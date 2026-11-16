@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { User, Session, Provider } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase/client';
+import {
+  clampHearts,
+  computePassiveHeartRegen,
+  HEART_REGEN_INTERVAL_MS,
+  MAX_HEARTS,
+} from '../lib/gamification';
 import type { AuthContextType, InstrumentFocus, UserProfile } from '../types/auth.types';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,6 +36,7 @@ const DEMO_PROFILES: Record<string, UserProfile> = {
     last_activity_date: new Date().toISOString(),
     exp: 2450,
     hearts: 5,
+    last_heart_update: null,
     created_at: new Date().toISOString(),
   },
   beginner: {
@@ -40,6 +47,7 @@ const DEMO_PROFILES: Record<string, UserProfile> = {
     last_activity_date: new Date().toISOString(),
     exp: 120,
     hearts: 5,
+    last_heart_update: null,
     created_at: new Date().toISOString(),
   },
 };
@@ -80,6 +88,81 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           updates.instrument_focus = preferredInstrument;
         }
 
+        // Check hearts and last_heart_update to reconcile passive regeneration while away
+        const currentHearts = clampHearts(data.hearts ?? MAX_HEARTS);
+        const regenStorageKey = `muz-heart-regen-${userId}`;
+        const gamificationStorageKey = `muz-gamification-v1-${userId}`;
+        let reconciledHearts = currentHearts;
+        let reconciledLastHeartUpdate: string | null = data.last_heart_update ?? null;
+
+        if (currentHearts >= MAX_HEARTS) {
+          if (typeof window !== 'undefined') {
+            window.localStorage.removeItem(regenStorageKey);
+          }
+          if (data.last_heart_update !== null) {
+            updates.last_heart_update = null;
+            reconciledLastHeartUpdate = null;
+          }
+        } else {
+          const dbMs = data.last_heart_update ? Date.parse(data.last_heart_update) : NaN;
+          const localRaw =
+            typeof window !== 'undefined' ? window.localStorage.getItem(regenStorageKey) : null;
+          const localMs = localRaw ? Number(localRaw) : NaN;
+          const startedAtMs = Number.isFinite(dbMs)
+            ? dbMs
+            : Number.isFinite(localMs)
+              ? localMs
+              : Date.now();
+
+          const regen = computePassiveHeartRegen(
+            currentHearts,
+            startedAtMs,
+            Date.now(),
+            HEART_REGEN_INTERVAL_MS,
+          );
+
+          reconciledHearts = regen.hearts;
+          if (regen.hearts >= MAX_HEARTS) {
+            reconciledLastHeartUpdate = null;
+            if (typeof window !== 'undefined') {
+              window.localStorage.removeItem(regenStorageKey);
+            }
+            if (data.hearts !== MAX_HEARTS) {
+              updates.hearts = MAX_HEARTS;
+            }
+            if (data.last_heart_update !== null) {
+              updates.last_heart_update = null;
+            }
+          } else {
+            const nextAnchorMs = regen.nextStartedAtMs ?? startedAtMs;
+            const nextAnchorIso = new Date(nextAnchorMs).toISOString();
+            reconciledLastHeartUpdate = nextAnchorIso;
+            if (typeof window !== 'undefined') {
+              window.localStorage.setItem(regenStorageKey, String(nextAnchorMs));
+            }
+            if (regen.hearts !== data.hearts) {
+              updates.hearts = regen.hearts;
+            }
+            if (data.last_heart_update !== nextAnchorIso) {
+              updates.last_heart_update = nextAnchorIso;
+            }
+          }
+        }
+
+        if (typeof window !== 'undefined') {
+          const rawGamification = window.localStorage.getItem(gamificationStorageKey);
+          if (rawGamification) {
+            try {
+              const parsed = JSON.parse(rawGamification) as Record<string, unknown>;
+              parsed.hearts = reconciledHearts;
+              parsed.lastHeartUpdate = reconciledLastHeartUpdate;
+              window.localStorage.setItem(gamificationStorageKey, JSON.stringify(parsed));
+            } catch {
+              // Ignore malformed cached state
+            }
+          }
+        }
+
         if (Object.keys(updates).length > 0) {
           const { data: updated, error: updateError } = await supabase
             .from('profiles')
@@ -91,11 +174,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (updateError) {
             console.warn('Could not update profile metadata:', updateError.message);
           } else if (updated) {
-            return updated;
+            return updated as UserProfile;
           }
         }
 
-        return data as UserProfile;
+        return {
+          ...(data as UserProfile),
+          hearts: reconciledHearts,
+          last_heart_update: reconciledLastHeartUpdate,
+        };
       }
 
       // If profile not found, try to upsert a default profile
@@ -107,6 +194,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         last_activity_date: new Date().toISOString(),
         exp: 100,
         hearts: 5,
+        last_heart_update: null,
         created_at: new Date().toISOString(),
       };
 
@@ -383,6 +471,100 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(null);
       setProfile(null);
       return;
+    }
+
+    const activeUserId = profile?.id ?? user?.id;
+    if (activeUserId) {
+      try {
+        const regenStorageKey = `muz-heart-regen-${activeUserId}`;
+        const gamificationStorageKey = `muz-gamification-v1-${activeUserId}`;
+        let currentHearts = clampHearts(profile?.hearts ?? MAX_HEARTS);
+        let storedLastHeartUpdate: string | null = profile?.last_heart_update ?? null;
+
+        if (typeof window !== 'undefined') {
+          const rawGamification = window.localStorage.getItem(gamificationStorageKey);
+          if (rawGamification) {
+            try {
+              const parsed = JSON.parse(rawGamification) as {
+                hearts?: number;
+                lastHeartUpdate?: string | null;
+              };
+              if (typeof parsed.hearts === 'number') {
+                currentHearts = clampHearts(parsed.hearts);
+              }
+              if (parsed.lastHeartUpdate) {
+                storedLastHeartUpdate = parsed.lastHeartUpdate;
+              }
+            } catch {
+              // Ignore malformed JSON
+            }
+          }
+        }
+
+        let finalHearts = currentHearts;
+        let finalLastHeartUpdate: string | null = null;
+
+        if (currentHearts < MAX_HEARTS) {
+          const rawAnchor =
+            typeof window !== 'undefined' ? window.localStorage.getItem(regenStorageKey) : null;
+          const localMs = rawAnchor ? Number(rawAnchor) : NaN;
+          const dbMs = storedLastHeartUpdate ? Date.parse(storedLastHeartUpdate) : NaN;
+          const startedAtMs =
+            Number.isFinite(localMs) && Number.isFinite(dbMs)
+              ? Math.max(localMs, dbMs)
+              : Number.isFinite(localMs)
+                ? localMs
+                : Number.isFinite(dbMs)
+                  ? dbMs
+                  : Date.now();
+
+          const regen = computePassiveHeartRegen(
+            currentHearts,
+            startedAtMs,
+            Date.now(),
+            HEART_REGEN_INTERVAL_MS,
+          );
+          finalHearts = regen.hearts;
+          if (finalHearts >= MAX_HEARTS) {
+            finalLastHeartUpdate = null;
+            if (typeof window !== 'undefined') {
+              window.localStorage.removeItem(regenStorageKey);
+            }
+          } else {
+            const nextAnchorMs = regen.nextStartedAtMs ?? startedAtMs;
+            finalLastHeartUpdate = new Date(nextAnchorMs).toISOString();
+            if (typeof window !== 'undefined') {
+              window.localStorage.setItem(regenStorageKey, String(nextAnchorMs));
+            }
+          }
+        } else if (typeof window !== 'undefined') {
+          window.localStorage.removeItem(regenStorageKey);
+        }
+
+        if (typeof window !== 'undefined') {
+          const rawGamification = window.localStorage.getItem(gamificationStorageKey);
+          if (rawGamification) {
+            try {
+              const parsed = JSON.parse(rawGamification) as Record<string, unknown>;
+              parsed.hearts = finalHearts;
+              parsed.lastHeartUpdate = finalLastHeartUpdate;
+              window.localStorage.setItem(gamificationStorageKey, JSON.stringify(parsed));
+            } catch {
+              // Ignore malformed JSON
+            }
+          }
+        }
+
+        await supabase
+          .from('profiles')
+          .update({
+            hearts: finalHearts,
+            last_heart_update: finalLastHeartUpdate,
+          })
+          .eq('id', activeUserId);
+      } catch (syncErr) {
+        console.warn('Could not sync hearts on signOut:', syncErr);
+      }
     }
 
     try {

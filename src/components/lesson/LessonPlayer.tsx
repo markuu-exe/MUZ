@@ -39,6 +39,8 @@ export interface LessonPlayerProps {
    * COURSE-6 saves the result here. May return a short note for the results screen.
    */
   onComplete?: (result: LessonResult) => void | string | Promise<void | string>;
+  /** Called immediately when a heart is lost during a practice or rhythm exercise. */
+  onHeartLost?: (reason: 'timeout' | 'misses' | 'rhythm-fail') => void;
   onClose: () => void;
 }
 
@@ -61,6 +63,7 @@ export default function LessonPlayer({
   hearts,
   registry = EXERCISE_REGISTRY,
   onComplete,
+  onHeartLost,
   onClose,
 }: LessonPlayerProps) {
   const [run, setRun] = useState<LessonRunState>(() => createLessonRun(lessonId, payload, hearts, Date.now()));
@@ -70,6 +73,8 @@ export default function LessonPlayer({
   const [note, setNote] = useState<string | null>(null);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
+  const onHeartLostRef = useRef(onHeartLost);
+  onHeartLostRef.current = onHeartLost;
   const reported = useRef<LessonRunState | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
@@ -99,7 +104,16 @@ export default function LessonPlayer({
 
   const advance = useCallback((outcome: ExerciseOutcome) => {
     setPending(null);
-    setRun((s) => submitOutcome(s, outcome, Date.now()));
+    setRun((s) => {
+      const next = submitOutcome(s, outcome, Date.now());
+      // Practice drills already report each lost heart via onHeartLost as it happens;
+      // if a rhythm exercise deducts a heart on submitOutcome, report that too.
+      const prevItem = currentItem(s);
+      if (prevItem && prevItem.stage === 'rhythm' && next.hearts < s.hearts) {
+        onHeartLostRef.current?.('rhythm-fail');
+      }
+      return next;
+    });
   }, []);
 
   const handleOutcome = useCallback(
@@ -225,6 +239,7 @@ export default function LessonPlayer({
                     hearts={run.hearts}
                     submitted={pending !== null}
                     onOutcome={handleOutcome}
+                    onHeartLost={(reason) => onHeartLostRef.current?.(reason)}
                   />
                 </div>
               </PracticeRigProvider>
