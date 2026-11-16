@@ -17,6 +17,7 @@ export interface Database {
           last_activity_date: string | null;
           exp: number;
           hearts: number;
+          last_heart_update: string | null;
           created_at: string | null;
         };
         Insert: {
@@ -27,6 +28,7 @@ export interface Database {
           last_activity_date?: string | null;
           exp?: number;
           hearts?: number;
+          last_heart_update?: string | null;
           created_at?: string | null;
         };
         Update: {
@@ -37,6 +39,7 @@ export interface Database {
           last_activity_date?: string | null;
           exp?: number;
           hearts?: number;
+          last_heart_update?: string | null;
           created_at?: string | null;
         };
         Relationships: [];
