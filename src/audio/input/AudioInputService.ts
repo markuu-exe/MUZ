@@ -175,6 +175,8 @@ export class AudioInputService extends Emitter<AudioInputEvents> {
       rmsDb: msg.rmsDb,
       noiseDb: msg.noiseDb,
       flux: msg.flux,
+      pitchHz: msg.pitchHz,
+      clarity: msg.clarity,
     });
   }
 

@@ -75,6 +75,8 @@ class ChromaWorkletProcessor extends AudioWorkletProcessor {
       flux: f.flux,
       onset: f.onset,
       onsetTime: f.onsetTime,
+      pitchHz: f.pitchHz,
+      clarity: f.clarity,
     };
     this.port.postMessage(msg, [msg.chroma.buffer]);
   }

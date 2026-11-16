@@ -11,6 +11,10 @@ export interface AcousticFrame {
   ringing?: boolean;
   onset: boolean;
   onsetMs: number;
+  /** T-08: pitchy f0 for this hop (Hz); null when unvoiced or no pitch found. Read by PitchVerifier (T-07). */
+  pitchHz?: number | null;
+  /** T-08: pitchy clarity 0..1 (0 when pitchHz is null). */
+  clarity?: number;
 }
 
 export type AttemptKind =

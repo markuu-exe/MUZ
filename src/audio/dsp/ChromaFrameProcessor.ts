@@ -1,3 +1,4 @@
+import { PitchDetector } from 'pitchy';
 import { DEFAULT_CHROMA_CONFIG, type ChromaConfig } from '../config';
 import { FFT, hannWindow } from './fft';
 import { freqToMidi } from './pitch';
@@ -25,6 +26,13 @@ export interface ChromaFrame {
   onset: boolean;
   /** Audio-clock time (s) of the detected onset (meaningful only when `onset`). */
   onsetTime: number;
+  /**
+   * T-08: pitchy (McLeod) fundamental of the same 4096-sample window, in Hz.
+   * Null when the frame is below the noise gate or pitchy finds no pitch.
+   */
+  pitchHz: number | null;
+  /** T-08: pitchy clarity 0..1 (0 when `pitchHz` is null). PitchVerifier applies the 0.85 rule. */
+  clarity: number;
 }
 
 const ONSET_FFT = 1024;
@@ -97,6 +105,9 @@ export class ChromaFrameProcessor {
   private residueOnset = -Infinity;
   private residueAudible = false;
   private readonly mag: Float64Array;
+  /** T-08: un-windowed copy of the ring, oldest sample first, for pitchy. */
+  private readonly pitchInput: Float32Array;
+  private readonly pitchDetector: PitchDetector<Float32Array>;
 
   private noiseDb: number;
   private readonly frame: ChromaFrame;
@@ -110,6 +121,8 @@ export class ChromaFrameProcessor {
     this.onFrame = onFrame;
 
     this.ring = new Float32Array(fftSize);
+    this.pitchInput = new Float32Array(fftSize);
+    this.pitchDetector = PitchDetector.forFloat32Array(fftSize);
     this.fft = new FFT(fftSize);
     this.win = hannWindow(fftSize);
     this.re = new Float64Array(fftSize);
@@ -150,6 +163,8 @@ export class ChromaFrameProcessor {
       flux: 0,
       onset: false,
       onsetTime: 0,
+      pitchHz: null,
+      clarity: 0,
     };
   }
 
@@ -202,6 +217,7 @@ export class ChromaFrameProcessor {
     let sumSq = 0;
     for (let i = 0; i < n; i++) {
       const x = this.ring[(this.writePos + i) % n];
+      this.pitchInput[i] = x;
       sumSq += x * x;
       this.re[i] = x * this.win[i];
       this.im[i] = 0;
@@ -249,9 +265,16 @@ export class ChromaFrameProcessor {
     if (!gated) {
       this.magRing[slot].fill(0); // quiet frame: nothing to carry over
       f.voiced = false;
+      f.pitchHz = null;
+      f.clarity = 0;
       this.onFrame(f);
       return;
     }
+
+    // ---- f0 (T-08): pitchy on the same window, only when the frame passed the gate ----
+    const [pitchHz, clarity] = this.pitchDetector.findPitch(this.pitchInput, this.sampleRate);
+    f.pitchHz = pitchHz > 0 && Number.isFinite(pitchHz) ? pitchHz : null;
+    f.clarity = f.pitchHz === null ? 0 : clarity;
 
     // ---- spectrum ----
     this.fft.transform(this.re, this.im);
