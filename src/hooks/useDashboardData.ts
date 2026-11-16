@@ -59,15 +59,6 @@ export function useDashboardData(profile: UserProfile | null, isDemo: boolean): 
         ]);
         if (cancelled) return;
 
-        let remoteProgress = (progressByUser.data ?? []) as UserProgress[];
-        if (progressByUser.error && remoteProgress.length === 0) {
-          const fallbackProgress = await supabase
-            .from('user_progress')
-            .select('*')
-            .eq('profile_id', profile.id);
-          remoteProgress = (fallbackProgress.data ?? []) as UserProgress[];
-        }
-
         const remoteProgress = (progressResult.data ?? []) as UserProgress[];
         setProgress(asProgressMap(remoteProgress));
 

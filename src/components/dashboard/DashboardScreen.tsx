@@ -132,7 +132,6 @@ export default function DashboardScreen() {
       window.setTimeout(() => setShakingId(null), 500);
       setBanner({
         message:
-          heartCheck.reason ??
           'No Stamina Hearts remaining! Complete a free Theory unit or wait for your heart regeneration.',
         type: 'error',
       });
@@ -352,7 +351,7 @@ export default function DashboardScreen() {
                   type="button"
                   onClick={() => {
                     setSelected(recoveryTheoryLesson);
-                    setActiveSessionNode(recoveryTheoryLesson);
+                    setActiveLesson(recoveryTheoryLesson);
                   }}
                   className="rounded-lg border border-emerald-400/40 bg-emerald-500/20 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-200 hover:bg-emerald-500/30"
                 >
