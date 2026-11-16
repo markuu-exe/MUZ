@@ -1,0 +1,105 @@
+import { Heart, RotateCcw, Sparkles, Target, Timer } from 'lucide-react';
+import type { LessonResult } from '../../lesson/types';
+import { cn } from '../../lib/cn';
+
+interface LessonResultsProps {
+  title: string;
+  result: LessonResult;
+  /** Shown under the headline, e.g. "Saved" / "Could not save" (COURSE-6). */
+  note?: string | null;
+  onRetry: () => void;
+  onClose: () => void;
+}
+
+const HEADLINE: Record<LessonResult['status'], { title: string; body: string }> = {
+  passed: { title: 'Lesson complete', body: 'Nice work. The next lesson is ready when you are.' },
+  failed: { title: 'Not quite there', body: 'You did not reach the pass mark this time. Review and try again.' },
+  'out-of-hearts': {
+    title: 'Out of hearts',
+    body: 'Practice needs hearts. Wait for one to come back, or score 80% or more on a theory lesson.',
+  },
+  quit: { title: 'Lesson closed', body: '' },
+};
+
+function formatDuration(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return m > 0 ? `${m}m ${String(s).padStart(2, '0')}s` : `${s}s`;
+}
+
+export default function LessonResults({ title, result, note, onRetry, onClose }: LessonResultsProps) {
+  const head = HEADLINE[result.status];
+  const used = (engine: 'rhythm' | 'practice') => result.records.some((r) => r.engine === engine);
+  const stats: Array<{ label: string; value: string; icon: typeof Target; tone: string }> = [
+    { label: 'First-try accuracy', value: `${Math.round(result.accuracy)}%`, icon: Target, tone: 'text-cyan-300' },
+    { label: 'EXP earned', value: `+${result.expAwarded}`, icon: Sparkles, tone: 'text-violet-300' },
+    { label: 'Hearts', value: `${result.heartsEnd} / 5`, icon: Heart, tone: 'text-rose-300' },
+    { label: 'Time', value: formatDuration(result.durationSec), icon: Timer, tone: 'text-slate-300' },
+  ];
+
+  return (
+    <div className="muz-rise mx-auto w-full max-w-xl space-y-6 text-center">
+      <div
+        className={cn(
+          'mx-auto flex h-20 w-20 items-center justify-center rounded-full border text-4xl',
+          result.passed
+            ? 'border-emerald-400/60 bg-emerald-500/15 shadow-[0_0_40px_rgba(52,211,153,0.45)]'
+            : 'border-rose-400/60 bg-rose-500/15 shadow-[0_0_40px_rgba(244,63,94,0.35)]',
+        )}
+      >
+        {result.passed ? '★' : result.status === 'out-of-hearts' ? '♡' : '↻'}
+      </div>
+      <div>
+        <p className="text-xs font-bold uppercase tracking-widest text-violet-300">{title}</p>
+        <h2 className="mt-1 text-3xl font-black text-white">{head.title}</h2>
+        <p className="mt-2 text-sm text-slate-400">{head.body}</p>
+        {note && <p className="mt-2 text-xs text-slate-500">{note}</p>}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {stats.map(({ label, value, icon: Icon, tone }) => (
+          <div key={label} className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 text-left">
+            <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-slate-500">
+              <Icon className={cn('h-3.5 w-3.5', tone)} />
+              {label}
+            </div>
+            <p className={cn('mt-1 text-2xl font-bold', tone)}>{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {(used('rhythm') || used('practice')) && (
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-left text-sm text-slate-300">
+          {used('rhythm') && <p>Rhythm consistency: {Math.round(result.metrics.rhythmConsistency)}%</p>}
+          {used('practice') && <p>Pitch accuracy: {Math.round(result.metrics.pitchAccuracy)}%</p>}
+          {used('practice') && <p>Posture score: {Math.round(result.metrics.postureScore)}%</p>}
+        </div>
+      )}
+
+      {result.heartRestored && (
+        <p className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-2 text-sm text-rose-200">
+          ♥ One heart restored for scoring {Math.round(result.theoryScore ?? 0)}% on theory.
+        </p>
+      )}
+
+      <div className="flex gap-3">
+        {!result.passed && result.status !== 'out-of-hearts' && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-violet-500/50 bg-violet-500/10 px-6 py-3 text-sm font-bold uppercase tracking-wider text-violet-200 transition hover:bg-violet-500/20"
+          >
+            <RotateCcw className="h-4 w-4" /> Try again
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex-1 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 py-3 text-sm font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(168,85,247,0.45)] transition hover:brightness-110 active:scale-[0.98]"
+        >
+          {result.passed ? 'Continue' : 'Back to skill tree'}
+        </button>
+      </div>
+    </div>
+  );
+}

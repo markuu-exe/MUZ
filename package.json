@@ -9,7 +9,9 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck:seed": "tsc -p scripts/tsconfig.json --noEmit"
+    "typecheck:seed": "tsc -p scripts/tsconfig.json --noEmit",
+    "seed:lessons": "tsx scripts/generate-lesson-seed.ts",
+    "seed:lessons:check": "tsx scripts/generate-lesson-seed.ts --check"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "1.1.0",
@@ -32,6 +34,7 @@
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.23.15",
     "typescript": "^5.7.2",
     "vite": "^6.0.3",
     "vitest": "^3.2.7"

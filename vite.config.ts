@@ -17,4 +17,9 @@ export default defineConfig({
     sourcemap: false,
     chunkSizeWarningLimit: 1000,
   },
+  worker: {
+    // The posture worker import()s @mediapipe/tasks-vision, which code-splits
+    // the worker bundle; the default iife format cannot express that.
+    format: 'es',
+  },
 });

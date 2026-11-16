@@ -2,53 +2,47 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase/client';
 import {
   DEMO_CURRICULUM,
-  DEMO_PROGRESS,
+  demoProgressForExp,
   toCurriculumNode,
   type CurriculumNode,
+  type ProgressMap,
 } from '../lib/dashboard/curriculum';
+import { isLessonPayload } from '../types/lesson.types';
 import type { UserProgress } from '../types/database.types';
 import type { UserProfile } from '../types/auth.types';
 
 interface DashboardData {
   lessons: CurriculumNode[];
-  progress: Record<string, UserProgress | Pick<UserProgress, 'lesson_id' | 'completed'>>;
+  progress: ProgressMap;
   loading: boolean;
+  /** True when the bundled course is shown instead of the database rows. */
   usingFallback: boolean;
+  /** Re-read progress after a lesson finishes (COURSE-6). */
+  reload: () => void;
 }
 
-function asProgressMap(
-  rows: Array<Partial<UserProgress> & { lesson_id?: string; completed?: boolean }>,
-): DashboardData['progress'] {
-  const map: DashboardData['progress'] = {};
-  for (const row of rows) {
-    if (!row.lesson_id) continue;
-    map[row.lesson_id] = {
-      id: row.id ?? row.lesson_id,
-      user_id: row.user_id ?? row.profile_id ?? '',
-      profile_id: row.profile_id ?? row.user_id ?? '',
-      lesson_id: row.lesson_id,
-      completed: Boolean(row.completed),
-      accuracy_percentage: row.accuracy_percentage ?? (row.completed ? 100 : 0),
-      posture_stability_score: row.posture_stability_score ?? (row.completed ? 94 : 0),
-      unlocked_at: row.unlocked_at ?? row.created_at ?? null,
-      completed_at: row.completed_at ?? row.updated_at ?? null,
-      created_at: row.created_at ?? null,
-      updated_at: row.updated_at ?? null,
-    };
-  }
+function asProgressMap(rows: UserProgress[]): ProgressMap {
+  const map: ProgressMap = {};
+  for (const row of rows) map[row.lesson_id] = row;
   return map;
 }
 
+/**
+ * COURSE-2: lessons come from Supabase when the table holds v2 payloads;
+ * otherwise (offline, empty table, or the old seed) the bundled course is used.
+ * Progress is always read from `user_progress.user_id` (was the non-existent `profile_id`).
+ */
 export function useDashboardData(profile: UserProfile | null, isDemo: boolean): DashboardData {
   const [lessons, setLessons] = useState<CurriculumNode[]>(DEMO_CURRICULUM);
-  const [progress, setProgress] = useState<DashboardData['progress']>(DEMO_PROGRESS);
+  const [progress, setProgress] = useState<ProgressMap>({});
   const [loading, setLoading] = useState(!isDemo);
   const [usingFallback, setUsingFallback] = useState(true);
+  const [version, setVersion] = useState(0);
 
   useEffect(() => {
     if (isDemo || !profile?.id) {
       setLessons(DEMO_CURRICULUM);
-      setProgress(DEMO_PROGRESS);
+      setProgress(demoProgressForExp(profile?.exp ?? 0));
       setUsingFallback(true);
       setLoading(false);
       return;
@@ -59,16 +53,10 @@ export function useDashboardData(profile: UserProfile | null, isDemo: boolean): 
     const load = async () => {
       setLoading(true);
       try {
-        const [{ data: lessonRows, error: lessonError }, progressByUser] = await Promise.all([
-          supabase
-            .from('lessons')
-            .select('*')
-            .eq('instrument', 'piano')
-            .order('module_index')
-            .order('node_index'),
+        const [{ data: lessonRows, error: lessonError }, progressResult] = await Promise.all([
+          supabase.from('lessons').select('*').eq('instrument', 'piano').order('module_index').order('node_index'),
           supabase.from('user_progress').select('*').eq('user_id', profile.id),
         ]);
-
         if (cancelled) return;
 
         let remoteProgress = (progressByUser.data ?? []) as UserProgress[];
@@ -80,27 +68,21 @@ export function useDashboardData(profile: UserProfile | null, isDemo: boolean): 
           remoteProgress = (fallbackProgress.data ?? []) as UserProgress[];
         }
 
-        const remoteLessons = lessonRows ?? [];
+        const remoteProgress = (progressResult.data ?? []) as UserProgress[];
+        setProgress(asProgressMap(remoteProgress));
 
-        if (lessonError || remoteLessons.length === 0) {
+        const remoteLessons = lessonRows ?? [];
+        const usable = !lessonError && remoteLessons.length > 0 && remoteLessons.every((l) => isLessonPayload(l.payload));
+        if (!usable) {
           setLessons(DEMO_CURRICULUM);
-          setProgress(remoteProgress.length > 0 ? asProgressMap(remoteProgress) : DEMO_PROGRESS);
           setUsingFallback(true);
           return;
         }
-
-        const progressMap = asProgressMap(remoteProgress);
-        setLessons(
-          remoteLessons.map((lesson) =>
-            toCurriculumNode(lesson, progressMap[lesson.id] as UserProgress | undefined),
-          ),
-        );
-        setProgress(progressMap);
+        setLessons(remoteLessons.map((lesson) => toCurriculumNode(lesson, asProgressMap(remoteProgress)[lesson.id])));
         setUsingFallback(false);
       } catch {
         if (cancelled) return;
         setLessons(DEMO_CURRICULUM);
-        setProgress(DEMO_PROGRESS);
         setUsingFallback(true);
       } finally {
         if (!cancelled) setLoading(false);
@@ -111,10 +93,10 @@ export function useDashboardData(profile: UserProfile | null, isDemo: boolean): 
     return () => {
       cancelled = true;
     };
-  }, [isDemo, profile?.id]);
+  }, [isDemo, profile?.id, profile?.exp, version]);
 
   return useMemo(
-    () => ({ lessons, progress, loading, usingFallback }),
+    () => ({ lessons, progress, loading, usingFallback, reload: () => setVersion((v) => v + 1) }),
     [lessons, progress, loading, usingFallback],
   );
 }
