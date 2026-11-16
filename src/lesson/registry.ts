@@ -17,6 +17,12 @@ export interface ExerciseViewProps<T extends Exercise = Exercise> {
   submitted: boolean;
   /** Answer views call this once on Check. Activity views call it when the activity ends. */
   onOutcome: (outcome: ExerciseOutcome) => void;
+  /**
+   * Activity views that spend hearts call this whenever their running total of
+   * hearts lost changes, before onOutcome. The player charges it if the learner
+   * quits mid-exercise (SRS 3.1.2.4); once onOutcome reports, it is discarded.
+   */
+  onHeartsSpent?: (heartsLostSoFar: number) => void;
 }
 
 export interface ExerciseRegistryEntry {

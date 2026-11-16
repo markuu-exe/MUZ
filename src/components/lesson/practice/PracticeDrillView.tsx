@@ -30,12 +30,14 @@ function targetTitle(target: DrillTarget): string {
   return target.kind === 'note' ? `Play ${targetLabel(target)}` : `Play the ${targetLabel(target)} chord`;
 }
 
-export default function PracticeDrillView({ exercise, settings, hearts, onOutcome }: ExerciseViewProps<DrillExercise>) {
+export default function PracticeDrillView({ exercise, settings, hearts, onOutcome, onHeartsSpent }: ExerciseViewProps<DrillExercise>) {
   const { rig, state } = usePracticeRig();
   const targets = useMemo(() => drillTargets(exercise), [exercise]);
   const [ended, setEnded] = useState<{ passed: boolean; stats: DrillStats } | null>(null);
   const onOutcomeRef = useRef(onOutcome);
   onOutcomeRef.current = onOutcome;
+  const onHeartsSpentRef = useRef(onHeartsSpent);
+  onHeartsSpentRef.current = onHeartsSpent;
 
   const problems = mediaProblems(state, true);
   const ready = state.camera.status === 'active' && state.model === 'ready' && state.mic === 'running';
@@ -57,6 +59,13 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
   useEffect(() => {
     if (ready && !running) start();
   }, [ready, running, start]);
+
+  // Tell the player about every heart as it is lost, so quitting mid-drill
+  // (or during the outcome pause below) cannot refund it (T-06).
+  const { heartsLost } = drill;
+  useEffect(() => {
+    onHeartsSpentRef.current?.(heartsLost);
+  }, [heartsLost]);
 
   // Show the outcome for a moment, then hand it to the lesson player.
   useEffect(() => {
