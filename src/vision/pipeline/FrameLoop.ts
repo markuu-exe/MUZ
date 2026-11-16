@@ -14,8 +14,17 @@ export type FrameLoopEvents = {
 
 export interface FrameLoopOptions {
   worker: Worker;
+  /** Monotonic clock in ms (default performance.now). Stamps every frame sent to the worker. */
   timestamp?: () => number;
+  /**
+   * Minimum time between frames sent to the worker (SRS 3.4: 20–30 Hz inference).
+   * 30 ms rather than 33 so a 30 fps camera's jittery ~33 ms frames are not dropped,
+   * while a 60 fps camera sends every second frame.
+   */
+  minIntervalMs?: number;
 }
+
+const DEFAULT_MIN_INTERVAL_MS = 30;
 
 /**
  * Captures video frames with requestVideoFrameCallback and sends at most one frame
@@ -26,17 +35,26 @@ export class FrameLoop extends Emitter<FrameLoopEvents> {
   private readonly video: HTMLVideoElement;
   private readonly worker: Worker;
   private readonly now: () => number;
+  private readonly minIntervalMs: number;
+  private lastSentMs = -Infinity;
   private running = false;
   private awaitingResult = false;
   private inFlightCaptureMs = 0;
   private callbackId: number | null = null;
   private disposed = false;
+  private _delegate: 'GPU' | 'CPU' | null = null;
+
+  /** Where the pose model runs, from the worker's READY message; null until it loads. */
+  get delegate(): 'GPU' | 'CPU' | null {
+    return this._delegate;
+  }
 
   constructor(video: HTMLVideoElement, options: FrameLoopOptions) {
     super();
     this.video = video;
     this.worker = options.worker;
     this.now = options.timestamp ?? (() => performance.now());
+    this.minIntervalMs = options.minIntervalMs ?? DEFAULT_MIN_INTERVAL_MS;
     this.worker.addEventListener('message', this.onWorkerMessage);
     this.worker.addEventListener('error', this.onWorkerError);
   }
@@ -82,19 +100,39 @@ export class FrameLoop extends Emitter<FrameLoopEvents> {
     if (!this.running) return;
     this.schedule();
     if (this.awaitingResult) return;
+    const sentAt = this.now();
+    if (sentAt - this.lastSentMs < this.minIntervalMs) return;
 
-    const frame = await createImageBitmap(this.video);
+    // Claim the slot before the await, or a frame arriving mid-capture would start a second one.
+    this.awaitingResult = true;
+    let frame: ImageBitmap;
+    try {
+      frame = await createImageBitmap(this.video);
+    } catch (err) {
+      this.awaitingResult = false;
+      this.emit('error', {
+        type: 'ERROR',
+        code: 'UNKNOWN',
+        message: err instanceof Error ? err.message : 'Could not capture a camera frame.',
+        fatal: false,
+      });
+      return;
+    }
     if (!this.running) {
+      this.awaitingResult = false;
       frame.close();
       return;
     }
 
-    this.awaitingResult = true;
+    this.lastSentMs = sentAt;
     this.inFlightCaptureMs = metadata.expectedDisplayTime || now;
     const message: Extract<PostureWorkerRequest, { type: 'PROCESS' }> = {
       type: 'PROCESS',
       frame,
-      timestampMs: metadata.mediaTime * 1000 || this.now(),
+      // Not metadata.mediaTime: it restarts near 0 when the camera stream is replaced,
+      // and the long-lived worker then clamps every frame to "previous + 1 ms", which
+      // stretches cue delays and One-Euro smoothing (T-09).
+      timestampMs: sentAt,
     };
     this.worker.postMessage(message, [frame]);
   };
@@ -112,6 +150,7 @@ export class FrameLoop extends Emitter<FrameLoopEvents> {
         this.emit('error', message);
         break;
       case 'READY':
+        this._delegate = message.delegate;
         this.emit('ready', message);
         break;
       case 'STOPPED':
