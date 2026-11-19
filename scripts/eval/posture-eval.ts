@@ -13,7 +13,7 @@
  */
 import * as fs from 'node:fs';
 import { LandmarkLog } from '../../src/vision/eval/landmarkLog';
-import { evaluateLog, formatReport, parseLabelsCsv } from '../../src/vision/eval/postureScore';
+import { evaluateLog, formatReport, labelWarnings, parseLabelsCsv } from '../../src/vision/eval/postureScore';
 
 const USAGE = 'usage: npm run eval:posture -- <log.json> <labels.csv>';
 
@@ -35,7 +35,9 @@ function main(argv: string[]): number {
   try {
     const log = LandmarkLog.fromJSON(readJson(logPath));
     const spans = parseLabelsCsv(fs.readFileSync(labelsPath, 'utf8'));
-    console.log(formatReport(evaluateLog(log, spans)));
+    const report = evaluateLog(log, spans);
+    console.log(formatReport(report));
+    for (const w of labelWarnings(spans, report)) console.error(`warning: ${w}`);
     return 0;
   } catch (err) {
     console.error(`posture-eval: ${err instanceof Error ? err.message : String(err)}`);

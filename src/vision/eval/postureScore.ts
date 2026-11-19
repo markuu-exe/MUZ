@@ -6,12 +6,15 @@
  * compared with the label of the span it falls in:
  *
  *   good  — no fault           → elbow −, wrist −, overall −
- *   elbow — elbow out of band  → elbow +, wrist −, overall +
- *   wrist — wrist bent         → elbow −, wrist +, overall +
+ *   elbow — elbow out of band  → elbow +, wrist not scored, overall +
+ *   wrist — wrist bent         → elbow not scored, wrist +, overall +
  *   unknown / no label         → not scored (counted)
  *
- * "Positive" means "violation". A rule's prediction is unevaluable (null) when
- * neither arm could be measured for it; those frames are counted, not scored.
+ * "Positive" means "violation". Negatives for a rule come only from `good` spans:
+ * a fault span says nothing reliable about the other joint. A rule's prediction is
+ * unevaluable (null) when neither arm could be measured for it; those frames are
+ * counted by polarity (unevaluable+ where the rule should fire, unevaluable− where
+ * it should not) and `strictRecall` counts unevaluable+ frames as misses.
  */
 import { PostureAnalyzer } from '../posture/PostureAnalyzer';
 import type { MetricState, PostureSnapshot } from '../posture/types';
@@ -37,16 +40,22 @@ export interface Confusion {
   tn: number;
   /** Scored frames: tp + fp + fn + tn. */
   n: number;
-  /** Labelled (good/elbow/wrist) frames where the rule could not decide. */
-  unevaluable: number;
+  /** Frames where the rule should fire but could not decide. */
+  unevaluablePos: number;
+  /** Frames where the rule should stay quiet but could not decide. */
+  unevaluableNeg: number;
   /** tp / (tp + fp), null when nothing was predicted positive. */
   precision: number | null;
   /** tp / (tp + fn), null when no frame was labelled positive. */
   recall: number | null;
+  /** tp / (tp + fn + unevaluablePos): a fault the app could not see counts as missed. */
+  strictRecall: number | null;
 }
 
 export interface PostureEvalReport {
   frames: number;
+  /** Time of the last frame (ms since the first), null for an empty log. */
+  lastMs: number | null;
   /** Frames outside every label span. */
   unlabelled: number;
   byLabel: Record<PostureLabel, number>;
@@ -117,15 +126,15 @@ export function predictRules(s: PostureSnapshot): Record<RuleName, boolean | nul
   };
 }
 
-/** Ground truth per rule for a label, or null when the frame is not scored. */
-export function truthFor(label: PostureLabel): Record<RuleName, boolean> | null {
+/** Ground truth per rule for a label (null = this rule is not scored here), or null when the frame is not scored at all. */
+export function truthFor(label: PostureLabel): Record<RuleName, boolean | null> | null {
   switch (label) {
     case 'good':
       return { elbow: false, wrist: false, overall: false };
     case 'elbow':
-      return { elbow: true, wrist: false, overall: true };
+      return { elbow: true, wrist: null, overall: true };
     case 'wrist':
-      return { elbow: false, wrist: true, overall: true };
+      return { elbow: null, wrist: true, overall: true };
     case 'unknown':
       return null;
   }
@@ -137,19 +146,21 @@ function ratio(num: number, den: number): number | null {
 
 export class PostureScorer {
   private frames = 0;
+  private lastMs: number | null = null;
   private unlabelled = 0;
   private compliantNull = 0;
   private readonly byLabel: Record<PostureLabel, number> = { good: 0, elbow: 0, wrist: 0, unknown: 0 };
-  private readonly counts: Record<RuleName, { tp: number; fp: number; fn: number; tn: number; unevaluable: number }> = {
-    elbow: { tp: 0, fp: 0, fn: 0, tn: 0, unevaluable: 0 },
-    wrist: { tp: 0, fp: 0, fn: 0, tn: 0, unevaluable: 0 },
-    overall: { tp: 0, fp: 0, fn: 0, tn: 0, unevaluable: 0 },
+  private readonly counts: Record<RuleName, Omit<Confusion, 'n' | 'precision' | 'recall' | 'strictRecall'>> = {
+    elbow: { tp: 0, fp: 0, fn: 0, tn: 0, unevaluablePos: 0, unevaluableNeg: 0 },
+    wrist: { tp: 0, fp: 0, fn: 0, tn: 0, unevaluablePos: 0, unevaluableNeg: 0 },
+    overall: { tp: 0, fp: 0, fn: 0, tn: 0, unevaluablePos: 0, unevaluableNeg: 0 },
   };
 
   constructor(private readonly spans: readonly LabelSpan[]) {}
 
   add(tMs: number, snapshot: PostureSnapshot): void {
     this.frames++;
+    this.lastMs = tMs;
     if (snapshot.compliant === null) this.compliantNull++;
     const label = labelAt(this.spans, tMs);
     if (label === null) {
@@ -161,12 +172,16 @@ export class PostureScorer {
     if (!truth) return;
     const pred = predictRules(snapshot);
     for (const rule of RULES) {
+      const want = truth[rule];
+      if (want === null) continue;
       const c = this.counts[rule];
       const p = pred[rule];
-      if (p === null) c.unevaluable++;
-      else if (p && truth[rule]) c.tp++;
+      if (p === null) {
+        if (want) c.unevaluablePos++;
+        else c.unevaluableNeg++;
+      } else if (p && want) c.tp++;
       else if (p) c.fp++;
-      else if (truth[rule]) c.fn++;
+      else if (want) c.fn++;
       else c.tn++;
     }
   }
@@ -175,10 +190,17 @@ export class PostureScorer {
     const rules = {} as Record<RuleName, Confusion>;
     for (const rule of RULES) {
       const c = this.counts[rule];
-      rules[rule] = { ...c, n: c.tp + c.fp + c.fn + c.tn, precision: ratio(c.tp, c.tp + c.fp), recall: ratio(c.tp, c.tp + c.fn) };
+      rules[rule] = {
+        ...c,
+        n: c.tp + c.fp + c.fn + c.tn,
+        precision: ratio(c.tp, c.tp + c.fp),
+        recall: ratio(c.tp, c.tp + c.fn),
+        strictRecall: ratio(c.tp, c.tp + c.fn + c.unevaluablePos),
+      };
     }
     return {
       frames: this.frames,
+      lastMs: this.lastMs,
       unlabelled: this.unlabelled,
       byLabel: { ...this.byLabel },
       compliantNull: this.compliantNull,
@@ -199,6 +221,25 @@ export function evaluateLog(log: LandmarkLog, spans: readonly LabelSpan[]): Post
   return scorer.report();
 }
 
+/** A span ending this long after the last frame is suspicious (a typo, or a log cut short). */
+const SPAN_PAST_END_TOLERANCE_MS = 1000;
+
+/** Plausibility checks on the labels against the log, as human-readable warnings. */
+export function labelWarnings(spans: readonly LabelSpan[], r: PostureEvalReport): string[] {
+  const out: string[] = [];
+  if (r.lastMs !== null) {
+    for (const s of spans) {
+      if (s.endMs > r.lastMs + SPAN_PAST_END_TOLERANCE_MS) {
+        out.push(`label span ${s.startMs}-${s.endMs} (${s.label}) ends after the last frame (t=${r.lastMs} ms)`);
+      }
+    }
+  }
+  if (r.frames > 0 && r.unlabelled / r.frames > 0.5) {
+    out.push(`${pct(r.unlabelled, r.frames)} of frames have no label: labels in seconds instead of ms?`);
+  }
+  return out;
+}
+
 function pct(part: number, whole: number): string {
   return whole > 0 ? `${((100 * part) / whole).toFixed(1)}%` : '—';
 }
@@ -209,10 +250,12 @@ function fixed(v: number | null): string {
 
 /** Plain-text table for the CLI. */
 export function formatReport(r: PostureEvalReport): string {
-  const header = ['rule', 'TP', 'FP', 'FN', 'TN', 'precision', 'recall', 'n', 'unevaluable'];
+  const header = ['rule', 'TP', 'FP', 'FN', 'TN', 'precision', 'recall', 'strict recall', 'n', 'unev+', 'unev−'];
   const rows = RULES.map((rule) => {
     const c = r.rules[rule];
-    return [rule, c.tp, c.fp, c.fn, c.tn, fixed(c.precision), fixed(c.recall), c.n, c.unevaluable].map(String);
+    return [rule, c.tp, c.fp, c.fn, c.tn, fixed(c.precision), fixed(c.recall), fixed(c.strictRecall), c.n, c.unevaluablePos, c.unevaluableNeg].map(
+      String,
+    );
   });
   const widths = header.map((h, i) => Math.max(h.length, ...rows.map((row) => row[i].length)));
   const line = (cells: string[]) => cells.map((c, i) => (i === 0 ? c.padEnd(widths[i]) : c.padStart(widths[i]))).join('  ');
@@ -226,5 +269,7 @@ export function formatReport(r: PostureEvalReport): string {
     ...rows.map(line),
     '',
     'positive = violation; overall = the gated compliance verdict (elbow + wrist by default).',
+    'negatives come from good spans only; unev+/unev− = could not decide where the rule should / should not fire;',
+    'strict recall = TP / (TP + FN + unev+).',
   ].join('\n');
 }
