@@ -43,11 +43,11 @@ import PlacementModal from './PlacementModal';
 import { lessonExp } from '../../content';
 import type { LessonResult } from '../../lesson/types';
 import { supabase } from '../../lib/supabase/client';
-import { canOpenLesson, isDevAccount } from '../../lib/progress/devAccess';
+import { canOpenLesson, isDevAccount, resultDestination } from '../../lib/progress/devAccess';
+import { saveRunResult } from '../../lib/progress/devTestResults';
 import { PLACEMENT_METADATA_KEY } from '../../lib/progress/placement';
-import { saveLessonResult } from '../../lib/progress/saveLessonResult';
 import { displayedStreak, toLocalDate } from '../../lib/progress/streak';
-import { persistRegeneratedHearts, savePlacement, supabaseProgressStore } from '../../lib/progress/supabaseStore';
+import { persistRegeneratedHearts, savePlacement, supabaseDevTestStore, supabaseProgressStore } from '../../lib/progress/supabaseStore';
 
 interface NavItem {
   id: DashboardView;
@@ -74,6 +74,8 @@ export default function DashboardScreen() {
   const [selected, setSelected] = useState<CurriculumNode | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<NodeStatus | null>(null);
   const [activeLesson, setActiveLesson] = useState<CurriculumNode | null>(null);
+  // D1: the node status when the lesson was opened decides where its result is saved.
+  const [activeStatus, setActiveStatus] = useState<NodeStatus | null>(null);
   const [lessonFilter, setLessonFilter] = useState<'all' | 'theory' | 'practice' | 'rhythm'>('all');
   const [placementDone, setPlacementDone] = useState(false);
 
@@ -114,17 +116,26 @@ export default function DashboardScreen() {
   };
 
   // COURSE-6: save each finished run; demo mode saves nothing.
-  const handleLessonComplete = async (lesson: CurriculumNode, result: LessonResult): Promise<LessonSaveFeedback> => {
+  // D1: a lesson a developer opened while it was locked is saved as test data only.
+  const handleLessonComplete = async (
+    lesson: CurriculumNode,
+    result: LessonResult,
+    statusAtOpen: NodeStatus | null,
+  ): Promise<LessonSaveFeedback> => {
     if (isDemo || !profile) return { note: 'Demo mode: results are not saved.' };
     const payload = lesson.payload as unknown as LessonPayload;
-    const applied = await saveLessonResult(supabaseProgressStore(supabase), {
-      userId: profile.id,
-      lesson: { passMark: payload.settings.passMark, expReward: lessonExp(payload) },
-      result,
-    });
+    const feedback = await saveRunResult(
+      {
+        destination: resultDestination(isDev, statusAtOpen),
+        userId: profile.id,
+        lesson: { passMark: payload.settings.passMark, expReward: lessonExp(payload) },
+        result,
+      },
+      { progress: supabaseProgressStore(supabase), devTest: supabaseDevTestStore(supabase) },
+    );
     await refreshProfile();
     data.reload();
-    return { note: applied.note, expAwarded: applied.expGained };
+    return feedback;
   };
 
   const masteredCount = useMemo(
@@ -622,6 +633,7 @@ export default function DashboardScreen() {
                       }
                       setBanner(null);
                       setActiveLesson(selected);
+                      setActiveStatus(selectedStatus);
                       setSelected(null);
                       setSelectedStatus(null);
                     }}
@@ -635,7 +647,7 @@ export default function DashboardScreen() {
                     ) : (
                       <>
                         <Play className="h-4 w-4 fill-white" />
-                        {selectedStatus === 'locked' ? 'Start Lesson (developer access)' : 'Start Lesson'}
+                        {selectedStatus === 'locked' ? 'Start test run (developer access)' : 'Start Lesson'}
                       </>
                     )}
                   </button>
@@ -654,7 +666,7 @@ export default function DashboardScreen() {
           title={activeLesson.title}
           payload={activeLesson.payload}
           hearts={hearts}
-          onComplete={(result) => handleLessonComplete(activeLesson, result)}
+          onComplete={(result) => handleLessonComplete(activeLesson, result, activeStatus)}
           onClose={() => setActiveLesson(null)}
         />
       )}

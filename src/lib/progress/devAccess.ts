@@ -22,3 +22,15 @@ export function isDevAccount(profile: { is_dev?: boolean } | null | undefined, i
 export function canOpenLesson(status: NodeStatus, isDev: boolean): boolean {
   return isDev || status !== 'locked';
 }
+
+/** D1: where a finished run is saved. */
+export type ResultDestination = 'learner' | 'dev-test';
+
+/**
+ * Decision D1: a lesson a developer opened through the lock override (it was
+ * `locked` for them when they opened it) is test data. Every other run, including
+ * a developer replaying an unlocked lesson, is saved as normal learner progress.
+ */
+export function resultDestination(isDev: boolean, statusAtOpen: NodeStatus | null): ResultDestination {
+  return isDev && statusAtOpen === 'locked' ? 'dev-test' : 'learner';
+}
