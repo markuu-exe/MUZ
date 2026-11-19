@@ -5,7 +5,7 @@ These are Member A's additional tasks, kept separate from T-01…T-26. Neither c
 | ID | Status (2026-11-19) | Next step |
 |---|---|---|
 | **AUX-AI-01** | **Paused.** The assessment is kept as reference. No implementation and no measurements. R1/R2/R3 are not started. | Any measurement is coordinated with T-19 (one hardware session), when A decides |
-| **AUX-TEST-ACCESS-01** | **Redesign: `profiles.is_dev`** (`AUX_TEST_ACCESS_IS_DEV_DESIGN.md`). §10 decisions recorded (all recommended options). Not implemented. | A's explicit go-ahead to implement the code PR. The migration waits for C's `profiles` fix. |
+| **AUX-TEST-ACCESS-01** | **Redesign: `profiles.is_dev`** (`AUX_TEST_ACCESS_IS_DEV_DESIGN.md`). §10 decisions recorded (all recommended options). **Implemented** on `task/AUX-TEST-ACCESS-01` (code + migration file). **Migration not applied.** | PR review (B). Apply the migration after C's `profiles` fix and a backup, then run `sql/is_dev_guard_check.sql` and the manual scenarios. |
 
 ## Reversion audit (2026-11-19)
 
@@ -24,11 +24,11 @@ These are Member A's additional tasks, kept separate from T-01…T-26. Neither c
 
 **Untouched:** `task/T-02-rulings-final` (still @ `0fcec46`, clean), `main`, every other branch, and all T-xx work. No AUX-AI-01 code was written.
 
-**Untracked on disk** (not committed anywhere): `AUX_AI_FEATURE_ASSESSMENT.md`, `AUX_AI_CLAIMS_AND_EVIDENCE.md`, `AUX_AI_IMPROVEMENT_PLAN.md`, `AUX_TEST_ACCESS_IS_DEV_DESIGN.md`, and this file.
+**Untracked on disk at the time of the audit** (not committed anywhere then): `AUX_AI_FEATURE_ASSESSMENT.md`, `AUX_AI_CLAIMS_AND_EVIDENCE.md`, `AUX_AI_IMPROVEMENT_PLAN.md`, `AUX_TEST_ACCESS_IS_DEV_DESIGN.md`, and this file.
 
 **Reversion: DONE (approved by A, 2026-11-19).**
 - Steps 1 and 3 were run; step 2 was skipped, so the three old test-access docs were not kept.
-- `task/AUX-TEST-ACCESS-01` is deleted (it was `c47a50c`). If ever needed: `git branch recover-aux c47a50c` while it is still in the reflog.
+- The old `task/AUX-TEST-ACCESS-01` (table design, `c47a50c`) was deleted. The branch name was reused afterwards for the `is_dev` implementation, cut fresh from `origin/main`. If ever needed: `git branch recover-aux c47a50c` while it is still in the reflog.
 - Verified afterwards: on `task/T-02-rulings-final` @ `0fcec46`; no `lesson_test_access` in `src/` or `supabase/`; only the five untracked `docs/auxiliary/` files remain.
 
 Steps as proposed:

@@ -7,7 +7,9 @@
 -- Why a trigger: profiles grants UPDATE on every column to authenticated, and RLS
 -- (profiles_update_own) restricts rows, not columns. Without this guard any user
 -- could PATCH their own is_dev to true. The guard silently keeps the stored value
--- for every role except the admin roles below (dashboard SQL editor / service role).
+-- unless the writer is an admin role (dashboard SQL editor / service role) AND the
+-- request does not carry an end-user JWT (anon / authenticated). The second check also
+-- covers any future SECURITY DEFINER function that writes profiles on a user's behalf.
 --
 -- Not a content boundary: lessons stay readable by every authenticated user, and
 -- the lock itself is still enforced in the client for everyone.
@@ -28,8 +30,11 @@ language plpgsql
 security invoker
 set search_path = public
 as $$
+declare
+  jwt_role text := coalesce(nullif(current_setting('request.jwt.claims', true), '')::json ->> 'role', '');
 begin
-  if current_user in ('postgres', 'supabase_admin', 'service_role') then
+  if current_user in ('postgres', 'supabase_admin', 'service_role')
+     and jwt_role not in ('anon', 'authenticated') then
     return new;
   end if;
   if tg_op = 'INSERT' then
@@ -42,7 +47,7 @@ end;
 $$;
 
 comment on function public.protect_profiles_is_dev() is
-  'AUX-TEST-ACCESS-01: client roles can never set or change profiles.is_dev.';
+  'AUX-TEST-ACCESS-01: client roles and end-user JWTs can never set or change profiles.is_dev.';
 
 drop trigger if exists profiles_protect_is_dev on public.profiles;
 create trigger profiles_protect_is_dev

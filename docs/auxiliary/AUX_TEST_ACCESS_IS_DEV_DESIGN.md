@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Task** | AUX-TEST-ACCESS-01 (additional workstream, Member A). Not part of T-01…T-26. |
-| **Status** | **Decisions recorded (A chose all recommended options, 2026-11-19; see §10). Awaiting an explicit implementation go-ahead. Nothing implemented or applied.** |
+| **Status** | **Implemented** on branch `task/AUX-TEST-ACCESS-01` (A's go-ahead, 2026-11-19; decisions in §10). **Migration not applied** (waits for C's `profiles` fix, §10.5). Results in `AUX_TEST_ACCESS_TEST_REPORT.md`. |
 | **Supersedes** | `AUX_TEST_ACCESS_DESIGN.md` (the `lesson_test_access` table, approach A) |
 | **Date** | 2026-11-19 |
 | **Code baseline** | `origin/main` @ `67dc05e` |
@@ -47,7 +47,9 @@
 
 **Recommendation: option 1.** It is the smallest change that is still safe, and it leaves the existing grants and RLS alone.
 
-### 2.2 SQL (for a new migration; not yet created)
+### 2.2 SQL (as designed; see `supabase/migrations/20261120000000_profiles_is_dev.sql` for the implemented version)
+
+> **Change made after the code review:** the implemented guard also treats any request carrying an end-user JWT (`request.jwt.claims` role `anon` / `authenticated`) as a client, even when `current_user` is an admin role. This covers any future `SECURITY DEFINER` function that writes `profiles` on a user's behalf.
 
 ```sql
 -- AUX-TEST-ACCESS-01: developer lesson-access flag.
