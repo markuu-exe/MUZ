@@ -27,10 +27,13 @@ export function canOpenLesson(status: NodeStatus, isDev: boolean): boolean {
 export type ResultDestination = 'learner' | 'dev-test';
 
 /**
- * Decision D1: a lesson a developer opened through the lock override (it was
- * `locked` for them when they opened it) is test data. Every other run, including
- * a developer replaying an unlocked lesson, is saved as normal learner progress.
+ * Decision D1: a lesson opened while it was `locked` is test data. Only a developer can
+ * open a locked node (canOpenLesson), so the status at open identifies a test run, and
+ * deciding from it alone fails closed: if `is_dev` is revoked mid-run the run still goes
+ * to test storage, where RLS rejects it, instead of becoming learner progress.
+ * Decide once, when the lesson opens. Every other run, including a developer replaying
+ * an unlocked lesson, is saved as normal learner progress.
  */
-export function resultDestination(isDev: boolean, statusAtOpen: NodeStatus | null): ResultDestination {
-  return isDev && statusAtOpen === 'locked' ? 'dev-test' : 'learner';
+export function resultDestination(statusAtOpen: NodeStatus | null): ResultDestination {
+  return statusAtOpen === 'locked' ? 'dev-test' : 'learner';
 }

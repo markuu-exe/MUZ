@@ -68,13 +68,18 @@ function stores(profile: ProfileSnapshot = PROFILE) {
 }
 
 describe('resultDestination (D1)', () => {
-  it('sends only developer runs of lessons opened while locked to test storage', () => {
-    expect(resultDestination(true, 'locked')).toBe('dev-test');
-    expect(resultDestination(true, 'current')).toBe('learner');
-    expect(resultDestination(true, 'mastered')).toBe('learner');
-    expect(resultDestination(false, 'locked')).toBe('learner');
-    expect(resultDestination(false, 'current')).toBe('learner');
-    expect(resultDestination(true, null)).toBe('learner');
+  it('sends runs of lessons opened while locked to test storage, everything else to learner progress', () => {
+    expect(resultDestination('locked')).toBe('dev-test');
+    expect(resultDestination('current')).toBe('learner');
+    expect(resultDestination('mastered')).toBe('learner');
+    expect(resultDestination(null)).toBe('learner');
+  });
+
+  it('fails closed: "locked at open" is a test run whatever the account is when the run ends', () => {
+    // Only developers can open a locked node (canOpenLesson). If is_dev is revoked mid-run,
+    // the run must still not become learner progress; RLS then rejects the test row.
+    expect(canOpenLesson('locked', false)).toBe(false);
+    expect(resultDestination('locked')).toBe('dev-test');
   });
 });
 
@@ -106,7 +111,8 @@ describe('saveRunResult (D1)', () => {
       { destination: 'dev-test', userId: USER, lesson: LESSON, result: result({ status: 'failed', passed: false, heartsEnd: 3, heartsLost: 2 }), now: NOW },
       s,
     );
-    expect(s.writes).toEqual(['dev_test_results', 'profile:hearts']);
+    // Hearts first: the zero-heart rule must hold even if the test row cannot be written.
+    expect(s.writes).toEqual(['profile:hearts', 'dev_test_results']);
     expect(s.profile()).toEqual({ ...PROFILE, hearts: 2 });
   });
 
@@ -129,6 +135,21 @@ describe('saveRunResult (D1)', () => {
     expect(s.profile().hearts).toBe(0);
   });
 
+  it('developer access revoked mid-run: the test row is rejected, hearts are still spent, nothing reaches learner progress', async () => {
+    const s = stores();
+    s.devTest.insertDevTestResult = async () => {
+      throw new Error('new row violates row-level security policy for table "dev_test_results"');
+    };
+    await expect(
+      saveRunResult(
+        { destination: 'dev-test', userId: USER, lesson: LESSON, result: result({ heartsEnd: 4, heartsLost: 1 }), now: NOW },
+        s,
+      ),
+    ).rejects.toThrow(/row-level security/);
+    expect(s.writes).toEqual(['profile:hearts']);
+    expect(s.profile()).toEqual({ ...PROFILE, hearts: 3 });
+  });
+
   it('ordinary learner completion is saved exactly as before (and nothing goes to test storage)', async () => {
     const s = stores();
     const feedback = await saveRunResult({ destination: 'learner', userId: USER, lesson: LESSON, result: result(), now: NOW }, s);
@@ -140,7 +161,7 @@ describe('saveRunResult (D1)', () => {
 
   it('a developer replaying an unlocked lesson progresses like a learner', async () => {
     const s = stores();
-    await saveRunResult({ destination: resultDestination(true, 'current'), userId: USER, lesson: LESSON, result: result(), now: NOW }, s);
+    await saveRunResult({ destination: resultDestination('current'), userId: USER, lesson: LESSON, result: result(), now: NOW }, s);
     expect(s.writes).toContain('user_progress');
     expect(s.devRows).toEqual([]);
   });

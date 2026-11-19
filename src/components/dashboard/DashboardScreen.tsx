@@ -43,7 +43,7 @@ import PlacementModal from './PlacementModal';
 import { lessonExp } from '../../content';
 import type { LessonResult } from '../../lesson/types';
 import { supabase } from '../../lib/supabase/client';
-import { canOpenLesson, isDevAccount, resultDestination } from '../../lib/progress/devAccess';
+import { canOpenLesson, isDevAccount, resultDestination, type ResultDestination } from '../../lib/progress/devAccess';
 import { saveRunResult } from '../../lib/progress/devTestResults';
 import { PLACEMENT_METADATA_KEY } from '../../lib/progress/placement';
 import { displayedStreak, toLocalDate } from '../../lib/progress/streak';
@@ -74,8 +74,8 @@ export default function DashboardScreen() {
   const [selected, setSelected] = useState<CurriculumNode | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<NodeStatus | null>(null);
   const [activeLesson, setActiveLesson] = useState<CurriculumNode | null>(null);
-  // D1: the node status when the lesson was opened decides where its result is saved.
-  const [activeStatus, setActiveStatus] = useState<NodeStatus | null>(null);
+  // D1: where this lesson's results are saved, decided once when it is opened.
+  const [activeDestination, setActiveDestination] = useState<ResultDestination>('learner');
   const [lessonFilter, setLessonFilter] = useState<'all' | 'theory' | 'practice' | 'rhythm'>('all');
   const [placementDone, setPlacementDone] = useState(false);
 
@@ -120,13 +120,13 @@ export default function DashboardScreen() {
   const handleLessonComplete = async (
     lesson: CurriculumNode,
     result: LessonResult,
-    statusAtOpen: NodeStatus | null,
+    destination: ResultDestination,
   ): Promise<LessonSaveFeedback> => {
     if (isDemo || !profile) return { note: 'Demo mode: results are not saved.' };
     const payload = lesson.payload as unknown as LessonPayload;
     const feedback = await saveRunResult(
       {
-        destination: resultDestination(isDev, statusAtOpen),
+        destination,
         userId: profile.id,
         lesson: { passMark: payload.settings.passMark, expReward: lessonExp(payload) },
         result,
@@ -633,7 +633,7 @@ export default function DashboardScreen() {
                       }
                       setBanner(null);
                       setActiveLesson(selected);
-                      setActiveStatus(selectedStatus);
+                      setActiveDestination(resultDestination(selectedStatus));
                       setSelected(null);
                       setSelectedStatus(null);
                     }}
@@ -666,7 +666,8 @@ export default function DashboardScreen() {
           title={activeLesson.title}
           payload={activeLesson.payload}
           hearts={hearts}
-          onComplete={(result) => handleLessonComplete(activeLesson, result, activeStatus)}
+          onComplete={(result) => handleLessonComplete(activeLesson, result, activeDestination)}
+          testRun={activeDestination === 'dev-test'}
           onClose={() => setActiveLesson(null)}
         />
       )}

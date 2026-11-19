@@ -54,14 +54,16 @@ export function devTestRow(result: LessonResult): DevTestRow {
   };
 }
 
+/** Hearts first: the zero-heart rule must hold even if the test row cannot be written. */
 async function saveDevTestResult(store: DevTestStore, userId: string, result: LessonResult): Promise<void> {
-  await store.insertDevTestResult(userId, result.lessonId, devTestRow(result));
   const delta = result.heartsEnd - result.heartsStart;
-  if (delta === 0) return;
-  const current = await store.getHearts(userId);
-  if (current === null) throw new Error('Your profile could not be loaded, so the hearts change was not saved.');
-  const hearts = Math.min(MAX_HEARTS, Math.max(0, current + delta));
-  if (hearts !== current) await store.updateHearts(userId, hearts);
+  if (delta !== 0) {
+    const current = await store.getHearts(userId);
+    if (current === null) throw new Error('Your profile could not be loaded, so the hearts change was not saved.');
+    const hearts = Math.min(MAX_HEARTS, Math.max(0, current + delta));
+    if (hearts !== current) await store.updateHearts(userId, hearts);
+  }
+  await store.insertDevTestResult(userId, result.lessonId, devTestRow(result));
 }
 
 export interface SaveRunInput {

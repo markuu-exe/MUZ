@@ -17,7 +17,8 @@
 create table if not exists public.dev_test_results (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles (id) on delete cascade,
-  lesson_id text not null references public.lessons (id),
+  -- Test data must never block a curriculum change, so it follows the lesson.
+  lesson_id text not null references public.lessons (id) on delete cascade,
   recorded_at timestamptz not null default now(),
   -- LessonResult.status (src/lesson/types.ts), minus 'running'.
   status text not null,
