@@ -25,6 +25,7 @@ class FakeVideo {
 /** Worker stand-in: records PROCESS messages; the test replies with `respond()`. */
 class FakeWorker {
   readonly processed: Array<Extract<PostureWorkerRequest, { type: 'PROCESS' }>> = [];
+  readonly control: Array<Exclude<PostureWorkerRequest, { type: 'PROCESS' }>> = [];
   private listeners: Array<(e: MessageEvent<PostureWorkerResponse>) => void> = [];
   addEventListener(type: string, fn: (e: MessageEvent<PostureWorkerResponse>) => void): void {
     if (type === 'message') this.listeners.push(fn);
@@ -34,13 +35,14 @@ class FakeWorker {
   }
   postMessage(msg: PostureWorkerRequest): void {
     if (msg.type === 'PROCESS') this.processed.push(msg);
+    else this.control.push(msg);
   }
   ready(delegate: 'GPU' | 'CPU'): void {
     const data = { type: 'READY', delegate } as PostureWorkerResponse;
     for (const l of this.listeners) l({ data } as MessageEvent<PostureWorkerResponse>);
   }
-  respond(): void {
-    const data = { type: 'RESULT', snapshot: {}, hud: new Float32Array(0), inferenceMs: 12 } as unknown as PostureWorkerResponse;
+  respond(extra: { landmarks?: Float32Array } = {}): void {
+    const data = { type: 'RESULT', snapshot: {}, hud: new Float32Array(0), inferenceMs: 12, ...extra } as unknown as PostureWorkerResponse;
     for (const l of this.listeners) l({ data } as MessageEvent<PostureWorkerResponse>);
   }
 }
@@ -121,5 +123,28 @@ describe('FrameLoop (T-09)', () => {
     clock = 40;
     await video.frame(0.04);
     expect(worker.processed).toHaveLength(1);
+  });
+
+  it('forwards the debugLandmarks INIT option to the worker (AI-3)', () => {
+    loop.post({ type: 'INIT', modelPath: '/m.task', debugLandmarks: true });
+    expect(worker.control).toEqual([{ type: 'INIT', modelPath: '/m.task', debugLandmarks: true }]);
+  });
+
+  it('passes RESULT.landmarks through when the worker sends it (AI-3)', async () => {
+    const results: Array<Extract<PostureWorkerResponse, { type: 'RESULT' }>> = [];
+    loop.on('result', (r) => results.push(r));
+    await video.frame(0);
+    const landmarks = new Float32Array([1, 0.5, NaN]);
+    worker.respond({ landmarks });
+    expect(results[0].landmarks).toBe(landmarks);
+  });
+
+  it('has no landmarks field on RESULT by default (AI-3)', async () => {
+    const results: Array<Extract<PostureWorkerResponse, { type: 'RESULT' }>> = [];
+    loop.on('result', (r) => results.push(r));
+    await video.frame(0);
+    worker.respond();
+    expect(results).toHaveLength(1);
+    expect('landmarks' in results[0]).toBe(false);
   });
 });
