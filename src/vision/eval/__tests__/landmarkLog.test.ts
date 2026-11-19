@@ -4,7 +4,7 @@ import { LM, TRACKED_LANDMARKS, createPoseFrame, type PoseFrame } from '../../po
 import type { PostureSnapshot } from '../../posture/types';
 import { makeSkeleton, occlude, type SkeletonSpec } from '../../posture/__tests__/fixtures';
 import { ANALYZER_INPUT_LENGTH, packAnalyzerInput, unpackAnalyzerInput } from '../analyzerInput';
-import { DEFAULT_MAX_FRAMES, LandmarkLog } from '../landmarkLog';
+import { DEFAULT_MAX_FRAMES, LandmarkLog, modelTagFromPath } from '../landmarkLog';
 
 /** MediaPipe hands out float32 values; round the synthetic skeleton the same way. */
 function asFloat32(frame: PoseFrame): PoseFrame {
@@ -156,6 +156,7 @@ describe('LandmarkLog (AI-3)', () => {
     const data = new Float32Array(ANALYZER_INPUT_LENGTH);
     data[0] = 1;
     for (let i = 1; i < data.length; i++) data[i] = (Math.sin(i * 12.9898) * 43758.5453) % 1 * 10 ** ((i % 9) - 6);
+    for (let i = 6; i < data.length; i += 6) data[i] = (i % 97) / 97; // visibility slots stay in [0, 1]
     const log = new LandmarkLog();
     log.push(0, data);
     const back = LandmarkLog.fromJSON(JSON.parse(JSON.stringify(log.toJSON())));
@@ -175,6 +176,16 @@ describe('LandmarkLog (AI-3)', () => {
     expect(log.full).toBe(true);
     expect(log.dropped).toBe(2);
     expect(log.toJSON().frames).toHaveLength(3);
+  });
+
+  it('tags the file with the model it was built for, and import accepts only pose_landmarker_lite', () => {
+    expect(modelTagFromPath('/models/pose_landmarker_lite.task')).toBe('pose_landmarker_lite');
+    expect(new LandmarkLog().toJSON().model).toBe('pose_landmarker_lite');
+    const other = new LandmarkLog(DEFAULT_MAX_FRAMES, modelTagFromPath('/models/some_other_model.task'));
+    other.push(0, packAnalyzerInput(createPoseFrame()));
+    const json = JSON.parse(JSON.stringify(other.toJSON()));
+    expect(json.model).toBe('some_other_model');
+    expect(() => LandmarkLog.fromJSON(json)).toThrow(/model/);
   });
 
   it('rejects input of the wrong length', () => {
@@ -204,6 +215,10 @@ describe('LandmarkLog (AI-3)', () => {
       ['bad time', (j) => ((j.frames[3].t = null), j), /frame 3/],
       ['time going backwards', (j) => ((j.frames[4].t = -1), j), /frame 4/],
       ['pose not boolean', (j) => ((j.frames[0].pose = 1), j), /frame 0/],
+      ['first frame not at 0', (j) => ((j.frames[0].t = 5), j), /frame 0: t must be 0/],
+      ['value overflowing float32', (j) => ((j.frames[1].v[0] = 1e39), j), /frame 1: v\[0\].*float32/],
+      ['visibility above 1', (j) => ((j.frames[2].v[5] = 1.5), j), /frame 2: v\[5\].*visibility/],
+      ['negative visibility', (j) => ((j.frames[2].v[11] = -0.1), j), /frame 2: v\[11\].*visibility/],
     ];
     for (const [name, mutate, message] of cases) {
       it(`throws a clear error: ${name}`, () => {

@@ -93,8 +93,9 @@ describe('downloadLandmarkLog (AI-3)', () => {
     expect(appended).toEqual([anchor]);
     expect(blob!.type).toBe('application/json');
     expect(JSON.parse(await blob!.text())).toEqual(file);
+    vi.advanceTimersByTime(999);
     expect(revokeObjectURL).not.toHaveBeenCalled();
-    vi.runAllTimers();
+    vi.advanceTimersByTime(1);
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:fake');
   });
 });

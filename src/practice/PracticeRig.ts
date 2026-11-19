@@ -15,7 +15,7 @@ import type { CameraState } from '../vision/camera/types';
 import { Emitter } from '../vision/core/Emitter';
 import type { VisionErrorCode } from '../vision/errors/VisionError';
 import { hudVideoStyle } from '../vision/hud/viewport';
-import { LandmarkLog, type LandmarkLogFile } from '../vision/eval/landmarkLog';
+import { DEFAULT_MAX_FRAMES, LandmarkLog, modelTagFromPath } from '../vision/eval/landmarkLog';
 import { FrameLoop } from '../vision/pipeline/FrameLoop';
 import type { PostureSnapshot } from '../vision/posture/types';
 import type { PostureWorkerRequest } from '../vision/posture/workerProtocol';
@@ -81,7 +81,7 @@ export class PracticeRig extends Emitter<PracticeRigEvents> {
     this.audio = new AudioInputService();
     this.worker = new Worker(new URL('../workers/posture.worker.ts', import.meta.url), { type: 'module' });
     this.frameLoop = new FrameLoop(this.video, { worker: this.worker });
-    this.landmarkLog = options.debugLandmarks ? new LandmarkLog() : null;
+    this.landmarkLog = options.debugLandmarks ? new LandmarkLog(DEFAULT_MAX_FRAMES, modelTagFromPath(POSE_MODEL_PATH)) : null;
 
     this._state = { camera: this.camera.state, model: 'idle', modelError: null, mic: this.audio.status, micError: null };
 
@@ -159,11 +159,6 @@ export class PracticeRig extends Emitter<PracticeRigEvents> {
   /** Start both. Call from a click. */
   async start(): Promise<void> {
     await Promise.all([this.startCamera(), this.startMic()]);
-  }
-
-  /** AI-3: the landmark log as an export file, or null when not recording (no `?debug`). */
-  exportLandmarks(): LandmarkLogFile | null {
-    return this.landmarkLog?.toJSON() ?? null;
   }
 
   /** Forget onset and noise history between exercises. */

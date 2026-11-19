@@ -17,6 +17,7 @@ import {
 
 export const LANDMARK_LOG_FORMAT = 'muz-landmarks';
 export const LANDMARK_LOG_VERSION = 1;
+/** The only model the evaluation accepts (SRS 3.6.2). */
 export const LANDMARK_LOG_MODEL = 'pose_landmarker_lite';
 /** 30 fps × 10 minutes (~8 MB in memory, ~16 MB of JSON). Later frames are dropped. */
 export const DEFAULT_MAX_FRAMES = 30 * 60 * 10;
@@ -33,7 +34,8 @@ export interface LandmarkLogFrame {
 export interface LandmarkLogFile {
   format: typeof LANDMARK_LOG_FORMAT;
   version: typeof LANDMARK_LOG_VERSION;
-  model: typeof LANDMARK_LOG_MODEL;
+  /** Model file the app loaded, from its path (e.g. pose_landmarker_lite). Import accepts only LANDMARK_LOG_MODEL. */
+  model: string;
   /** MediaPipe Pose landmark indices, in the order they appear in each frame's `v`. */
   landmarks: number[];
   /** Per landmark: world x/y/z (metres), image x/y (normalised), visibility. */
@@ -42,6 +44,13 @@ export interface LandmarkLogFile {
 }
 
 const VALUES_PER_FRAME = ANALYZER_INPUT_LENGTH - 1;
+const VISIBILITY_FIELD = ANALYZER_INPUT_FIELDS.indexOf('vis');
+
+/** '/models/pose_landmarker_lite.task' → 'pose_landmarker_lite': the tag for a log made with that model file. */
+export function modelTagFromPath(modelPath: string): string {
+  const file = modelPath.split(/[\/]/).pop() ?? modelPath;
+  return file.replace(/\.task$/, '');
+}
 
 /** Float32 values need at most 9 significant digits to round-trip; this keeps files ~half the size. */
 function encode(x: number): number | null {
@@ -62,7 +71,14 @@ export class LandmarkLog {
   private t0 = NaN;
   private _dropped = 0;
 
-  constructor(readonly maxFrames: number = DEFAULT_MAX_FRAMES) {}
+  /**
+   * @param model tag written to the file; the app derives it from the model path it sends
+   *   the worker (modelTagFromPath(POSE_MODEL_PATH)).
+   */
+  constructor(
+    readonly maxFrames: number = DEFAULT_MAX_FRAMES,
+    readonly model: string = LANDMARK_LOG_MODEL,
+  ) {}
 
   get length(): number {
     return this.data.length;
@@ -125,7 +141,7 @@ export class LandmarkLog {
     return {
       format: LANDMARK_LOG_FORMAT,
       version: LANDMARK_LOG_VERSION,
-      model: LANDMARK_LOG_MODEL,
+      model: this.model,
       landmarks: [...TRACKED_LANDMARKS],
       fields: [...ANALYZER_INPUT_FIELDS],
       frames,
@@ -140,7 +156,7 @@ export class LandmarkLog {
     if (!isRecord(json)) return fail('expected a JSON object');
     if (json.format !== LANDMARK_LOG_FORMAT) fail(`format must be "${LANDMARK_LOG_FORMAT}"`);
     if (json.version !== LANDMARK_LOG_VERSION) fail(`unsupported version ${String(json.version)} (expected ${LANDMARK_LOG_VERSION})`);
-    if (json.model !== LANDMARK_LOG_MODEL) fail(`model must be "${LANDMARK_LOG_MODEL}"`);
+    if (json.model !== LANDMARK_LOG_MODEL) fail(`model must be "${LANDMARK_LOG_MODEL}", got "${String(json.model)}"`);
     if (!sameList(json.landmarks, TRACKED_LANDMARKS)) fail('landmarks list does not match this version of the analyzer');
     if (!sameList(json.fields, ANALYZER_INPUT_FIELDS)) fail(`fields must be ${ANALYZER_INPUT_FIELDS.join(',')}`);
     if (!Array.isArray(json.frames)) return fail('frames must be an array');
@@ -154,15 +170,23 @@ export class LandmarkLog {
       if (!isRecord(fr)) fail(`${where} must be an object`);
       const { t, pose, v } = fr as Record<string, unknown>;
       if (typeof t !== 'number' || !Number.isFinite(t) || t < prevT) fail(`${where}: t must be a finite number >= the previous frame's`);
+      if (i === 0 && t !== 0) fail(`${where}: t must be 0 (times are relative to the first frame)`);
       if (typeof pose !== 'boolean') fail(`${where}: pose must be true or false`);
       if (!Array.isArray(v) || v.length !== VALUES_PER_FRAME) {
         fail(`${where}: v must hold ${VALUES_PER_FRAME} values (${TRACKED_LANDMARKS.length} landmarks × ${ANALYZER_INPUT_STRIDE})`);
       }
       input[0] = pose ? 1 : 0;
       (v as unknown[]).forEach((x, k) => {
-        if (x === null) input[k + 1] = NaN;
-        else if (typeof x === 'number' && Number.isFinite(x)) input[k + 1] = x;
-        else fail(`${where}: v[${k}] must be a number or null`);
+        if (x === null) {
+          input[k + 1] = NaN;
+          return;
+        }
+        if (typeof x !== 'number') return fail(`${where}: v[${k}] must be a number or null`);
+        input[k + 1] = x; // rounds to float32
+        if (!Number.isFinite(input[k + 1])) fail(`${where}: v[${k}] = ${x} does not fit a float32`);
+        if (k % ANALYZER_INPUT_STRIDE === VISIBILITY_FIELD && !(x >= 0 && x <= 1)) {
+          fail(`${where}: v[${k}] is a visibility and must be in [0, 1], got ${x}`);
+        }
       });
       log.push(t as number, input);
       prevT = t as number;

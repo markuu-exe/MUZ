@@ -74,7 +74,7 @@ describe('PracticeRig landmark export (AI-3)', () => {
     expect(init && 'debugLandmarks' in init).toBe(false);
     FakeWorker.last.result(100, input());
     expect(rig.landmarkLog).toBeNull();
-    expect(rig.exportLandmarks()).toBeNull();
+    expect('exportLandmarks' in rig).toBe(false); // one export path: PerfOverlay → landmarkLog.toJSON()
     rig.dispose();
   });
 
@@ -86,7 +86,7 @@ describe('PracticeRig landmark export (AI-3)', () => {
     FakeWorker.last.result(5033, undefined); // a RESULT without landmarks is skipped
     FakeWorker.last.result(5066, input());
     expect(rig.landmarkLog?.length).toBe(2);
-    const file = rig.exportLandmarks();
+    const file = rig.landmarkLog?.toJSON();
     expect(file?.frames.map((f) => f.t)).toEqual([0, 66]);
     expect(file?.model).toBe('pose_landmarker_lite');
     rig.dispose();

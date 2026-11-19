@@ -29,6 +29,8 @@ interface PerfOverlayProps {
 /** No date, user or device in the name: the file carries only session-relative numbers. */
 export const LANDMARK_EXPORT_FILENAME = 'muz-landmarks.json';
 
+const REVOKE_AFTER_MS = 1000;
+
 /** Saves the log as a JSON file through a temporary Blob object URL. */
 export function downloadLandmarkLog(file: LandmarkLogFile): void {
   const blob = new Blob([JSON.stringify(file)], { type: 'application/json' });
@@ -39,8 +41,8 @@ export function downloadLandmarkLog(file: LandmarkLogFile): void {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  // Revoke after the click has been handled, or some browsers cancel the download.
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  // Revoke once the download has started; revoking at once can cancel it in some browsers.
+  setTimeout(() => URL.revokeObjectURL(url), REVOKE_AFTER_MS);
 }
 
 function fmt(value: number | null | undefined, digits = 1): string {
