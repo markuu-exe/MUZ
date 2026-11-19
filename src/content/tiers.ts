@@ -59,7 +59,7 @@ export const TIERS: Readonly<Record<Tier, TierInfo>> = Object.freeze({
     units: [9, 12],
     defaults: {
       passMark: 0.85,
-      timeoutSec: 12,
+      timeoutSec: 15, // SRS 3.1.2.4; ruling D5: 15 s in every tier
       bpm: 100,
       countInBeats: 4,
       rhythmRepeats: 2,
