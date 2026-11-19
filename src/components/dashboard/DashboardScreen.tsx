@@ -43,6 +43,7 @@ import PlacementModal from './PlacementModal';
 import { lessonExp } from '../../content';
 import type { LessonResult } from '../../lesson/types';
 import { supabase } from '../../lib/supabase/client';
+import { canOpenLesson, isDevAccount } from '../../lib/progress/devAccess';
 import { PLACEMENT_METADATA_KEY } from '../../lib/progress/placement';
 import { saveLessonResult } from '../../lib/progress/saveLessonResult';
 import { displayedStreak, toLocalDate } from '../../lib/progress/streak';
@@ -64,6 +65,8 @@ const NAV_ITEMS: NavItem[] = [
 
 export default function DashboardScreen() {
   const { user, profile, isDemo, signOut, refreshProfile } = useAuth();
+  // AUX-TEST-ACCESS-01: developer accounts may open locked lessons (access only, never progress).
+  const isDev = isDevAccount(profile, isDemo);
   const data = useDashboardData(profile, isDemo);
   const [view, setView] = useState<DashboardView>('skill-tree');
   const [banner, setBanner] = useState<{ message: string; type: 'warning' | 'error' | 'info' } | null>(null);
@@ -142,7 +145,7 @@ export default function DashboardScreen() {
 
   // Click handler for Skill Tree & Lesson nodes
   const handleSelect = (lesson: CurriculumNode, status: NodeStatus) => {
-    if (status === 'locked') {
+    if (!canOpenLesson(status, isDev)) {
       setSelected(null);
       setSelectedStatus(null);
       setShakingId(lesson.id);
@@ -295,6 +298,14 @@ export default function DashboardScreen() {
                 {isDemo && (
                   <span className="rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-300">
                     Guest Demo
+                  </span>
+                )}
+                {isDev && (
+                  <span
+                    className="rounded-full border border-sky-500/40 bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-sky-300"
+                    title="Locked lessons can be opened for testing. Progress, EXP and hearts work normally."
+                  >
+                    Developer access
                   </span>
                 )}
               </div>
@@ -624,7 +635,7 @@ export default function DashboardScreen() {
                     ) : (
                       <>
                         <Play className="h-4 w-4 fill-white" />
-                        Start Lesson
+                        {selectedStatus === 'locked' ? 'Start Lesson (developer access)' : 'Start Lesson'}
                       </>
                     )}
                   </button>

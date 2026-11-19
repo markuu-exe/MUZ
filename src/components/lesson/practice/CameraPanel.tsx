@@ -3,9 +3,11 @@
  * panel, HTML5 Canvas Posture HUD"). The <video> element belongs to the rig; this
  * component only places it on screen.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { PracticeRig, RigState } from '../../../practice/PracticeRig';
+import type { HudEngine } from '../../../vision/hud/HudEngine';
 import { PostureHud } from '../../practice/PostureHud';
+import PerfOverlay, { isPerfDebug } from './PerfOverlay';
 
 interface CameraPanelProps {
   rig: PracticeRig;
@@ -14,6 +16,8 @@ interface CameraPanelProps {
 
 export default function CameraPanel({ rig, state }: CameraPanelProps) {
   const mount = useRef<HTMLDivElement>(null);
+  const [debug] = useState(isPerfDebug);
+  const [engine, setEngine] = useState<HudEngine | null>(null);
 
   useEffect(() => {
     const host = mount.current;
@@ -38,7 +42,15 @@ export default function CameraPanel({ rig, state }: CameraPanelProps) {
   return (
     <div className="relative aspect-video overflow-hidden rounded-2xl border border-violet-500/30 bg-black shadow-[0_0_30px_rgba(139,92,246,0.2)]">
       <div ref={mount} className="absolute inset-0" />
-      <PostureHud video={rig.video} source={rig.frameLoop} fit="cover" mirrored running={live && state.model === 'ready'} />
+      <PostureHud
+        video={rig.video}
+        source={rig.frameLoop}
+        fit="cover"
+        mirrored
+        running={live && state.model === 'ready'}
+        onEngine={debug ? setEngine : undefined}
+      />
+      {debug && <PerfOverlay frameLoop={rig.frameLoop} engine={engine} />}
       {overlay && (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-950/80 text-sm font-semibold text-slate-300">
           {overlay}

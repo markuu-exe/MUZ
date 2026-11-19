@@ -9,6 +9,7 @@ import { usePracticeDrill } from '../../../hooks/usePracticeDrill';
 import type { ExerciseViewProps } from '../../../lesson/registry';
 import { cn } from '../../../lib/cn';
 import { drillTargets, targetLabel, type DrillStats, type DrillTarget } from '../../../practice/PracticeDrill';
+import { NOT_VISIBLE_MESSAGE, NotVisibleTimer } from '../../../practice/visibilityCue';
 import type { PlayChordExercise, PlayNoteExercise, PlaySequenceExercise } from '../../../types/lesson.types';
 import GrandStaff from '../../theory/GrandStaff';
 import { exampleVoicing } from '../theory/BuildTheChordView';
@@ -30,12 +31,14 @@ function targetTitle(target: DrillTarget): string {
   return target.kind === 'note' ? `Play ${targetLabel(target)}` : `Play the ${targetLabel(target)} chord`;
 }
 
-export default function PracticeDrillView({ exercise, settings, hearts, onOutcome }: ExerciseViewProps<DrillExercise>) {
+export default function PracticeDrillView({ exercise, settings, hearts, onOutcome, onHeartsSpent }: ExerciseViewProps<DrillExercise>) {
   const { rig, state } = usePracticeRig();
   const targets = useMemo(() => drillTargets(exercise), [exercise]);
   const [ended, setEnded] = useState<{ passed: boolean; stats: DrillStats } | null>(null);
   const onOutcomeRef = useRef(onOutcome);
   onOutcomeRef.current = onOutcome;
+  const onHeartsSpentRef = useRef(onHeartsSpent);
+  onHeartsSpentRef.current = onHeartsSpent;
 
   const problems = mediaProblems(state, true);
   const ready = state.camera.status === 'active' && state.model === 'ready' && state.mic === 'running';
@@ -57,6 +60,20 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
   useEffect(() => {
     if (ready && !running) start();
   }, [ready, running, start]);
+
+  // Tell the player about every heart as it is lost, so quitting mid-drill
+  // (or during the outcome pause below) cannot refund it (T-06).
+  const { heartsLost } = drill;
+  useEffect(() => {
+    onHeartsSpentRef.current?.(heartsLost);
+  }, [heartsLost]);
+
+  // AI-1: say so when the camera has not been able to judge posture for a while.
+  const [notVisible, setNotVisible] = useState(false);
+  useEffect(() => {
+    const timer = new NotVisibleTimer();
+    return rig.on('posture', ({ tMs, snapshot }) => setNotVisible(timer.push(tMs, snapshot.compliant)));
+  }, [rig]);
 
   // Show the outcome for a moment, then hand it to the lesson player.
   useEffect(() => {
@@ -82,10 +99,11 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
   else if (ended) status = { text: 'Out of hearts. Practice is paused until a heart comes back.', tone: 'rose' };
   else if (!running) status = { text: 'Get ready…', tone: 'slate' };
   else if (drill.state === 'paused') status = { text: 'Paused', tone: 'slate' };
-  else if (drill.state === 'verifying') status = { text: 'Listening…', tone: 'cyan' };
   else if (drill.state === 'latching') status = { text: 'That is the right sound. Hold your posture to lock it in.', tone: 'amber' };
   else if (drill.postureBlocked)
     status = { text: 'Right sound, but your posture was off. Fix what the camera shows in red and play it again.', tone: 'amber' };
+  else if (notVisible) status = { text: NOT_VISIBLE_MESSAGE, tone: 'amber' };
+  else if (drill.state === 'verifying') status = { text: 'Listening…', tone: 'cyan' };
   else if (drill.lastAttempt === 'miss')
     status = {
       text: `${drill.lastHeard ? `That sounded like ${drill.lastHeard}. ` : 'Not quite. '}Try again (${drill.consecutiveMisses} of 3 wrong tries before a heart is lost).`,
