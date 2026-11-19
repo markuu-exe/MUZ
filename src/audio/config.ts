@@ -122,6 +122,19 @@ export const DEFAULT_VERIFIER_CONFIG: Readonly<VerifierConfig> = Object.freeze({
   rollGraceMs: 150,
 });
 
+/** T-07: single-note acceptance (SRS 3.1.6.2). */
+export interface PitchConfig {
+  /** Max distance from the exact target note. SPEC: SRS 3.1.6.2 (±35 cents). */
+  centsTolerance: number;
+  /** Frames with lower pitchy clarity never pass. SPEC: SRS 3.1.6.2 (0.85). */
+  minClarity: number;
+}
+
+export const DEFAULT_PITCH_CONFIG: Readonly<PitchConfig> = Object.freeze({
+  centsTolerance: 35, // SPEC
+  minClarity: 0.85, // SPEC
+});
+
 export interface WaitStateConfig {
   /** Posture and acoustic criteria must coincide within this window. SPEC: SRS 3.1.6.5 (400 ms). */
   latchWindowMs: number;
