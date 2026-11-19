@@ -15,7 +15,7 @@ import {
   type LessonPayload,
 } from '../../types/lesson.types';
 import { n, placeAnswer } from '../builders';
-import { COURSE_LESSONS, COURSE_UNITS, exerciseBpm, lessonBadge } from '../index';
+import { COURSE_LESSONS, COURSE_UNITS, exerciseBpm, exerciseSettings, lessonBadge } from '../index';
 import { PATTERNS, getPattern } from '../patterns';
 import { TIERS } from '../tiers';
 
@@ -224,5 +224,25 @@ describe('builders', () => {
     const a = placeAnswer('q', 'right', ['x', 'y', 'z']);
     expect(a).toEqual(placeAnswer('q', 'right', ['x', 'y', 'z']));
     expect(a.options[a.correctIndex]).toBe('right');
+  });
+});
+
+// Ruling D5 (T-02, 2026-11-16): every practice drill times out after 15 s
+// (SRS 3.1.2.4, SDD C-06). Checks the effective value after tier defaults and
+// per-exercise overrides are merged, i.e. what PracticeDrillView receives.
+describe('drill timeout (ruling D5)', () => {
+  const DRILLS = new Set(['play-note', 'play-chord', 'play-sequence']);
+  it('is 15 s for every practice drill in every tier', () => {
+    const wrong: string[] = [];
+    for (const lesson of COURSE_LESSONS) {
+      const payload = lesson.payload as LessonPayload;
+      for (const stage of payload.stages)
+        for (const exercise of stage.exercises as Exercise[]) {
+          if (!DRILLS.has(exercise.type)) continue;
+          const { timeoutSec } = exerciseSettings(payload, exercise);
+          if (timeoutSec !== 15) wrong.push(`${lesson.id}/${exercise.id}: ${timeoutSec} s`);
+        }
+    }
+    expect(wrong).toEqual([]);
   });
 });

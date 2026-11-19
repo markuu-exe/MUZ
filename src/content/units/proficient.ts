@@ -315,7 +315,7 @@ export const PROFICIENT_UNITS = [
         description: 'Lock the pop progression to a groove.',
         stages: [
           rhythm(tapAlong('pop-rhythm', { settings: { bpm: 90 } })),
-          play(playChords('C G Am F', { settings: { timeoutSec: 10 }, prompt: 'Play it again, faster: 10 seconds per chord.' })),
+          play(playChords('C G Am F', { prompt: 'Play it again, changing chords a little faster.' })),
         ],
       }),
       checkpoint({
