@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ExerciseViewProps } from '../../../lesson/registry';
 import { PostureHold } from '../../../practice/PostureHold';
+import { NOT_VISIBLE_MESSAGE, NotVisibleTimer } from '../../../practice/visibilityCue';
 import type { PostureHoldExercise } from '../../../types/lesson.types';
 import CameraPanel from './CameraPanel';
 import MediaDiagnostics, { mediaProblems } from './MediaDiagnostics';
@@ -35,15 +36,17 @@ export default function PostureHoldView({ exercise, settings, onOutcome }: Exerc
     const hold = holdRef.current!;
     let lastUi = 0;
     let finishTimer: number | null = null;
+    const notVisible = new NotVisibleTimer();
     const off = rig.on('posture', ({ tMs, snapshot }) => {
       if (hold.done) return;
       const finished = hold.push(tMs, snapshot.compliant, snapshot.inBandStrict);
+      const hidden = notVisible.push(tMs, snapshot.compliant);
       if (finished || tMs - lastUi >= 100) {
         lastUi = tMs;
         setView({
           progress: hold.progress,
           cue: snapshot.cues.find((c) => c.gating)?.message ?? null,
-          visible: snapshot.compliant !== null,
+          visible: !hidden,
           done: hold.done,
         });
       }
@@ -63,7 +66,7 @@ export default function PostureHoldView({ exercise, settings, onOutcome }: Exerc
   const secondsLeft = Math.ceil((1 - view.progress) * settings.postureHoldSec);
   let message: string;
   if (view.done) message = 'Great posture. That is how to sit every time you play.';
-  else if (!view.visible) message = 'Move so the camera can see your arm and hand from the side.';
+  else if (!view.visible) message = NOT_VISIBLE_MESSAGE;
   else if (view.cue) message = view.cue;
   else if (view.progress > 0) message = 'Good. Keep holding…';
   else message = 'Sit tall, forearms level with the keys, wrists straight.';
