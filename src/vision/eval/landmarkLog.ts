@@ -18,7 +18,7 @@ import {
 export const LANDMARK_LOG_FORMAT = 'muz-landmarks';
 export const LANDMARK_LOG_VERSION = 1;
 export const LANDMARK_LOG_MODEL = 'pose_landmarker_lite';
-/** 30 fps × 10 minutes (~6.5 MB in memory, ~20 MB of JSON). Later frames are dropped. */
+/** 30 fps × 10 minutes (~8 MB in memory, ~16 MB of JSON). Later frames are dropped. */
 export const DEFAULT_MAX_FRAMES = 30 * 60 * 10;
 
 export interface LandmarkLogFrame {

@@ -11,5 +11,5 @@
     "allowImportingTsExtensions": false,
     "resolveJsonModule": true
   },
-  "include": ["./generate-lesson-seed.ts"]
+  "include": ["./generate-lesson-seed.ts", "./eval/posture-eval.ts"]
 }
