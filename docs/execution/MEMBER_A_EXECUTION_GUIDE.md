@@ -40,6 +40,7 @@
 | T-19 Hardware benchmark + tuning | KAN-277, NEW-16 | P1 | 2 d | D7 (**hard:** T-08 and T-09 merged) | D8 | B | To do → pending |
 | T-24 Defect triage + regression lead | KAN-273, KAN-281, KAN-282 | P1 | 1.5 d | D12 (**hard:** T-19 to T-23 results) | D13 | original reviewers | To do → pending |
 | Integration, reviews, checkpoints | — | — | ~2 d spread | continuous | D14 | — | — |
+| AUX-TEST-ACCESS-01 follow-up (**outside T-01…T-26**; not in the load figure below) | — (A updates Jira when done) | — | ~0.5 d (design §9) | **Hard:** C's F2 `profiles` fix merged and C's notification | not scheduled | — | Code merged (PR #23) → migration not applied. Steps A-1…A-8 in `docs/auxiliary/AUX_TEST_ACCESS_IS_DEV_DESIGN.md` §11 |
 
 **Load warning.** About 11.5 ideal days in a 14-day window, plus about 18 PR reviews. That is at capacity. Protect your review time: see the daily plan in §4.1.
 
@@ -466,6 +467,7 @@ Merge order inside each checkpoint (rebase on `main` before each merge, then run
 | T-08 | C (T-07) | T-19, T-21 (D) | `AcousticFrame.pitchHz` / `clarity` (D1) | Merged by D6 | "Pitch path live on staging", for D's privacy audit |
 | T-19 | T-08, T-09 | Everyone (defects) | Machine and mic availability (ask on D5) | D8 | Report link; defects logged |
 | T-24 | T-19 to T-23 | Everyone | Defect owners | D12 | Assignment list |
+| AUX-TEST-ACCESS-01 follow-up | C (F2 merged + notification) | Testers / team | — | After A-7 (results recorded) | Test report updated; Jira updated; team told which flows are verified. **No tester emails or IDs in messages that are committed.** |
 
 ---
 

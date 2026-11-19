@@ -75,6 +75,8 @@ This schedule covers all four members. D1–D15 are working days, counted from t
 | T-24 Fixes + regression | A + all | D12–D13 | T-19…T-23 | — | original reviewers | D13 | RC |
 | T-25 Deploy + demo | B | D14 (prep D13) | T-24 (RC) | U-06 | A | D14 | Release |
 | T-26 Docs v01.02 | D | D9–D14 | T-02 | T-19…T-23 reports | A | D14 | — |
+| F2 `profiles` RLS fix (existing P0 bug; RULINGS §4.3; `T-02_VERIFICATION_PLAN_HANDOFF.md` F2) | C | per T-02 handoff | — | — | — | — | — |
+| AUX-TEST-ACCESS-01 follow-up (outside T-01…T-26) | **A** | after F2; no day fixed | F2 merged (C) + C's notification | — | — | — | Not a merge: DB steps A-1…A-8, `docs/auxiliary/AUX_TEST_ACCESS_IS_DEV_DESIGN.md` §11 |
 
 **Review deadline rule.** A reviewer responds within 4 working hours. A PR opened after 14:00 is reviewed by 12:00 the next day. A bold review-due date means a later task is waiting on that review.
 
