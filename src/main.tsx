@@ -1,3 +1,6 @@
+// Must stay the first import: shows a readable error instead of a blank page
+// when the Supabase env is missing (see src/configGuard.ts).
+import './configGuard';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
