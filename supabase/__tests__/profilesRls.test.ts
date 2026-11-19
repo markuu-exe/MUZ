@@ -14,14 +14,17 @@ const HARDENING = '20261119120000_profiles_rls_hardening.sql';
 const beforeHardening = (name: string) => name < HARDENING;
 
 /** Two learners, then the kinds of drift that would explain the live leak. */
-async function driftedDb(drift: 'public-policy' | 'rls-off'): Promise<PGlite> {
+async function driftedDb(drift: 'public-policy' | 'rls-off' | 'public-grant'): Promise<PGlite> {
   const db = await freshDb(beforeHardening);
   await createUser(db, U1, 'learner-one');
   await createUser(db, U2, 'learner-two');
   if (drift === 'public-policy') {
     await db.exec(`create policy "Public profiles are viewable by everyone." on public.profiles for select using (true);`);
-  } else {
+  } else if (drift === 'rls-off') {
     await db.exec(`alter table public.profiles disable row level security;`);
+  } else {
+    // A grant to PUBLIC reaches anon even after anon's own grants are revoked.
+    await db.exec(`create policy open_read on public.profiles for select using (true); grant select, delete on public.profiles to public;`);
   }
   return db;
 }
@@ -29,7 +32,7 @@ async function driftedDb(drift: 'public-policy' | 'rls-off'): Promise<PGlite> {
 const count = (rows: Array<{ n: number | string }>) => Number(rows[0].n);
 
 describe('profiles RLS hardening (F2 / DEF-001)', { timeout: 60_000 }, () => {
-  for (const drift of ['public-policy', 'rls-off'] as const) {
+  for (const drift of ['public-policy', 'rls-off', 'public-grant'] as const) {
     it(`reproduces the leak (${drift}) and closes it`, async () => {
       const db = await driftedDb(drift);
       // The leak as seen live: an anonymous caller reads every profile.

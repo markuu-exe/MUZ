@@ -57,8 +57,9 @@ create policy profiles_update_own
   with check (id = auth.uid());
 
 -- Supabase's default privileges grant every role everything on new public
--- tables; RLS is then the only gate. Remove anon entirely and give authenticated
+-- tables; RLS is then the only gate. Remove PUBLIC and anon entirely and give authenticated
 -- exactly what the initial schema intended.
+revoke all on public.profiles from public;
 revoke all on public.profiles from anon;
 revoke all on public.profiles from authenticated;
 grant select, insert, update on public.profiles to authenticated;
@@ -68,8 +69,10 @@ grant select, insert, update on public.profiles to authenticated;
 --   where schemaname = 'public' and tablename = 'profiles';      -- exactly the 3 *_own policies
 --   select relrowsecurity from pg_class where oid = 'public.profiles'::regclass;  -- true
 --   select grantee, privilege_type from information_schema.role_table_grants
---   where table_schema = 'public' and table_name = 'profiles' and grantee in ('anon', 'authenticated');
---     -- authenticated: SELECT, INSERT, UPDATE; anon: none
+--   where table_schema = 'public' and table_name = 'profiles' and grantee in ('PUBLIC', 'anon', 'authenticated');
+--     -- authenticated: SELECT, INSERT, UPDATE; anon and PUBLIC: none
+--   select viewname from pg_views where schemaname = 'public' and definition ilike '%profiles%';  -- expect none
+--     (a view or SECURITY DEFINER function over profiles bypasses RLS; this migration cannot see those)
 -- Then, from a terminal with the publishable key (no user token):
 --   GET <SUPABASE_URL>/rest/v1/profiles?select=id&limit=1  → 401/permission error or [], never a row.
 --
