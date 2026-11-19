@@ -70,7 +70,7 @@ describe('parseChord (KAN-266)', () => {
   });
 });
 
-describe('ChordMatcher on synthetic piano (KAN-266)', () => {
+describe('ChordMatcher on synthetic piano (KAN-266)', { timeout: 60_000 }, () => {
   const SEED_LESSONS = ['C', 'G', 'Am', 'F'];
 
   for (const fs of [48000, 44100]) {

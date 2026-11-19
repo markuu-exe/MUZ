@@ -7,9 +7,11 @@
  * NoteVerifier or ChordVerifier; hearts carry over from step to step.
  */
 import { ChordMatcher } from '../audio/chords/ChordMatcher';
+import { DEFAULT_PRACTICE_CONFIG } from '../audio/config';
 import { parseChord } from '../audio/chords/vocabulary';
 import { PITCH_CLASS_NAMES } from '../audio/dsp/pitch';
 import { NoteMatcher } from '../audio/notes/NoteMatcher';
+import { PitchVerifier } from '../audio/notes/PitchVerifier';
 import { ChordVerifier, type AcousticFrame, type AcousticVerifier, type AttemptKind } from '../audio/practice/ChordVerifier';
 import { NoteVerifier } from '../audio/practice/NoteVerifier';
 import { WaitStateMachine, type HeartLossReason, type WaitState } from '../audio/practice/WaitStateMachine';
@@ -33,9 +35,9 @@ export function drillTargets(exercise: Exercise): DrillTarget[] {
   }
 }
 
-/** "C", "F#", "Am" — the label shown for a target. */
+/** "C4", "F#3", "Am" — the label shown for a target. Notes carry their octave: it is checked (T-08). */
 export function targetLabel(target: DrillTarget): string {
-  return target.kind === 'note' ? PITCH_CLASS_NAMES[((target.note % 12) + 12) % 12] : parseChord(target.chord).label;
+  return target.kind === 'note' ? midiToName(target.note) : parseChord(target.chord).label;
 }
 
 export interface DrillStats {
@@ -89,11 +91,13 @@ export interface PracticeDrillOptions {
   hearts: number;
   /** settings.timeoutSec × 1000. */
   timeoutMs: number;
-  /**
-   * Single-note verifier. Defaults to the chroma NoteVerifier until T-07's
-   * PitchVerifier is merged; T-08 then switches the default (SRS 3.1.6.2, ruling D4).
-   */
+  /** Single-note verifier override (tests). Default: see `useChromaNoteVerifier`. */
   createNoteVerifier?: NoteVerifierFactory;
+  /**
+   * Use the chroma NoteVerifier instead of PitchVerifier (T-19 comparison only).
+   * Default DEFAULT_PRACTICE_CONFIG.useChromaNoteVerifier (false: SRS 3.1.6.2, ruling D4).
+   */
+  useChromaNoteVerifier?: boolean;
 }
 
 /** One matcher of each kind is enough for the whole app. */
@@ -102,6 +106,9 @@ const noteMatcher = new NoteMatcher();
 
 /** The chroma, pitch-class-only verifier (kept for comparison in T-19, ruling D4). */
 export const chromaNoteVerifier: NoteVerifierFactory = (targetMidi) => new NoteVerifier(noteMatcher, targetMidi);
+
+/** T-07/T-08: pitchy f0 within ±35 cents of the exact note, clarity ≥ 0.85 (SRS 3.1.6.2). */
+export const pitchNoteVerifier: NoteVerifierFactory = (targetMidi) => new PitchVerifier(targetMidi);
 
 export class PracticeDrill extends Emitter<PracticeDrillEvents> {
   readonly targets: readonly DrillTarget[];
@@ -128,7 +135,8 @@ export class PracticeDrill extends Emitter<PracticeDrillEvents> {
     if (targets.length === 0) throw new Error('A practice drill needs at least one target.');
     this.targets = targets;
     this.timeoutMs = options.timeoutMs;
-    this.createNoteVerifier = options.createNoteVerifier ?? chromaNoteVerifier;
+    const useChroma = options.useChromaNoteVerifier ?? DEFAULT_PRACTICE_CONFIG.useChromaNoteVerifier;
+    this.createNoteVerifier = options.createNoteVerifier ?? (useChroma ? chromaNoteVerifier : pitchNoteVerifier);
     this.heartsStart = Math.max(0, Math.floor(options.hearts));
     this.hearts = this.heartsStart;
   }

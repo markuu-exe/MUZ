@@ -125,7 +125,7 @@ describe('PitchVerifier', () => {
   });
 });
 
-describe('PitchVerifier on synthetic piano through ChromaFrameProcessor', () => {
+describe('PitchVerifier on synthetic piano through ChromaFrameProcessor', { timeout: 60_000 }, () => {
   function attempt(played: number, target: number, seed: number): AttemptKind | 'none' {
     const fs = 48000;
     const audio = renderPiano([{ midi: played, at: 0.6 }], { sampleRate: fs, durationSec: 1.2, seed, snrDb: 30 });

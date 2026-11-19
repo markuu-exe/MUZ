@@ -135,6 +135,19 @@ export const DEFAULT_PITCH_CONFIG: Readonly<PitchConfig> = Object.freeze({
   minClarity: 0.85, // SPEC
 });
 
+/** T-08: which single-note verifier live drills use. */
+export interface PracticeConfig {
+  /**
+   * true = the chroma NoteVerifier (pitch class only, any octave passes); kept so
+   * T-19 can compare it with pitchy on real pianos. false = PitchVerifier (SRS 3.1.6.2).
+   */
+  useChromaNoteVerifier: boolean;
+}
+
+export const DEFAULT_PRACTICE_CONFIG: Readonly<PracticeConfig> = Object.freeze({
+  useChromaNoteVerifier: false,
+});
+
 export interface WaitStateConfig {
   /** Posture and acoustic criteria must coincide within this window. SPEC: SRS 3.1.6.5 (400 ms). */
   latchWindowMs: number;

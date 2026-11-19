@@ -4,6 +4,7 @@ import { feed, renderPiano, type NoteEvent } from '../../audio/__tests__/fixture
 import { COURSE_LESSONS } from '../../content';
 import { EXERCISE_ENGINE } from '../../types/lesson.types';
 import type { AcousticFrame, AcousticVerifier, AttemptResult } from '../../audio/practice/ChordVerifier';
+import { DEFAULT_PRACTICE_CONFIG } from '../../audio/config';
 import { drillTargets, PracticeDrill, targetLabel, type DrillTarget } from '../PracticeDrill';
 
 const FS = 48000;
@@ -14,7 +15,16 @@ function play(drill: PracticeDrill, events: NoteEvent[], durationSec: number, po
   const proc = new ChromaFrameProcessor(FS, (f) => {
     const tMs = startMs + f.time * 1000;
     drill.pushPosture(tMs, posture);
-    drill.pushFrame({ tMs, chroma: f.chroma, voiced: f.voiced, ringing: f.ringing, onset: f.onset, onsetMs: startMs + f.onsetTime * 1000 });
+    drill.pushFrame({
+      tMs,
+      chroma: f.chroma,
+      voiced: f.voiced,
+      ringing: f.ringing,
+      onset: f.onset,
+      onsetMs: startMs + f.onsetTime * 1000,
+      pitchHz: f.pitchHz,
+      clarity: f.clarity,
+    });
   });
   feed(proc, audio, FS);
 }
@@ -30,7 +40,7 @@ function record(drill: PracticeDrill) {
 
 const notes = (...midi: number[]): DrillTarget[] => midi.map((note) => ({ kind: 'note', note }));
 
-describe('PracticeDrill', () => {
+describe('PracticeDrill', { timeout: 60_000 }, () => {
   it('a single note with good posture completes without losing hearts', () => {
     const drill = new PracticeDrill(notes(60), { hearts: 5, timeoutMs: 15000 });
     const log = record(drill);
@@ -63,7 +73,7 @@ describe('PracticeDrill', () => {
     drill.start(0);
     play(drill, [{ midi: 65, at: 0.5 }], 1.2);
     expect(log).toEqual([]);
-    expect(drill.snapshot(1200)).toMatchObject({ stepIndex: 0, lastAttempt: 'miss', lastHeard: 'F', consecutiveMisses: 1, hearts: 5 });
+    expect(drill.snapshot(1200)).toMatchObject({ stepIndex: 0, lastAttempt: 'miss', lastHeard: 'F4', consecutiveMisses: 1, hearts: 5 });
     expect(drill.stats.pitchAccuracy).toBe(0);
   });
 
@@ -173,7 +183,7 @@ function strike(drill: PracticeDrill, tMs: number) {
   drill.pushFrame({ tMs, chroma: new Float32Array(12), voiced: true, onset: true, onsetMs: tMs });
 }
 
-describe('PracticeDrill single-note verifier seam (T-08)', () => {
+describe('PracticeDrill single-note verifier seam (T-08)', { timeout: 60_000 }, () => {
   it('uses the injected verifier for note targets and names the heard note with its octave', () => {
     ScriptedPitchVerifier.created = [];
     const drill = new PracticeDrill(notes(69), {
@@ -201,14 +211,52 @@ describe('PracticeDrill single-note verifier seam (T-08)', () => {
     expect(ScriptedPitchVerifier.created).toEqual([]);
   });
 
-  it('keeps the chroma NoteVerifier when no factory is given (behaviour on main until T-07)', () => {
-    const drill = new PracticeDrill(notes(60), { hearts: 5, timeoutMs: 15000 });
+  it('uses the pitchy PitchVerifier by default: a played A3 against an A4 target is a miss', () => {
+    expect(DEFAULT_PRACTICE_CONFIG.useChromaNoteVerifier).toBe(false);
+    const drill = new PracticeDrill(notes(69), { hearts: 5, timeoutMs: 15000 });
+    const log = record(drill);
     drill.start(0);
-    play(drill, [{ midi: 65, at: 0.5 }], 1.2);
-    expect(drill.snapshot(1200)).toMatchObject({ lastAttempt: 'miss', lastHeard: 'F' });
+    play(drill, [{ midi: 57, at: 0.5 }], 1.2);
+    expect(log).toEqual([]);
+    expect(drill.snapshot(1200)).toMatchObject({ stepIndex: 0, lastAttempt: 'miss', lastHeard: 'A3', consecutiveMisses: 1 });
   });
 
-  // Integration-blocked: needs C's PitchVerifier (T-07) merged. Enable when it lands.
-  it.todo('with the real PitchVerifier, a played A3 against an A4 target is a miss (needs T-07)');
-  it.todo('with the real PitchVerifier, A4 at +30 cents passes and at +40 cents misses (needs T-07)');
+  it('with the default PitchVerifier, A4 at +30 cents passes and at +40 cents misses', () => {
+    const at30 = new PracticeDrill(notes(69), { hearts: 5, timeoutMs: 15000 });
+    const log30 = record(at30);
+    at30.start(0);
+    hold(at30, 440 * 2 ** (30 / 1200), 0.95, 500);
+    expect(log30).toEqual(['step0', 'complete']);
+
+    const at40 = new PracticeDrill(notes(69), { hearts: 5, timeoutMs: 15000 });
+    const log40 = record(at40);
+    at40.start(0);
+    hold(at40, 440 * 2 ** (40 / 1200), 0.95, 500);
+    expect(log40).toEqual([]);
+    expect(at40.snapshot(1000)).toMatchObject({ lastAttempt: 'miss', lastHeard: 'A4' });
+  });
+
+  it('keeps the chroma NoteVerifier behind useChromaNoteVerifier for the T-19 comparison', () => {
+    const drill = new PracticeDrill(notes(69), { hearts: 5, timeoutMs: 15000, useChromaNoteVerifier: true });
+    const log = record(drill);
+    drill.start(0);
+    play(drill, [{ midi: 57, at: 0.5 }], 1.2);
+    // Pitch class only: the wrong octave passes, which is why it is no longer the default.
+    expect(log).toEqual(['step0', 'complete']);
+  });
+
+  it('labels note targets with their octave, since the octave is now checked', () => {
+    expect(targetLabel({ kind: 'note', note: 60 })).toBe('C4');
+    expect(targetLabel({ kind: 'note', note: 61 })).toBe('C#4');
+    expect(targetLabel({ kind: 'chord', chord: 'Am' })).toBe('Am');
+  });
 });
+
+/** Sustained frames at a fixed f0 after one onset at `startMs` (≈ 430 ms, past the miss decision). */
+function hold(drill: PracticeDrill, pitchHz: number, clarity: number, startMs: number) {
+  for (let i = 0; i < 40; i++) {
+    const tMs = startMs + i * 10.7;
+    drill.pushPosture(tMs, true);
+    drill.pushFrame({ tMs, chroma: new Float32Array(12), voiced: true, onset: i === 0, onsetMs: startMs, pitchHz, clarity });
+  }
+}

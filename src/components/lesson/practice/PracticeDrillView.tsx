@@ -165,7 +165,9 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
             </div>
           )}
           <TargetKeyboard notes={targetNotes(target)} />
-          {target.kind === 'chord' && <p className="text-center text-xs text-slate-500">Any octave and any inversion counts.</p>}
+          <p className="text-center text-xs text-slate-500">
+            {target.kind === 'chord' ? 'Any octave and any inversion counts.' : 'Play this exact key: the octave counts.'}
+          </p>
 
           <div className="mt-auto flex items-center justify-between">
             <HeartRow hearts={drill.hearts} />

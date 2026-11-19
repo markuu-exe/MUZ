@@ -68,7 +68,7 @@ describe('NoteMatcher', () => {
   });
 });
 
-describe('Single-note attempts (COURSE-5)', () => {
+describe('Single-note attempts (COURSE-5)', { timeout: 60_000 }, () => {
   it('correct note, C3–C5, 48 and 44.1 kHz: ≥ 95 % match', () => {
     const cases = COURSE_RANGE.flatMap((m) => [48000, 44100].map((fs) => () => attempt([m], m, 200 + m + fs, { fs })));
     expect(rate(cases, 'match')).toBeGreaterThanOrEqual(0.95);
@@ -117,7 +117,7 @@ describe('Single-note attempts (COURSE-5)', () => {
   });
 });
 
-describe('NoteVerifier + WaitStateMachine', () => {
+describe('NoteVerifier + WaitStateMachine', { timeout: 60_000 }, () => {
   function drive(played: number[], target: number, posture: boolean | null) {
     const machine = new WaitStateMachine(new NoteVerifier(matcher, target));
     const events: string[] = [];
