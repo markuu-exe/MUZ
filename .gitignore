@@ -10,3 +10,5 @@ TASKS/
 *.tsbuildinfo
 vite.config.js
 vite.config.d.ts
+# AI-2: local audio recordings for `npm run eval:audio`. Never commit audio.
+eval-data/

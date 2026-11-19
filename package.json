@@ -12,7 +12,8 @@
     "typecheck:seed": "tsc -p scripts/tsconfig.json --noEmit",
     "seed:lessons": "tsx scripts/generate-lesson-seed.ts",
     "seed:lessons:check": "tsx scripts/generate-lesson-seed.ts --check",
-    "eval:posture": "tsx scripts/eval/posture-eval.ts"
+    "eval:posture": "tsx scripts/eval/posture-eval.ts",
+    "eval:audio": "tsx scripts/eval/audio-eval.ts"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "1.1.0",
