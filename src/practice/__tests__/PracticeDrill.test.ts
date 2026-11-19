@@ -254,9 +254,12 @@ describe('PracticeDrill single-note verifier seam (T-08)', { timeout: 60_000 }, 
 
 /** Sustained frames at a fixed f0 after one onset at `startMs` (≈ 430 ms, past the miss decision). */
 function hold(drill: PracticeDrill, pitchHz: number, clarity: number, startMs: number) {
+  // A clean single note: its pitch class dominates the chroma (PitchVerifier cross-checks it).
+  const chroma = new Float32Array(12);
+  chroma[((Math.round(69 + 12 * Math.log2(pitchHz / 440)) % 12) + 12) % 12] = 1;
   for (let i = 0; i < 40; i++) {
     const tMs = startMs + i * 10.7;
     drill.pushPosture(tMs, true);
-    drill.pushFrame({ tMs, chroma: new Float32Array(12), voiced: true, onset: i === 0, onsetMs: startMs, pitchHz, clarity });
+    drill.pushFrame({ tMs, chroma, voiced: true, onset: i === 0, onsetMs: startMs, pitchHz, clarity });
   }
 }
