@@ -3,6 +3,7 @@ import { ChromaFrameProcessor } from '../../audio/dsp/ChromaFrameProcessor';
 import { feed, renderPiano, type NoteEvent } from '../../audio/__tests__/fixtures';
 import { COURSE_LESSONS } from '../../content';
 import { EXERCISE_ENGINE } from '../../types/lesson.types';
+import type { AcousticFrame, AcousticVerifier, AttemptResult } from '../../audio/practice/ChordVerifier';
 import { drillTargets, PracticeDrill, targetLabel, type DrillTarget } from '../PracticeDrill';
 
 const FS = 48000;
@@ -135,4 +136,79 @@ describe('PracticeDrill', () => {
     }
     expect(count).toBe(48);
   });
+});
+
+/**
+ * T-08 part 2: the single-note verifier is injectable so the pitchy PitchVerifier
+ * (T-07, contract C2) can replace the chroma NoteVerifier without touching the drill.
+ * C2: `new PitchVerifier(targetMidi, config?)` implements AcousticVerifier and exposes
+ * `lastHeardMidi` (−1 if none). This double follows that shape and returns a scripted
+ * verdict on each onset; it is not a pitch detector.
+ */
+class ScriptedPitchVerifier implements AcousticVerifier {
+  static created: number[] = [];
+  lastHeardMidi = -1;
+  private open = false;
+  constructor(
+    readonly targetMidi: number,
+    private readonly verdict: { kind: 'match' | 'miss'; heardMidi: number },
+  ) {
+    ScriptedPitchVerifier.created.push(targetMidi);
+  }
+  get isOpen(): boolean {
+    return this.open;
+  }
+  reset(): void {
+    this.open = false;
+  }
+  push(frame: AcousticFrame): AttemptResult | null {
+    if (!frame.onset) return null;
+    this.lastHeardMidi = this.verdict.heardMidi;
+    return { kind: this.verdict.kind, onsetMs: frame.onsetMs, decidedMs: frame.tMs, passRatio: 1, voicedRatio: 1, detail: null };
+  }
+}
+
+function strike(drill: PracticeDrill, tMs: number) {
+  drill.pushPosture(tMs, true);
+  drill.pushFrame({ tMs, chroma: new Float32Array(12), voiced: true, onset: true, onsetMs: tMs });
+}
+
+describe('PracticeDrill single-note verifier seam (T-08)', () => {
+  it('uses the injected verifier for note targets and names the heard note with its octave', () => {
+    ScriptedPitchVerifier.created = [];
+    const drill = new PracticeDrill(notes(69), {
+      hearts: 5,
+      timeoutMs: 15000,
+      createNoteVerifier: (midi) => new ScriptedPitchVerifier(midi, { kind: 'miss', heardMidi: 57 }),
+    });
+    const log = record(drill);
+    drill.start(0);
+    strike(drill, 500);
+    expect(ScriptedPitchVerifier.created).toEqual([69]);
+    expect(log).toEqual([]);
+    // An octave error: the chroma verifier would have said "A" (and passed it); a pitch verifier says A3.
+    expect(drill.snapshot(600)).toMatchObject({ stepIndex: 0, lastAttempt: 'miss', lastHeard: 'A3', consecutiveMisses: 1 });
+  });
+
+  it('does not use the note verifier factory for chord targets', () => {
+    ScriptedPitchVerifier.created = [];
+    const drill = new PracticeDrill([{ kind: 'chord', chord: 'C' }], {
+      hearts: 5,
+      timeoutMs: 15000,
+      createNoteVerifier: (midi) => new ScriptedPitchVerifier(midi, { kind: 'match', heardMidi: midi }),
+    });
+    drill.start(0);
+    expect(ScriptedPitchVerifier.created).toEqual([]);
+  });
+
+  it('keeps the chroma NoteVerifier when no factory is given (behaviour on main until T-07)', () => {
+    const drill = new PracticeDrill(notes(60), { hearts: 5, timeoutMs: 15000 });
+    drill.start(0);
+    play(drill, [{ midi: 65, at: 0.5 }], 1.2);
+    expect(drill.snapshot(1200)).toMatchObject({ lastAttempt: 'miss', lastHeard: 'F' });
+  });
+
+  // Integration-blocked: needs C's PitchVerifier (T-07) merged. Enable when it lands.
+  it.todo('with the real PitchVerifier, a played A3 against an A4 target is a miss (needs T-07)');
+  it.todo('with the real PitchVerifier, A4 at +30 cents passes and at +40 cents misses (needs T-07)');
 });

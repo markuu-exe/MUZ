@@ -10,9 +10,10 @@ import { ChordMatcher } from '../audio/chords/ChordMatcher';
 import { parseChord } from '../audio/chords/vocabulary';
 import { PITCH_CLASS_NAMES } from '../audio/dsp/pitch';
 import { NoteMatcher } from '../audio/notes/NoteMatcher';
-import { ChordVerifier, type AcousticFrame, type AttemptKind } from '../audio/practice/ChordVerifier';
+import { ChordVerifier, type AcousticFrame, type AcousticVerifier, type AttemptKind } from '../audio/practice/ChordVerifier';
 import { NoteVerifier } from '../audio/practice/NoteVerifier';
 import { WaitStateMachine, type HeartLossReason, type WaitState } from '../audio/practice/WaitStateMachine';
+import { midiToName } from '../lib/theory/notes';
 import { Emitter } from '../vision/core/Emitter';
 import type { Exercise, SequenceStep } from '../types/lesson.types';
 
@@ -74,15 +75,33 @@ export type PracticeDrillEvents = {
   locked: DrillStats;
 };
 
+/**
+ * T-08: a single-note verifier. Either the chroma NoteVerifier (pitch class only:
+ * `lastHeardPc`) or the pitchy PitchVerifier from T-07 (contract C2: f0 within ±35
+ * cents, clarity ≥ 0.85, octave included: `lastHeardMidi`, −1 when nothing heard).
+ */
+export type SingleNoteVerifier = AcousticVerifier & ({ readonly lastHeardMidi: number } | { readonly lastHeardPc: number });
+
+/** Builds the verifier for one note target (MIDI number, octave included). */
+export type NoteVerifierFactory = (targetMidi: number) => SingleNoteVerifier;
+
 export interface PracticeDrillOptions {
   hearts: number;
   /** settings.timeoutSec × 1000. */
   timeoutMs: number;
+  /**
+   * Single-note verifier. Defaults to the chroma NoteVerifier until T-07's
+   * PitchVerifier is merged; T-08 then switches the default (SRS 3.1.6.2, ruling D4).
+   */
+  createNoteVerifier?: NoteVerifierFactory;
 }
 
 /** One matcher of each kind is enough for the whole app. */
 const chordMatcher = new ChordMatcher();
 const noteMatcher = new NoteMatcher();
+
+/** The chroma, pitch-class-only verifier (kept for comparison in T-19, ruling D4). */
+export const chromaNoteVerifier: NoteVerifierFactory = (targetMidi) => new NoteVerifier(noteMatcher, targetMidi);
 
 export class PracticeDrill extends Emitter<PracticeDrillEvents> {
   readonly targets: readonly DrillTarget[];
@@ -90,7 +109,8 @@ export class PracticeDrill extends Emitter<PracticeDrillEvents> {
   private readonly heartsStart: number;
 
   private machine: WaitStateMachine | null = null;
-  private noteVerifier: NoteVerifier | null = null;
+  private readonly createNoteVerifier: NoteVerifierFactory;
+  private noteVerifier: SingleNoteVerifier | null = null;
   private offs: Array<() => void> = [];
   private stepIndex = 0;
   private hearts: number;
@@ -108,6 +128,7 @@ export class PracticeDrill extends Emitter<PracticeDrillEvents> {
     if (targets.length === 0) throw new Error('A practice drill needs at least one target.');
     this.targets = targets;
     this.timeoutMs = options.timeoutMs;
+    this.createNoteVerifier = options.createNoteVerifier ?? chromaNoteVerifier;
     this.heartsStart = Math.max(0, Math.floor(options.hearts));
     this.hearts = this.heartsStart;
   }
@@ -192,7 +213,7 @@ export class PracticeDrill extends Emitter<PracticeDrillEvents> {
   private arm(nowMs: number): void {
     this.detach();
     const target = this.targets[this.stepIndex];
-    this.noteVerifier = target.kind === 'note' ? new NoteVerifier(noteMatcher, target.note) : null;
+    this.noteVerifier = target.kind === 'note' ? this.createNoteVerifier(target.note) : null;
     const verifier = this.noteVerifier ?? new ChordVerifier(chordMatcher, (target as { chord: string }).chord);
     const machine = new WaitStateMachine(verifier, { timeoutMs: this.timeoutMs });
     this.machine = machine;
@@ -235,9 +256,11 @@ export class PracticeDrill extends Emitter<PracticeDrillEvents> {
   }
 
   private describeHeard(closestChord: string | null): string | null {
-    if (this.noteVerifier) {
-      const pc = this.noteVerifier.lastHeardPc;
-      return pc >= 0 ? PITCH_CLASS_NAMES[pc] : null;
+    const v = this.noteVerifier;
+    if (v) {
+      // A pitch verifier knows the octave ("A3"); the chroma one only the pitch class ("A").
+      if ('lastHeardMidi' in v) return v.lastHeardMidi >= 0 ? midiToName(v.lastHeardMidi) : null;
+      return v.lastHeardPc >= 0 ? PITCH_CLASS_NAMES[v.lastHeardPc] : null;
     }
     return closestChord && closestChord.length > 0 ? closestChord : null;
   }
