@@ -9,8 +9,8 @@ project ref to this file or anywhere else in the repo.** Put values in
 | Environment | Where it runs | Supabase database | Env vars needed | Status |
 |---|---|---|---|---|
 | Local dev | `npm run dev` on each member's machine (`http://localhost:5173`) | The existing Supabase project (same as staging, U-08) | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` in `.env.local` | Working |
-| CI | GitHub Actions, `.github/workflows/ci.yml`, every PR and every push to `main` | None | **None.** No secrets are configured or needed | Workflow committed; **NOT DONE:** not yet run on GitHub |
-| Staging | Vercel, Member B's account (U-15), Preview deployments | The existing Supabase project (U-08) | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (Vercel: Preview) | **NOT DONE:** Vercel project not connected; no staging URL yet |
+| CI | GitHub Actions, `.github/workflows/ci.yml`, every PR and every push to `main` | None | **None.** No secrets are configured or needed | **Running.** First run green on PR #30 (job `verify`, 1 m 36 s, 2026-11-19) |
+| Staging | Vercel, Member B's account (U-15), Preview deployments | The existing Supabase project (U-08) | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (Vercel: Preview) | **Connected:** a Vercel project builds a Preview for every PR (checks `Vercel`, `Vercel Preview Comments` on PR #30). Previews are behind Vercel Authentication. **NOT VERIFIED:** whether the Preview env vars are set, signup, deep-link refresh |
 | Production | Vercel, Member B's account (U-15), Production deployment | Open (U-06: new project, or this one cleaned and promoted) | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (Vercel: Production) | **NOT DONE:** T-25 |
 
 The client also accepts the `NEXT_PUBLIC_SUPABASE_URL` and
@@ -44,7 +44,7 @@ CI run is advisory only.
 
 ## Vercel (staging and production)
 
-**NOT DONE:** the repo is not yet connected to a Vercel project.
+**Connected (found 2026-11-19):** the repo already deploys to a Vercel project on a team account; PR #30 got a Preview deployment. Previews are protected by Vercel Authentication, so they can only be opened by members of that Vercel team. Someone with access (B, U-15) must confirm the settings below and the env vars.
 
 | Setting | Value |
 |---|---|
@@ -85,8 +85,8 @@ configuration:
 
 | Item | Blocked on |
 |---|---|
-| Connect the repo to Vercel and set the env vars | Member B's Vercel account (U-15) |
-| Staging URL (record it here, no keys) | Vercel connection |
+| Confirm the Vercel env vars (Preview + Production) and the settings below | Member B's Vercel account (U-15) |
+| Staging URL: the Preview deployment of `main` or a chosen branch (record it here, no keys); decide whether testers need Vercel Authentication turned off for Previews | B with A |
 | Staging signup check: one signup creates exactly one `profiles` row | Staging URL; U-08 precautions |
 | Deep-link refresh check on staging (`/some/deep/path`, refresh, no 404) | Staging URL |
 | Failing PR blocks merge | Branch protection on `main`; A has not approved it |
