@@ -48,8 +48,6 @@ export interface LessonPlayerProps {
    * actually granted (EXP is only given on first mastery), for the results screen.
    */
   onComplete?: (result: LessonResult) => LessonCompleteReturn | Promise<LessonCompleteReturn>;
-  /** Called immediately when a heart is lost during a practice or rhythm exercise. */
-  onHeartLost?: (reason: 'timeout' | 'misses' | 'rhythm-fail') => void;
   onClose: () => void;
 }
 
@@ -72,7 +70,6 @@ export default function LessonPlayer({
   hearts,
   registry = EXERCISE_REGISTRY,
   onComplete,
-  onHeartLost,
   onClose,
 }: LessonPlayerProps) {
   const [run, setRun] = useState<LessonRunState>(() => createLessonRun(lessonId, payload, hearts, Date.now()));
@@ -83,8 +80,6 @@ export default function LessonPlayer({
   const [savedExp, setSavedExp] = useState<number | null>(null);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
-  const onHeartLostRef = useRef(onHeartLost);
-  onHeartLostRef.current = onHeartLost;
   const reported = useRef<LessonRunState | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
@@ -128,16 +123,7 @@ export default function LessonPlayer({
     // The outcome carries the exercise's hearts, so drop the in-flight count or it would be charged twice.
     inFlightHeartsLost.current = 0;
     setPending(null);
-    setRun((s) => {
-      const next = submitOutcome(s, outcome, Date.now());
-      // Practice drills already report each lost heart via onHeartLost as it happens;
-      // if a rhythm exercise deducts a heart on submitOutcome, report that too.
-      const prevItem = currentItem(s);
-      if (prevItem && prevItem.stage === 'rhythm' && next.hearts < s.hearts) {
-        onHeartLostRef.current?.('rhythm-fail');
-      }
-      return next;
-    });
+    setRun((s) => submitOutcome(s, outcome, Date.now()));
   }, []);
 
   const handleOutcome = useCallback(
@@ -271,7 +257,6 @@ export default function LessonPlayer({
                     hearts={run.hearts}
                     submitted={pending !== null}
                     onOutcome={handleOutcome}
-                    onHeartLost={(reason) => onHeartLostRef.current?.(reason)}
                     onHeartsSpent={reportHeartsSpent}
                   />
                 </div>

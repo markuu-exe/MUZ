@@ -17,7 +17,6 @@ export interface Database {
           last_activity_date: string | null;
           exp: number;
           hearts: number;
-          last_heart_update: string | null;
           created_at: string | null;
           /**
            * AUX-TEST-ACCESS-01 developer lesson-access flag (default false). Optional because
@@ -34,7 +33,6 @@ export interface Database {
           last_activity_date?: string | null;
           exp?: number;
           hearts?: number;
-          last_heart_update?: string | null;
           created_at?: string | null;
           /** Accepted by the API but ignored for client roles (guard trigger); listed so whole-row writes type-check. */
           is_dev?: boolean;
@@ -47,7 +45,6 @@ export interface Database {
           last_activity_date?: string | null;
           exp?: number;
           hearts?: number;
-          last_heart_update?: string | null;
           created_at?: string | null;
           /** Accepted by the API but ignored for client roles (guard trigger); listed so whole-row writes type-check. */
           is_dev?: boolean;

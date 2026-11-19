@@ -17,7 +17,6 @@ create table public.profiles (
   last_activity_date date default current_date,
   exp integer not null default 0,
   hearts integer not null default 5,
-  last_heart_update timestamptz,
   created_at timestamptz not null default now(),
   constraint profiles_username_unique unique (username),
   constraint profiles_instrument_piano check (instrument_focus = 'piano'),

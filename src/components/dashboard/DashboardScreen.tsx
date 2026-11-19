@@ -5,33 +5,35 @@ import {
   GitBranch,
   Heart,
   LogOut,
+  Music2,
   Piano,
   Settings,
   UserRound,
   Play,
   RotateCcw,
   Sparkles,
+  ShieldAlert,
   CheckCircle2,
   Sliders,
   Volume2,
   Camera,
   Layers,
-  Trophy,
+  ChevronRight,
+  Flame,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useDashboardData } from '../../hooks/useDashboardData';
-import { useGamification } from '../../hooks/useGamification';
 import { useHeartRegen } from '../../hooks/useHeartRegen';
 import { cn } from '../../lib/cn';
 import {
   displayNameFromProfile,
   expProgress,
+  groupByModule,
   nodeStatus,
   type CurriculumNode,
   type DashboardView,
   type NodeStatus,
 } from '../../lib/dashboard/curriculum';
-import { canStartLessonWithHearts, nodeBaseExpReward } from '../../lib/gamification';
 import DashboardHud from './DashboardHud';
 import SkillTreeView from './SkillTreeView';
 import LessonPlayer, { type LessonSaveFeedback } from '../lesson/LessonPlayer';
@@ -44,7 +46,8 @@ import { supabase } from '../../lib/supabase/client';
 import { canOpenLesson, isDevAccount } from '../../lib/progress/devAccess';
 import { PLACEMENT_METADATA_KEY } from '../../lib/progress/placement';
 import { saveLessonResult } from '../../lib/progress/saveLessonResult';
-import { savePlacement, supabaseProgressStore } from '../../lib/progress/supabaseStore';
+import { displayedStreak, toLocalDate } from '../../lib/progress/streak';
+import { persistRegeneratedHearts, savePlacement, supabaseProgressStore } from '../../lib/progress/supabaseStore';
 
 interface NavItem {
   id: DashboardView;
@@ -65,19 +68,8 @@ export default function DashboardScreen() {
   // AUX-TEST-ACCESS-01: developer accounts may open locked lessons (access only, never progress).
   const isDev = isDevAccount(profile, isDemo);
   const data = useDashboardData(profile, isDemo);
-  const gamification = useGamification(
-    profile,
-    isDemo,
-    data.lessons,
-    data.progress,
-    refreshProfile,
-  );
-
   const [view, setView] = useState<DashboardView>('skill-tree');
-  const [banner, setBanner] = useState<{
-    message: string;
-    type: 'warning' | 'error' | 'info';
-  } | null>(null);
+  const [banner, setBanner] = useState<{ message: string; type: 'warning' | 'error' | 'info' } | null>(null);
   const [shakingId, setShakingId] = useState<string | null>(null);
   const [selected, setSelected] = useState<CurriculumNode | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<NodeStatus | null>(null);
@@ -85,21 +77,23 @@ export default function DashboardScreen() {
   const [lessonFilter, setLessonFilter] = useState<'all' | 'theory' | 'practice' | 'rhythm'>('all');
   const [placementDone, setPlacementDone] = useState(false);
 
-  const { hearts, currentStreak: streak, exp, progressMap } = gamification;
+  const hearts = profile?.hearts ?? 4;
+  const streak = profile
+    ? displayedStreak(profile.current_streak, profile.last_activity_date, toLocalDate(new Date()))
+    : 7;
+  const exp = profile?.exp ?? 1240;
   const username = displayNameFromProfile(profile, user?.email);
   const progressMeta = expProgress(exp);
-  const regen = useHeartRegen(
-    profile?.id ?? user?.id,
-    hearts,
-    (restoredCount, _nextHearts, nextStartedAtMs) => {
-      gamification.restoreHearts(restoredCount, 'regen', nextStartedAtMs);
-      setBanner({
-        message: `+${restoredCount} Stamina Heart regenerated! You now have ${Math.min(5, hearts + restoredCount)}/5 Hearts.`,
-        type: 'info',
-      });
-    },
-    gamification.lastHeartUpdate,
-  );
+  const regen = useHeartRegen(profile?.id ?? user?.id, hearts, {
+    onRegenerate:
+      isDemo || !profile
+        ? undefined
+        : async (to, from) => {
+            const written = await persistRegeneratedHearts(supabase, profile.id, from, to);
+            await refreshProfile();
+            return written;
+          },
+  });
 
   // COURSE-6: ask a new learner where to start, once, when the course is in the database.
   const needsPlacement =
@@ -119,37 +113,14 @@ export default function DashboardScreen() {
     data.reload();
   };
 
-  // COURSE-6: save each finished run; demo mode updates local gamification only.
-  const handleLessonComplete = async (
-    lesson: CurriculumNode,
-    result: LessonResult,
-  ): Promise<LessonSaveFeedback> => {
-    if (result.passed) {
-      gamification.completeLessonSession({
-        lesson,
-        accuracyPercent: result.accuracy,
-        rhythmConsistency: result.metrics.rhythmConsistency || 95,
-        postureScore: result.metrics.postureScore || 95,
-        durationSec: result.durationSec || 45,
-        heartsEnd: result.heartsEnd,
-        heartRestoredOverride: result.heartRestored,
-      });
-    } else if (result.heartRestored) {
-      gamification.restoreHearts(1, 'theory-quiz');
-    }
-
+  // COURSE-6: save each finished run; demo mode saves nothing.
+  const handleLessonComplete = async (lesson: CurriculumNode, result: LessonResult): Promise<LessonSaveFeedback> => {
     if (isDemo || !profile) return { note: 'Demo mode: results are not saved.' };
     const payload = lesson.payload as unknown as LessonPayload;
-    // Lost hearts were already persisted as they happened via onHeartLost,
-    // so only pass any heart restoration delta to saveLessonResult.
-    const adjustedResult: LessonResult = {
-      ...result,
-      heartsStart: result.heartsEnd - (result.heartRestored ? 1 : 0),
-    };
     const applied = await saveLessonResult(supabaseProgressStore(supabase), {
       userId: profile.id,
       lesson: { passMark: payload.settings.passMark, expReward: lessonExp(payload) },
-      result: adjustedResult,
+      result,
     });
     await refreshProfile();
     data.reload();
@@ -157,18 +128,20 @@ export default function DashboardScreen() {
   };
 
   const masteredCount = useMemo(
-    () => data.lessons.filter((lesson) => progressMap[lesson.id]?.completed).length,
-    [data.lessons, progressMap],
+    () => data.lessons.filter((lesson) => data.progress[lesson.id]?.completed).length,
+    [data.lessons, data.progress],
   );
 
-  // First unlocked Theory lesson (used for instant 0-heart recovery)
-  const recoveryTheoryLesson = useMemo(() => {
-    return (
-      data.lessons.find((l) => l.kind === 'theory' && progressMap[l.id]?.completed) ??
-      data.lessons.find((l) => l.kind === 'theory') ??
-      null
-    );
-  }, [data.lessons, progressMap]);
+  const currentNode = useMemo(() => {
+    const modules = groupByModule(data.lessons);
+    for (const group of modules) {
+      const found = group.lessons.find((lesson, index) => {
+        return nodeStatus(lesson, index, group.lessons, data.progress, exp, data.lessons) === 'current';
+      });
+      if (found) return found;
+    }
+    return null;
+  }, [data.lessons, data.progress, exp]);
 
   // Click handler for Skill Tree & Lesson nodes
   const handleSelect = (lesson: CurriculumNode, status: NodeStatus) => {
@@ -197,8 +170,7 @@ export default function DashboardScreen() {
       setShakingId(lesson.id);
       window.setTimeout(() => setShakingId(null), 500);
       setBanner({
-        message:
-          'No Stamina Hearts remaining! Complete a free Theory unit or wait for your heart regeneration.',
+        message: 'No Stamina Hearts remaining! Complete a free Theory unit or wait for your heart regeneration.',
         type: 'error',
       });
       return;
@@ -267,9 +239,7 @@ export default function DashboardScreen() {
                   <div
                     className={cn(
                       'flex h-8 w-8 items-center justify-center rounded-xl transition-colors',
-                      active
-                        ? 'bg-violet-600 text-white'
-                        : 'bg-slate-800/80 text-slate-400 group-hover:text-slate-200',
+                      active ? 'bg-violet-600 text-white' : 'bg-slate-800/80 text-slate-400 group-hover:text-slate-200',
                     )}
                   >
                     <Icon className="h-4 w-4" />
@@ -357,32 +327,8 @@ export default function DashboardScreen() {
             streak={streak}
             exp={exp}
             nextHeartLabel={regen.label}
-            practicedToday={gamification.practicedToday}
-            streakAtRisk={gamification.streakAtRisk}
           />
         </header>
-
-        {/* Newly Unlocked Achievement Banner */}
-        {gamification.newlyUnlockedBadges.length > 0 && (
-          <div className="flex items-center justify-between border-b border-amber-500/40 bg-gradient-to-r from-amber-500/20 via-slate-900 to-amber-500/15 px-8 py-3 text-sm font-semibold text-amber-200">
-            <div className="flex items-center gap-3">
-              <Trophy className="h-5 w-5 shrink-0 text-amber-400" />
-              <span>
-                Achievement Unlocked:{' '}
-                {gamification.newlyUnlockedBadges
-                  .map((b) => `"${b.title}" (+${b.expReward} XP)`)
-                  .join(', ')}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={gamification.dismissNewlyUnlockedBadges}
-              className="rounded-lg px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-amber-300 hover:text-white"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
 
         {/* Global Warning / Locked Node Notification Banner */}
         {banner && (
@@ -415,23 +361,11 @@ export default function DashboardScreen() {
         {/* Depleted Stamina Notification Bar */}
         {hearts === 0 && !banner && (
           <div className="flex items-center justify-between border-b border-rose-500/30 bg-rose-500/15 px-8 py-2.5 text-xs text-rose-100">
-            <div className="flex items-center gap-3 font-medium">
+            <div className="flex items-center gap-2 font-medium">
               <Heart className="h-4 w-4 fill-rose-500 text-rose-500" />
               <span>
-                <strong>0 Hearts remaining:</strong> Practice drills are locked. Play a free Theory lesson (≥80%) to recover +1 Heart immediately.
+                <strong>0 Hearts remaining:</strong> Practice drills are locked. Play a Theory lesson to recover stamina immediately.
               </span>
-              {recoveryTheoryLesson && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelected(recoveryTheoryLesson);
-                    setActiveLesson(recoveryTheoryLesson);
-                  }}
-                  className="rounded-lg border border-emerald-400/40 bg-emerald-500/20 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-200 hover:bg-emerald-500/30"
-                >
-                  Start Free Theory Lesson
-                </button>
-              )}
             </div>
             <span className="font-bold uppercase tracking-wider text-rose-300">
               Next Heart in {regen.label}
@@ -445,7 +379,7 @@ export default function DashboardScreen() {
           {view === 'skill-tree' && (
             <SkillTreeView
               lessons={data.lessons}
-              progress={progressMap}
+              progress={data.progress}
               exp={exp}
               hearts={hearts}
               shakingId={shakingId}
@@ -461,11 +395,6 @@ export default function DashboardScreen() {
               userEmail={user?.email}
               masteredCount={masteredCount}
               totalLessons={data.lessons.length}
-              exp={exp}
-              streak={streak}
-              longestStreak={gamification.longestStreak}
-              badges={gamification.badges}
-              performanceRecords={gamification.performanceRecords}
             />
           )}
 
@@ -509,7 +438,7 @@ export default function DashboardScreen() {
                     lesson,
                     moduleLessons.findIndex((item) => item.id === lesson.id),
                     moduleLessons,
-                    progressMap,
+                    data.progress,
                     exp,
                     data.lessons,
                   );
@@ -545,12 +474,9 @@ export default function DashboardScreen() {
                         <span
                           className={cn(
                             'inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider',
-                            status === 'mastered' &&
-                              'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
-                            status === 'current' &&
-                              'bg-violet-500/20 text-violet-300 border border-violet-500/40',
-                            status === 'locked' &&
-                              'bg-slate-800 text-slate-400 border border-slate-700',
+                            status === 'mastered' && 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
+                            status === 'current' && 'bg-violet-500/20 text-violet-300 border border-violet-500/40',
+                            status === 'locked' && 'bg-slate-800 text-slate-400 border border-slate-700',
                           )}
                         >
                           {status === 'mastered' && <CheckCircle2 className="h-3.5 w-3.5" />}
@@ -574,9 +500,7 @@ export default function DashboardScreen() {
                   </div>
                   <div>
                     <h2 className="text-lg font-bold text-white">Audio & Posture Calibration</h2>
-                    <p className="text-xs text-slate-400">
-                      Configure your local sensors and acoustic analysis.
-                    </p>
+                    <p className="text-xs text-slate-400">Configure your local sensors and acoustic analysis.</p>
                   </div>
                 </div>
 
@@ -585,12 +509,8 @@ export default function DashboardScreen() {
                     <div className="flex items-center gap-3">
                       <Volume2 className="h-5 w-5 text-violet-400" />
                       <div>
-                        <p className="text-sm font-semibold text-white">
-                          Chromagram Pitch Tracking
-                        </p>
-                        <p className="text-xs text-slate-400">
-                          Browser WASM pitch latch window (400ms buffer).
-                        </p>
+                        <p className="text-sm font-semibold text-white">Chromagram Pitch Tracking</p>
+                        <p className="text-xs text-slate-400">Browser WASM pitch latch window (400ms buffer).</p>
                       </div>
                     </div>
                     <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-400 border border-emerald-500/30">
@@ -602,12 +522,8 @@ export default function DashboardScreen() {
                     <div className="flex items-center gap-3">
                       <Camera className="h-5 w-5 text-emerald-400" />
                       <div>
-                        <p className="text-sm font-semibold text-white">
-                          MediaPipe Hand & Wrist Pose Lock
-                        </p>
-                        <p className="text-xs text-slate-400">
-                          Ergonomic verification for piano practice posture.
-                        </p>
+                        <p className="text-sm font-semibold text-white">MediaPipe Hand & Wrist Pose Lock</p>
+                        <p className="text-xs text-slate-400">Ergonomic verification for piano practice posture.</p>
                       </div>
                     </div>
                     <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-400 border border-emerald-500/30">
@@ -620,9 +536,7 @@ export default function DashboardScreen() {
                       <Layers className="h-5 w-5 text-cyan-400" />
                       <div>
                         <p className="text-sm font-semibold text-white">Active Instrument Track</p>
-                        <p className="text-xs text-slate-400">
-                          Curriculum is calibrated for 88-key Acoustic Piano.
-                        </p>
+                        <p className="text-xs text-slate-400">Curriculum is calibrated for 88-key Acoustic Piano.</p>
                       </div>
                     </div>
                     <span className="text-xs font-bold text-slate-300">Acoustic Piano</span>
@@ -740,9 +654,6 @@ export default function DashboardScreen() {
           title={activeLesson.title}
           payload={activeLesson.payload}
           hearts={hearts}
-          onHeartLost={(reason) => {
-            gamification.depleteHeartForDrill(reason);
-          }}
           onComplete={(result) => handleLessonComplete(activeLesson, result)}
           onClose={() => setActiveLesson(null)}
         />
