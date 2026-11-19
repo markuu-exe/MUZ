@@ -19,6 +19,12 @@ export interface Database {
           hearts: number;
           last_heart_update: string | null;
           created_at: string | null;
+          /**
+           * AUX-TEST-ACCESS-01 developer lesson-access flag (default false). Optional because
+           * demo profiles and pre-migration databases do not carry it. The app never writes it;
+           * the guard trigger ignores any client write to it.
+           */
+          is_dev?: boolean;
         };
         Insert: {
           id: string;
@@ -30,6 +36,8 @@ export interface Database {
           hearts?: number;
           last_heart_update?: string | null;
           created_at?: string | null;
+          /** Accepted by the API but ignored for client roles (guard trigger); listed so whole-row writes type-check. */
+          is_dev?: boolean;
         };
         Update: {
           id?: string;
@@ -41,6 +49,8 @@ export interface Database {
           hearts?: number;
           last_heart_update?: string | null;
           created_at?: string | null;
+          /** Accepted by the API but ignored for client roles (guard trigger); listed so whole-row writes type-check. */
+          is_dev?: boolean;
         };
         Relationships: [];
       };
