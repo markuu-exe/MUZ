@@ -15,3 +15,9 @@ export function midiToFreq(midi: number): number {
 export function pc(n: number): number {
   return ((n % 12) + 12) % 12;
 }
+export function centsOff(hz: number, midi: number): number {
+  return 1200 * Math.log2(hz / midiToFreq(midi));
+}
+export function midiToNoteName(midi: number): string {
+  return PITCH_CLASS_NAMES[pc(midi)] + (Math.floor(midi / 12) - 1);
+}
