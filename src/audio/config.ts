@@ -136,3 +136,15 @@ export const DEFAULT_WAIT_STATE_CONFIG: Readonly<WaitStateConfig> = Object.freez
   timeoutMs: 15_000, // SPEC
   maxConsecutiveMisses: 3, // SPEC
 });
+
+export interface PitchConfig {
+  /** Max distance from the exact target note. SPEC: SRS 3.1.6.2 (±35 cents). */
+  centsTolerance: number;
+  /** Pitchy clarity floor. SPEC: SRS 3.1.6.2 (0.85). */
+  minClarity: number;
+}
+
+export const DEFAULT_PITCH_CONFIG: Readonly<PitchConfig> = Object.freeze({
+  centsTolerance: 35, // SPEC
+  minClarity: 0.85, // SPEC
+});
