@@ -6,6 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../types/database.types';
 import type { PerformanceRow, ProfileSnapshot, ProgressSnapshot } from './applyResult';
 import { PLACEMENT_METADATA_KEY, placementPlan } from './placement';
+import type { DevTestRow, DevTestStore } from './devTestResults';
 import type { ProgressStore } from './saveLessonResult';
 
 type Client = SupabaseClient<Database>;
@@ -48,6 +49,25 @@ export function supabaseProgressStore(client: Client): ProgressStore {
     async updateProfile(userId, patch: ProfileSnapshot) {
       const { error } = await client.from('profiles').update(patch).eq('id', userId);
       check(error, 'Could not update your profile');
+    },
+  };
+}
+
+/** D1: storage for developer test runs. Writes dev_test_results and profiles.hearts only. */
+export function supabaseDevTestStore(client: Client): DevTestStore {
+  return {
+    async getHearts(userId) {
+      const { data, error } = await client.from('profiles').select('hearts').eq('id', userId).maybeSingle();
+      check(error, 'Could not read your profile');
+      return data?.hearts ?? null;
+    },
+    async insertDevTestResult(userId, lessonId, row: DevTestRow) {
+      const { error } = await client.from('dev_test_results').insert({ user_id: userId, lesson_id: lessonId, ...row });
+      check(error, 'Could not save the developer test result');
+    },
+    async updateHearts(userId, hearts) {
+      const { error } = await client.from('profiles').update({ hearts }).eq('id', userId);
+      check(error, 'Could not update your hearts');
     },
   };
 }
