@@ -34,7 +34,7 @@ Because it is offline, the same recordings can be re-run after any tuning change
 | Distance | Laptop where the learner would put it: on the music stand or a table, about 0.5–1 m from the keys. USB mic at 0.5–1 m, pointed at the middle of the keyboard. Note the distance in `notes`. |
 | Gain | Loud strikes should peak around −12 to −6 dBFS. The harness warns about samples at full scale (clipping). Turn off automatic gain if the recorder allows it. |
 | Room noise | Normal room. Fridge or traffic hum is fine, but no TV or music. Before the first strike, record ~1 s of room tone; the detector needs ~0.2 s to warm up, so a strike in the first 0.2 s is missed. |
-| Strikes per clip | Either one strike per clip, or several strikes spaced **≥ 1.5 s** apart. Leave **≥ 1 s** after the last strike: a verdict comes 200–350 ms after the onset, and an attempt still open at the end of the file is reported as "no attempt". |
+| Strikes per clip | Either one strike per clip, or several strikes spaced **≥ 1.5 s** apart. **A clip with more than one strike must have its `strikes` count** in the labels (the harness warns if it is missing), otherwise missed strikes are not counted. Leave **≥ 1 s** after the last strike: a verdict comes 200–350 ms after the onset, and an attempt still open at the end of the file is reported as "no attempt". |
 | Clip length | Keep clips **under 15 s**, the drill's timeout (SRS 3.1.2.4). Longer clips are still judged in full but flagged. |
 | Instrument | Digital or acoustic piano, normal velocity. Sustain pedal is allowed, but say so in `notes`. |
 
@@ -86,7 +86,7 @@ usb/notes/c4_01.wav,note:60,correct,USB mic 0.5 m,
 | `target` | yes | `note:<MIDI or name>` (`note:60`, `note:C4`, `note:F#3`, `note:Bb3`; piano range 21–108) or `chord:<symbol>` (anything the lesson chord parser accepts: `C`, `Am`, `G_Maj`, `F#7`…). |
 | `expected` | yes | `correct` if the target was played, `wrong` if something else was. |
 | `notes` | no | Free text: mic, distance, pedal, anything odd. |
-| `strikes` | no | Number of strikes in the clip. When it is set, strikes the detector never heard count as "no attempt", and attempts beyond it are reported as extra (re-triggers). When it is left blank, a clip with no judged attempt counts as one "no attempt". |
+| `strikes` | no | Number of strikes in the clip. When it is set, strikes the detector never heard count as "no attempt", and attempts beyond it are reported as extra (re-triggers). When it is left blank, the clip counts as **one** unit (a clip with no judged attempt is one "no attempt"), so blank is only correct for single-strike clips; the harness warns when a blank-`strikes` clip has several onsets, several judged attempts or an attempt still open at the end. |
 
 Columns may come in any order. Fields with commas go in `"double quotes"`. Blank lines and lines starting with `#` are ignored. Every bad row is reported as `labels.csv:<line>: <reason>`, and nothing runs until the CSV and every WAV it lists are valid.
 
@@ -97,7 +97,7 @@ npm run eval:audio -- eval-data/audio/labels.csv
 npm run eval:audio -- eval-data/audio/labels.csv --json eval-data/audio/results.json
 ```
 
-Progress goes to stderr and the report to stdout. Exit codes: `0` done; `1` malformed input (named error with CSV line: bad label, file not found, not a WAV, unsupported format); `2` bad command line (prints the usage line). The `--json` file holds the summaries and every attempt of every clip. Write it inside `eval-data/` so it is git-ignored as well.
+Progress goes to stderr and the report to stdout. Exit codes: `0` done; `1` malformed input (named error with CSV line: bad label, file not found, not a WAV, unsupported format) or a runtime failure (a clip that cannot be evaluated, a `--json` file that cannot be written); `2` bad command line (prints the usage line). The `--json` file holds the summaries and every attempt of every clip. Write it inside `eval-data/` so it is git-ignored as well.
 
 On the dev laptop, analysis took about 0.4 s per second of audio, plus ~5 s of startup. At that rate, 400 clips of 2.5 s each take about 7 minutes.
 
@@ -109,7 +109,7 @@ Results are counted **per attempt**: an onset that the verifier judged as `match
 == chord — ChordVerifier: chroma chord match (live chord drills)
   correct played  n=100   true accept    97  97.0 %  |  false reject    3   3.0 %  |  no attempt    0   0.0 %
   wrong played    n=20    true reject    20 100.0 %  |  FALSE ACCEPT    0   0.0 %  |  no attempt    0   0.0 %
-  latency onset→verdict, 97 accepted attempts: p50 203 ms, p95 214 ms, max 341 ms
+  latency onset→verdict, 97 true accepts: p50 203 ms, p95 214 ms, max 341 ms
 ```
 (The numbers above only show the layout. They are not measurements.)
 
@@ -119,9 +119,9 @@ Results are counted **per attempt**: an onset that the verifier judged as `match
 | **false reject** | Correct playing was called wrong. | Costs the learner a miss, and three in a row cost a heart. This is the frustrating error. |
 | **FALSE ACCEPT** | Wrong playing was passed. | The drill teaches the wrong thing. For PitchVerifier it should be ~0 on octave errors. For the chroma NoteVerifier, octave errors *will* show here, by design. |
 | **true reject** | Wrong playing was caught. | Report the rate (T-19 "wrong-chord rejection"). |
-| **no attempt** | A strike gave no judged attempt: missed onset, too quiet, only `unvoiced`, or still open at the end of the clip. | Not a miss: in the drill nothing happens and the 15 s timer keeps running. A high rate points to gain or onset problems, not to the matcher. |
+| **no attempt** | (With `strikes` set.) A strike gave no judged attempt: missed onset, too quiet, only `unvoiced`, still open at the end of the clip, or replaced by a new strike more than 150 ms after it while its window was still open (the verifiers drop the older attempt, as in the drill). | Not a miss: in the drill nothing happens and the 15 s timer keeps running. A high rate points to gain or onset problems, not to the matcher. |
 | **n** | Attempts plus no-attempts in that row. | Always quote rates with n. 19/20 and 95/100 are not the same evidence. |
-| **latency** | `decidedMs − onsetMs` over every accepted attempt, using nearest-rank p50 / p95 / max. | This is the *algorithmic* delay. It is ≥ 200 ms by design (the SPEC sustain window, SRS 3.1.6.4) and steps in hops of ~10.7 ms at 48 kHz (11.6 ms at 44.1 kHz). It does **not** include mic, OS or browser input latency, so it is not the SRS 3.1.6.1 "within 50 ms of excitation" figure (see PERFORMANCE_REPORT §6). To get strike → onset, compare a clip's `@onset` time with the strike in the waveform (Audacity). |
+| **latency** | `decidedMs − onsetMs` over **true accepts** (accepted attempts on `correct` clips), using nearest-rank p50 / p95 / max. With fewer than 20 accepts, p95 equals the maximum, so do not over-read it. Misses are decided later (~350 ms) and are not included. | This is the *algorithmic* delay. It is ≥ 200 ms by design (the SPEC sustain window, SRS 3.1.6.4) and steps in hops of ~10.7 ms at 48 kHz (11.6 ms at 44.1 kHz). It does **not** include mic, OS or browser input latency, so it is not the SRS 3.1.6.1 "within 50 ms of excitation" figure (see PERFORMANCE_REPORT §6). To get strike → onset, compare a clip's `@onset` time with the strike in the waveform (Audacity). |
 
 The per-clip list shows each attempt as `kind @onset +latency heard X`. For PitchVerifier, X is a note with its octave (`A3`), for the chroma verifier a pitch class (`A`), and for chords the chord label (`F`). Use the list to find bad takes and mislabelled rows before you trust the totals.
 

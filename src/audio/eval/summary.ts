@@ -38,7 +38,7 @@ export interface VerifierSummary {
   verifier: VerifierId;
   correct: Counts;
   wrong: Counts;
-  /** Onset → verdict (ms) over every accepted attempt, correct or wrong clip. Null when none. */
+  /** Onset → verdict (ms) over true accepts (accepted attempts on correct clips). Null when none. */
   latency: LatencyStats | null;
   extraAttempts: number;
 }
@@ -71,7 +71,21 @@ export function countClip(attempts: readonly EvalAttempt[], strikes: number | nu
   return { accepted, rejected, noAttempt: Math.max(0, strikes - judged), extra: Math.max(0, judged - strikes) };
 }
 
-/** Nearest-rank percentile (p in (0, 100]); NaN for an empty list. */
+/**
+ * Without a `strikes` count a clip is one unit: missed onsets and attempts still open at
+ * the end cannot be counted, so a multi-strike clip would overstate the accept rate.
+ * Returns the warning to print for such a clip, or null.
+ */
+export function strikesWarning(strikes: number | null, onsets: number, judged: number, openAtEnd: boolean): string | null {
+  if (strikes !== null) return null;
+  const hint = 'add the number of strikes in the `strikes` column, or missed strikes are not counted';
+  if (onsets > 1) return `${onsets} onsets but no strikes count: ${hint}`;
+  if (judged > 1) return `${judged} judged attempts but no strikes count: ${hint}`;
+  if (openAtEnd) return `an attempt was still open at the end of the clip and no strikes count is set: ${hint}`;
+  return null;
+}
+
+/** Nearest-rank percentile (p in (0, 100]); NaN for an empty list. With n < 20, p95 is the maximum. */
 export function percentile(values: readonly number[], p: number): number {
   if (values.length === 0) return NaN;
   const sorted = [...values].sort((a, b) => a - b);
@@ -93,7 +107,8 @@ export function summarise(verifier: VerifierId, clips: readonly ClipAttempts[]):
     into.noAttempt += c.noAttempt;
     into.n += c.accepted + c.rejected + c.noAttempt;
     extraAttempts += c.extra;
-    for (const a of clip.attempts) if (a.kind === 'match') latencies.push(a.latencyMs);
+    // True accepts only: a false accept's timing is not the learner's experience of a correct strike.
+    if (clip.expected === 'correct') for (const a of clip.attempts) if (a.kind === 'match') latencies.push(a.latencyMs);
   }
   const latency =
     latencies.length === 0
@@ -125,10 +140,10 @@ export function formatSummary(s: VerifierSummary): string[] {
   ];
   if (s.latency) {
     const l = s.latency;
-    const what = l.n === 1 ? 'accepted attempt' : 'accepted attempts';
+    const what = l.n === 1 ? 'true accept' : 'true accepts';
     lines.push(`  latency onset→verdict, ${l.n} ${what}: p50 ${ms(l.p50)}, p95 ${ms(l.p95)}, max ${ms(l.max)}`);
   } else {
-    lines.push('  latency onset→verdict: no accepted attempts');
+    lines.push('  latency onset→verdict: no true accepts');
   }
   if (s.extraAttempts > 0) lines.push(`  note: ${s.extraAttempts} attempt(s) beyond the labelled strikes (re-triggers?)`);
   return lines;

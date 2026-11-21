@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AttemptKind } from '../../practice/ChordVerifier';
 import type { EvalAttempt, VerifierRun } from '../evaluateClip';
-import { countClip, formatReport, percentile, summarise, type ClipReport } from '../summary';
+import { countClip, formatReport, percentile, strikesWarning, summarise, type ClipReport } from '../summary';
 
 function att(kind: AttemptKind, latencyMs = 210, onsetMs = 600): EvalAttempt {
   return { kind, onsetMs, decidedMs: onsetMs + latencyMs, latencyMs, lastHeard: null, passRatio: 1, voicedRatio: 1 };
@@ -37,7 +37,7 @@ describe('percentile (nearest rank)', () => {
 });
 
 describe('summarise', () => {
-  it('builds the confusion counts and latency over accepted attempts', () => {
+  it('builds the confusion counts; latency is over true accepts only (no false accepts)', () => {
     const s = summarise('pitch', [
       { expected: 'correct', strikes: null, attempts: [att('match', 200)] },
       { expected: 'correct', strikes: null, attempts: [att('match', 220)] },
@@ -49,11 +49,12 @@ describe('summarise', () => {
     ]);
     expect(s.correct).toEqual({ accepted: 2, rejected: 1, noAttempt: 1, n: 4 });
     expect(s.wrong).toEqual({ accepted: 1, rejected: 1, noAttempt: 2, n: 4 });
-    expect(s.latency).toEqual({ n: 3, p50: 220, p95: 300, max: 300 });
+    expect(s.latency).toEqual({ n: 2, p50: 200, p95: 220, max: 220 });
     expect(s.extraAttempts).toBe(0);
   });
 
   it('has no latency when nothing was accepted', () => {
+    expect(summarise('pitch', [{ expected: 'wrong', strikes: null, attempts: [att('match')] }]).latency).toBeNull();
     expect(summarise('chord', [{ expected: 'wrong', strikes: null, attempts: [att('miss')] }]).latency).toBeNull();
   });
 });
@@ -75,7 +76,8 @@ describe('formatReport', () => {
     expect(text).not.toMatch(/^== chord/m);
     expect(text).toMatch(/correct played\s+n=1\s+true accept\s+1\s+100\.0 %[\s|]+false reject\s+0\s+0\.0 %[\s|]+no attempt\s+0\s+0\.0 %/);
     expect(text).toMatch(/wrong played\s+n=1\s+true reject\s+0\s+0\.0 %[\s|]+FALSE ACCEPT\s+1\s+100\.0 %/);
-    expect(text).toMatch(/latency onset→verdict, 2 accepted attempts: p50 213 ms, p95 224 ms, max 224 ms/);
+    // chroma-note's 224 ms accept was on the wrong clip (a false accept), so it is not in the latency.
+    expect(text).toMatch(/latency onset→verdict, 1 true accept: p50 213 ms, p95 213 ms, max 213 ms/);
     expect(text).toMatch(/clip3\.wav/);
     expect(text).toMatch(/miss\s+@600 ms\s+\+352 ms/);
   });
@@ -83,5 +85,19 @@ describe('formatReport', () => {
   it('shows a dash for rates when there are no clips of a kind', () => {
     const text = formatReport([clip(2, 'correct', [run('pitch', [att('match')]), run('chroma-note', [att('match')])])]);
     expect(text).toMatch(/wrong played\s+n=0\s+true reject\s+0\s+–/);
+  });
+});
+
+describe('strikesWarning (review of AI-2: multi-strike clips need a strikes count)', () => {
+  it('is silent for a single-strike clip or when strikes is given', () => {
+    expect(strikesWarning(null, 1, 1, false)).toBeNull();
+    expect(strikesWarning(null, 0, 0, false)).toBeNull();
+    expect(strikesWarning(20, 15, 15, true)).toBeNull();
+  });
+
+  it('warns when a clip without strikes has several onsets, several judged attempts or an open attempt', () => {
+    expect(strikesWarning(null, 3, 3, false)).toMatch(/3 onsets.*strikes/);
+    expect(strikesWarning(null, 1, 2, false)).toMatch(/2 judged attempts.*strikes/);
+    expect(strikesWarning(null, 1, 0, true)).toMatch(/still open.*strikes/);
   });
 });

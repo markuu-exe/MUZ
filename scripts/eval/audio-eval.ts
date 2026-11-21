@@ -15,7 +15,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { evaluateClip } from '../../src/audio/eval/evaluateClip';
 import { LabelsError, parseLabels, type LabelRow } from '../../src/audio/eval/labels';
-import { formatReport, summarise, type ClipReport } from '../../src/audio/eval/summary';
+import { formatReport, strikesWarning, summarise, type ClipReport } from '../../src/audio/eval/summary';
 import { downmix, readWav, type WavAudio } from './wav';
 
 const USAGE = 'usage: npm run eval:audio -- <labels.csv> [--json out.json]';
@@ -99,9 +99,14 @@ function main(): void {
   const reports: ClipReport[] = [];
   rows.forEach((row, i) => {
     process.stderr.write(`[${i + 1}/${rows.length}] ${row.file}\n`);
-    const wav = loadClip(row, baseDir);
-    const mono = downmix(wav.channels);
-    const ev = evaluateClip(mono, wav.sampleRate, row.target);
+    let wav: ReturnType<typeof loadClip>;
+    let ev: ReturnType<typeof evaluateClip>;
+    try {
+      wav = loadClip(row, baseDir);
+      ev = evaluateClip(downmix(wav.channels), wav.sampleRate, row.target);
+    } catch (err) {
+      fail([`${csvName}:${row.line}: ${row.file}: evaluation failed: ${err instanceof Error ? err.message : String(err)}`]);
+    }
 
     const warnings: string[] = [];
     if (!VALIDATED_RATES.includes(wav.sampleRate)) {
@@ -114,6 +119,14 @@ function main(): void {
     for (const ch of wav.channels) for (let k = 0; k < ch.length; k++) if (Math.abs(ch[k]) >= 0.999) clipped++;
     if (clipped > 0) warnings.push(`${clipped} sample(s) at full scale: the recording may be clipped; lower the input gain`);
     if (ev.onsetsMs.length === 0) warnings.push('no onset detected: silent, too quiet, or the strike is in the first ~0.2 s');
+    for (const run of ev.runs) {
+      const judged = run.attempts.filter((a) => a.kind !== 'unvoiced').length;
+      const w = strikesWarning(row.strikes, ev.onsetsMs.length, judged, run.openAtEnd);
+      if (w) {
+        warnings.push(w);
+        break;
+      }
+    }
 
     reports.push({
       line: row.line,
@@ -142,7 +155,11 @@ function main(): void {
       });
       return clips.length > 0 ? [summarise(id, clips)] : [];
     });
-    fs.writeFileSync(json, JSON.stringify({ labels: csvName, generatedAt: new Date().toISOString(), summaries, clips: reports }, null, 2) + '\n');
+    try {
+      fs.writeFileSync(json, JSON.stringify({ labels: csvName, generatedAt: new Date().toISOString(), summaries, clips: reports }, null, 2) + '\n');
+    } catch (err) {
+      fail([`cannot write ${json}: ${err instanceof Error ? err.message : String(err)}`]);
+    }
     console.error(`audio-eval: wrote ${json}`);
   }
 }
