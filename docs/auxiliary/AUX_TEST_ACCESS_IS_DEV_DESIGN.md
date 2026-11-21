@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Task** | AUX-TEST-ACCESS-01 (additional workstream, Member A). Not part of T-01…T-26. |
-| **Status** | **Implemented** on branch `task/AUX-TEST-ACCESS-01` (A's go-ahead, 2026-11-19; decisions in §10). **Migration not applied** (waits for C's `profiles` fix, §10.5). Results in `AUX_TEST_ACCESS_TEST_REPORT.md`. |
+| **Status** | **Code merged** to `main` (PR #23, `f2c79ed`). **Migration not applied.** The follow-up workflow (§11) is owned by **Member A** and waits on **Member C's** `profiles` fix (F2) as a prerequisite. Results go in `AUX_TEST_ACCESS_TEST_REPORT.md`. |
 | **Supersedes** | `AUX_TEST_ACCESS_DESIGN.md` (the `lesson_test_access` table, approach A) |
 | **Date** | 2026-11-19 |
 | **Code baseline** | `origin/main` @ `67dc05e` |
@@ -238,7 +238,7 @@ The simplest bypass would:
 | Manual scenarios + test report | 1 h |
 | **Total** | **≈ 4.5 h (about half a day)** |
 
-**Schedule:** this is a new feature, so it must merge before the IC-3 freeze (Tue Nov 24). It should come after T-08 part 2 (IC-2, Fri Nov 20) and after C's `profiles` RLS fix.
+**Schedule:** this is a new feature, so it must merge before the IC-3 freeze (Tue Nov 24). It should come after T-08 part 2 (IC-2, Fri Nov 20). *(The code merged as PR #23. Applying the migration is a separate step: see §11.)*
 
 ## 10. Decisions
 
@@ -250,7 +250,7 @@ The simplest bypass would:
 | 2 | Client attempt to change `is_dev` | **Silently keep the old value** |
 | 3 | TypeScript | **`is_dev?: boolean` (optional)**; no `AuthContext.tsx` edit |
 | 4 | Developer indicator | **One-line banner + "Start lesson (developer access)" label** |
-| 5 | Migration | **After C's `profiles` anonymous-read fix, with a backup first.** Applied by A or C; not part of the code PR. |
+| 5 | Migration | **After C's `profiles` anonymous-read fix (F2) is merged, with a backup first.** **Applied by Member A** (ownership confirmed by A, 2026-11-19; C only completes F2 and notifies A). Not part of the code PR. See §11. |
 | 6 | Branch base | **`main` now** (`task/AUX-TEST-ACCESS-01`); rebase if `task/revert-pr-22` merges first. This item had no recommendation in the original list; this is Claude's call, because the `handleSelect` hunk is the same on both bases. |
 | 7 | Developer heart bypass | **Deferred**; a separate decision later |
 | 8 | Tester accounts | **A supplies them privately** when the flag is ready to grant |
@@ -261,7 +261,37 @@ Original options, for reference:
 2. **When a client tries to change `is_dev`:** silently keep the old value (recommended), or raise an error.
 3. **TypeScript:** `is_dev` optional in the `profiles` Row type (recommended; no `AuthContext` edit), or required, with `AuthContext` `DEMO_PROFILES` / `defaultProfile` updated in coordination with B.
 4. **Visible indicator for developers:** a one-line banner and the start-button label (recommended), or none.
-5. **Migration timing and who applies it:** after C's `profiles` anonymous-read fix, with a backup; A or C applies it.
+5. **Migration timing and who applies it:** after C's `profiles` anonymous-read fix, with a backup; A or C applies it. *(Superseded: Member A applies it. See §11.)*
 6. **Branch base:** `main` now, or after `task/revert-pr-22` merges (the `handleSelect` hunk is the same on both).
 7. **Developer heart bypass:** later and separately (§6). Not part of this design.
 8. **Tester accounts:** you supply them privately when the flag is ready to grant.
+
+## 11. Follow-up workflow and ownership
+
+**Recorded 2026-11-19 (A).** Dependency order:
+
+`C: F2 profiles fix merged → A: verify → A: backup → A: apply migration → A: run check script → A: grant test accounts → A: manual checks → A: record and notify`
+
+### Member C: prerequisite only
+
+| # | Step | Done when |
+|---|---|---|
+| C-1 | Complete and merge the existing **F2** fix, so the live `profiles` table is no longer readable without signing in. F2 is C's existing P0, recorded in `docs/decisions/RULINGS.md` §4.3 and `T-02_VERIFICATION_PLAN_HANDOFF.md` F2. | Merged, and anonymous `profiles` reads are denied |
+| C-2 | Notify A that F2 is merged and the dependent migration workflow can start | A has the message |
+
+C is **not** assigned the migration, the tester grants or the verification below. No other C work changes.
+
+### Member A: dependent execution (starts only after C-1 and C-2)
+
+| # | Step | Evidence required |
+|---|---|---|
+| A-1 | Verify that F2 is actually merged. Inspect the resulting schema and code, plus the live `profiles` RLS and grants. Check the migration timestamp order against F2's (test report §5). | Commit/PR reference; anonymous `profiles` read denied |
+| A-2 | Back up the Supabase project | Backup time and method |
+| A-3 | Apply `supabase/migrations/20261120000000_profiles_is_dev.sql` | Apply time; the `is_dev` column and the `profiles_protect_is_dev` trigger exist |
+| A-4 | Run `docs/auxiliary/sql/is_dev_guard_check.sql` and inspect the result | Output ends "all checks passed", or failures recorded |
+| A-5 | Grant the explicitly selected test accounts in the SQL Editor (§2.3) | Number of accounts granted. **No emails or IDs in source-controlled docs.** |
+| A-6 | Run the manual scenarios in `AUX_TEST_ACCESS_TEST_REPORT.md` §3 (DB-8, M-1…M-9) | Result per scenario |
+| A-7 | Record results, failures and any follow-up fixes | Test report updated |
+| A-8 | Update Jira / task progress and notify the team | Message sent |
+
+**Completion rule.** AUX-TEST-ACCESS-01's follow-up stays incomplete until C-1 is satisfied **and** A-1…A-7 have actually been performed. A change of owner completes nothing.

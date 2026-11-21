@@ -25,6 +25,7 @@ Each item gives the question, why it matters, the affected tasks, the **default*
 | **U-14** | For the end-to-end test of 15-minute heart regeneration, may the tester edit the localStorage key `muz-heart-regen-v2-<userId>` to shorten the wait? | Otherwise the test takes 15+ minutes per heart | T-23 | Wait out one real 15-minute cycle | A | D10 |
 | **U-19** | Practice-drill target labels always use sharps (`src/practice/PracticeDrill.ts:36-38`). Should flats be fixed there too? | T-17 fixes only staff and theory labels | T-17, T-08 | Out of scope; recorded as a known limitation | A | D6 |
 | **U-20** | Confirm that at 0 hearts only lessons containing **practice** exercises are blocked, with theory and rhythm lessons left open | This matches `runner.ts:45` and `rhythmFailHeartCost: 0` in all tiers. `SkillTreeView` currently blocks rhythm lessons too. | T-15 | Practice-only blocking | A | D2 |
+| **U-21** | Which accounts get `profiles.is_dev = true` (AUX-TEST-ACCESS-01)? | Step A-5 grants them in the SQL Editor. **Account details stay out of the repo.** | AUX-TEST-ACCESS-01 | None granted | A | Before A-5 (after F2 and A-1…A-4) |
 
 ## 3. Needed for testing, release and documentation
 

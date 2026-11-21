@@ -72,6 +72,8 @@ graph LR
   T02[T-02 rulings] --> T26[T-26 docs]
 ```
 
+**Auxiliary dependency (added 2026-11-19, outside the T-graph).** C's F2 `profiles` fix (RULINGS §4.3; `T-02_VERIFICATION_PLAN_HANDOFF.md` F2) → **A:** verify F2 → backup → apply the `is_dev` migration → run the check script → grant test accounts → manual checks → record results and notify (AUX-TEST-ACCESS-01, `docs/auxiliary/AUX_TEST_ACCESS_IS_DEV_DESIGN.md` §11). It is hard on F2 and changes no T-xx dependency.
+
 ## 3. Critical path
 
 **T-01 (D1) → T-04 (D1) → T-11 (D2–D3) → T-12 (D4–D7) → IC-3 (D9) → T-22 ∥ T-23 (D10–D12) → T-24 (D12–D13) → T-25 (D14)**

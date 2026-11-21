@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | **Design** | `AUX_TEST_ACCESS_IS_DEV_DESIGN.md` (§7 scenarios) |
-| **Branch / commit** | `task/AUX-TEST-ACCESS-01` @ `9c6a7fb` (base `origin/main` @ `67dc05e`) |
+| **Branch / commit** | `task/AUX-TEST-ACCESS-01` @ `9c6a7fb` (base `origin/main` @ `67dc05e`); merged to `main` as PR #23 (`f2c79ed`) |
 | **Date** | 2026-11-19 |
-| **Migration applied?** | **No.** By decision §10.5 it waits for C's `profiles` anonymous-read fix and a backup. So every DB scenario and every developer-account scenario is **not run**. |
+| **Migration applied?** | **No.** It waits for **Member C's** `profiles` anonymous-read fix (F2, prerequisite). After that, **Member A** owns the backup, migration, check script, tester grants and manual checks (design §11). Until then every DB scenario and every developer-account scenario is **not run**. |
 
 ## 1. Automated checks (run)
 
@@ -35,6 +35,8 @@ Run on the `npm run dev` preview at 1366×850, guest demo "beginner" persona (`A
 A real developer account could not be exercised: the column does not exist in the database yet, and Claude does not sign in with real credentials.
 
 ## 3. Pending scenarios (run after the migration is applied)
+
+**Owner: Member A** (design §11, steps A-1…A-7). **Prerequisite:** Member C's F2 fix merged and notified. Record each result in this table. Do not record tester emails or IDs here.
 
 | ID | Scenario | How | Result |
 |---|---|---|---|
@@ -69,7 +71,7 @@ An independent reviewer read the diff `67dc05e..9c6a7fb`, read-only. It re-ran `
 | Defence in depth for future `SECURITY DEFINER` writers (recommendation) | — | **Adopted:** the guard also treats any request carrying an end-user JWT (`anon` / `authenticated`) as a client. New check DB-6c. |
 | Leave `is_dev` out of the Insert/Update types | Minor | **Declined:** without it `AuthContext.tsx:169,203` fails to type-check (§4), and decision §10.3 keeps that file untouched. The trigger is the control. |
 | No render test for the `handleSelect` wiring | Minor | **Not done:** the repo has no component-test setup (no jsdom or Testing Library), and adding one is out of scope. The wiring is a single condition, checked in the browser (§2). |
-| Coordinate migration timestamp ordering with C's `profiles` fix | — | Noted for whoever applies it (decision §10.5) |
+| Coordinate migration timestamp ordering with C's `profiles` fix | — | Noted for Member A, who applies the migration (design §11, step A-1) |
 
 The SQL script was revised **without being executed**, because there is no local Postgres here and the migration is not applied. It must pass on the database before the migration is signed off.
 

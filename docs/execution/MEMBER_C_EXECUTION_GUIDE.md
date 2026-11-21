@@ -43,6 +43,7 @@
 | Support: Google provider (T-10) | — | — | 0.25 d | D7 | D8 | — | — |
 | Support: production Supabase (T-25) | — | — | 0.5 d | D13 | D14 | — | — |
 | T-24 defect fixes in your areas | KAN-281 | P1 | as assigned | D12 | D13 | the original reviewer | — |
+| F2 live `profiles` anonymous-read fix (existing P0; RULINGS §4.3; `T-02_VERIFICATION_PLAN_HANDOFF.md` F2) | — (bug) | P0 | 0.5 d (T-02 handoff) | now | per T-02 handoff | — | Open. **Also a prerequisite for A's AUX-TEST-ACCESS-01 migration:** notify A when merged. Nothing else in that workflow is yours. |
 
 **Load: about 12 ideal days in 14. This is at capacity.**
 
@@ -504,6 +505,7 @@ The completed checklist, plus comments on KAN-271 and KAN-274.
 | T-07 | A (field names on D1) | **A (T-08 can't merge without you)** | `pitchHz?`, `clarity?`; `lastHeardMidi` | Merged (D4) | Class name, constructor, config keys |
 | T-13 | B (T-11 `ProgressStore`), A (migration + `runId` approval), D (T-15 merged) | IC-3, T-23 | Migration SQL; `SyncQueueItem`; the offline note text | Migration design on D3; merged D7 | How to inspect the queue; that the migration is applied to staging |
 | T-20 | T-05 | T-24, release go/no-go | Test users | D8 | Report link |
+| F2 (`profiles` RLS fix) | — | T-20; **A (AUX-TEST-ACCESS-01 migration, checks and tester grants: all A's)** | — | When merged | "F2 merged: anonymous `profiles` reads denied" + PR/commit |
 | T-23 | IC-3, T-05 | T-24 | Which steps B executes | D10 start, D12 done | Checklist with defect IDs |
 | Google provider (T-10) | Google Cloud project owner (U-07) | B (T-10) | Redirect URLs | D7 | "Provider enabled on staging" |
 | Production Supabase (T-25) | U-06 decision | B (T-25) | New vs promoted project | D13 | Project ref; migrations applied; Auth URLs set |

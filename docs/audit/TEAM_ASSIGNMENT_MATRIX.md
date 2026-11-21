@@ -46,6 +46,7 @@ The working-style profiles come from Member A. They are delegation preferences, 
 | T-25 Production deploy + demo | B | A, C | A | P0 | M | D14 |
 | T-26 SRS/SDD v01.02 | D | A | A | P1 | M | D9–D14 |
 | T-27…T-30 | unscheduled | — | — | P3 / deferred | — | — |
+| AUX-TEST-ACCESS-01 follow-up (outside T-01…T-26; added 2026-11-19) | A | — (C: F2 prerequisite only) | — | — | S | after C's F2 fix is merged |
 
 ## 3. Area ownership for defect fixes (T-24)
 

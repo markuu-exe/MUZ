@@ -1,11 +1,11 @@
 # Auxiliary Workstreams — Status
 
-These are Member A's additional tasks, kept separate from T-01…T-26. Neither changes any original assignment, deadline, the Member A execution guide or the team schedule.
+These are Member A's additional tasks, kept separate from T-01…T-26. Neither changes any original T-xx assignment or deadline. Since 2026-11-19 the AUX-TEST-ACCESS-01 follow-up is listed in the execution docs as **A-owned work outside T-01…T-26**, with C's existing F2 fix as its prerequisite.
 
 | ID | Status (2026-11-19) | Next step |
 |---|---|---|
 | **AUX-AI-01** | **Paused.** The assessment is kept as reference. No implementation and no measurements. R1/R2/R3 are not started. | Any measurement is coordinated with T-19 (one hardware session), when A decides |
-| **AUX-TEST-ACCESS-01** | **Redesign: `profiles.is_dev`** (`AUX_TEST_ACCESS_IS_DEV_DESIGN.md`). §10 decisions recorded (all recommended options). **Implemented** on `task/AUX-TEST-ACCESS-01` (code + migration file). **Migration not applied.** | PR review (B). Apply the migration after C's `profiles` fix and a backup, then run `sql/is_dev_guard_check.sql` and the manual scenarios. |
+| **AUX-TEST-ACCESS-01** | **Redesign: `profiles.is_dev`** (`AUX_TEST_ACCESS_IS_DEV_DESIGN.md`). §10 decisions recorded (all recommended options). **Code merged** (PR #23, `f2c79ed`). **Migration not applied.** | **Prerequisite (Member C):** F2 `profiles` fix merged, then notify A. **Then Member A:** verify F2 → backup → apply migration → run `sql/is_dev_guard_check.sql` → grant test accounts → manual checks → record results, update Jira and notify the team (design §11). |
 
 ## Reversion audit (2026-11-19)
 

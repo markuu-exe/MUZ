@@ -1,5 +1,6 @@
 -- AUX-TEST-ACCESS-01: verification of the profiles.is_dev guard (scenarios DB-1 … DB-7).
 --
+-- Owner: Member A (design §11, step A-4), after Member C's F2 profiles fix is merged.
 -- Run the whole script in the Supabase dashboard SQL editor (as the project owner)
 -- AFTER the migration *_profiles_is_dev.sql has been applied. Prefer a Supabase
 -- branch or local `supabase start` first. It inserts into auth.users, although it rolls back.

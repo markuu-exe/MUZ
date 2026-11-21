@@ -130,6 +130,7 @@ Each row lists the handoff message to send.
 | T-24 (all) | T-19…T-23 results | Hard | A: assignment list |
 | T-25 (B) | RC (A) | Hard | A: "RC go" |
 | T-26 (D) | T-02 rulings and wording (A); test reports | Hard / soft | A: wording per ruling |
+| AUX-TEST-ACCESS-01 follow-up (A): backup, migration, check script, tester grants, manual checks | F2 `profiles` fix merged (C) | Hard | C: "F2 merged: anonymous `profiles` reads denied; `<PR/commit>`" · then A, when done: "is_dev migration applied and verified; results in the test report" |
 
 ---
 
