@@ -50,7 +50,7 @@ export default function CameraPanel({ rig, state }: CameraPanelProps) {
         running={live && state.model === 'ready'}
         onEngine={debug ? setEngine : undefined}
       />
-      {debug && <PerfOverlay frameLoop={rig.frameLoop} engine={engine} />}
+      {debug && <PerfOverlay frameLoop={rig.frameLoop} engine={engine} landmarks={rig.landmarkLog} />}
       {overlay && (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-950/80 text-sm font-semibold text-slate-300">
           {overlay}

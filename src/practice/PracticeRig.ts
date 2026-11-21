@@ -4,7 +4,9 @@
  * microphone → chroma worklet. Nothing here knows about lessons or React.
  *
  * Privacy (SRS 3.5.1): video frames go only to the local worker, audio only to the
- * local worklet. Nothing is recorded, stored or sent anywhere.
+ * local worklet. Nothing is recorded, stored or sent anywhere. The one exception is
+ * AI-3's `debugLandmarks` (`?debug` only): an in-memory log of landmark numbers
+ * (never pixels) that stays on the device unless the tester downloads it.
  */
 import { AudioInputService, type AudioInputFrame, type AudioInputStatus } from '../audio/input/AudioInputService';
 import type { AudioError } from '../audio/errors/AudioError';
@@ -13,6 +15,7 @@ import type { CameraState } from '../vision/camera/types';
 import { Emitter } from '../vision/core/Emitter';
 import type { VisionErrorCode } from '../vision/errors/VisionError';
 import { hudVideoStyle } from '../vision/hud/viewport';
+import { DEFAULT_MAX_FRAMES, LandmarkLog, modelTagFromPath } from '../vision/eval/landmarkLog';
 import { FrameLoop } from '../vision/pipeline/FrameLoop';
 import type { PostureSnapshot } from '../vision/posture/types';
 import type { PostureWorkerRequest } from '../vision/posture/workerProtocol';
@@ -42,10 +45,21 @@ export type PracticeRigEvents = {
   audio: AudioInputFrame;
 };
 
+export interface PracticeRigOptions {
+  /**
+   * AI-3: keep a numbers-only log of the posture analyzer's input for offline
+   * evaluation. The caller decides (the app passes isPerfDebug()). Off by default,
+   * and when off the worker is not even asked for landmarks.
+   */
+  debugLandmarks?: boolean;
+}
+
 export class PracticeRig extends Emitter<PracticeRigEvents> {
   /** Mount this element inside the practice view; the rig owns it for its whole life. */
   readonly video: HTMLVideoElement;
   readonly frameLoop: FrameLoop;
+  /** AI-3 landmark log; null unless created with `debugLandmarks`. */
+  readonly landmarkLog: LandmarkLog | null;
   private readonly camera: CameraService;
   private readonly audio: AudioInputService;
   private readonly worker: Worker;
@@ -54,7 +68,7 @@ export class PracticeRig extends Emitter<PracticeRigEvents> {
   private _state: RigState;
   private _posture: PostureSample | null = null;
 
-  constructor() {
+  constructor(options: PracticeRigOptions = {}) {
     super();
     this.video = document.createElement('video');
     this.video.muted = true;
@@ -67,6 +81,7 @@ export class PracticeRig extends Emitter<PracticeRigEvents> {
     this.audio = new AudioInputService();
     this.worker = new Worker(new URL('../workers/posture.worker.ts', import.meta.url), { type: 'module' });
     this.frameLoop = new FrameLoop(this.video, { worker: this.worker });
+    this.landmarkLog = options.debugLandmarks ? new LandmarkLog(DEFAULT_MAX_FRAMES, modelTagFromPath(POSE_MODEL_PATH)) : null;
 
     this._state = { camera: this.camera.state, model: 'idle', modelError: null, mic: this.audio.status, micError: null };
 
@@ -92,6 +107,15 @@ export class PracticeRig extends Emitter<PracticeRigEvents> {
         this.emit('posture', this._posture);
       }),
     );
+    const log = this.landmarkLog;
+    if (log) {
+      // The analyzer's own clock, so a replay sees exactly the frame intervals it saw.
+      this.offs.push(
+        this.frameLoop.on('result', (r) => {
+          if (r.landmarks) log.push(r.snapshot.timestampMs, r.landmarks);
+        }),
+      );
+    }
   }
 
   get state(): RigState {
@@ -116,7 +140,11 @@ export class PracticeRig extends Emitter<PracticeRigEvents> {
     if (this.disposed) return;
     if (this._state.model === 'idle' || this._state.model === 'error') {
       this.patch({ model: 'loading', modelError: null });
-      this.post({ type: 'INIT', modelPath: POSE_MODEL_PATH, wasmPath: POSE_WASM_PATH });
+      this.post(
+        this.landmarkLog
+          ? { type: 'INIT', modelPath: POSE_MODEL_PATH, wasmPath: POSE_WASM_PATH, debugLandmarks: true }
+          : { type: 'INIT', modelPath: POSE_MODEL_PATH, wasmPath: POSE_WASM_PATH },
+      );
     }
     const status = this._state.camera.status;
     if (status !== 'active' && status !== 'paused' && status !== 'requesting') await this.camera.start();

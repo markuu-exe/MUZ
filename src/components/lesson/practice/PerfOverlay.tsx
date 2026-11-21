@@ -2,11 +2,15 @@
  * T-09: live posture-pipeline figures for the T-19 hardware benchmark (SRS 3.4).
  * Shown only with `?debug` in the URL. It re-renders every 500 ms; the HUD canvas
  * itself stays outside React, so the overlay does not touch the HUD's frame budget.
+ *
+ * AI-3: when the rig records a landmark log (also `?debug` only), a button downloads
+ * it as JSON for scripts/eval/posture-eval.ts. Numbers only, never camera frames.
  */
 import { useEffect, useRef, useState } from 'react';
 import type { HudEngine, HudStats } from '../../../vision/hud/HudEngine';
 import { InferenceStats, type InferenceSummary } from '../../../vision/pipeline/inferenceStats';
 import type { FrameLoop } from '../../../vision/pipeline/FrameLoop';
+import type { LandmarkLog, LandmarkLogFile } from '../../../vision/eval/landmarkLog';
 
 const REFRESH_MS = 500;
 
@@ -18,13 +22,34 @@ export function isPerfDebug(search: string = typeof window === 'undefined' ? '' 
 interface PerfOverlayProps {
   frameLoop: FrameLoop;
   engine: HudEngine | null;
+  /** AI-3: the rig's landmark log. No export button without it. */
+  landmarks?: LandmarkLog | null;
+}
+
+/** No date, user or device in the name: the file carries only session-relative numbers. */
+export const LANDMARK_EXPORT_FILENAME = 'muz-landmarks.json';
+
+const REVOKE_AFTER_MS = 1000;
+
+/** Saves the log as a JSON file through a temporary Blob object URL. */
+export function downloadLandmarkLog(file: LandmarkLogFile): void {
+  const blob = new Blob([JSON.stringify(file)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = LANDMARK_EXPORT_FILENAME;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // Revoke once the download has started; revoking at once can cancel it in some browsers.
+  setTimeout(() => URL.revokeObjectURL(url), REVOKE_AFTER_MS);
 }
 
 function fmt(value: number | null | undefined, digits = 1): string {
   return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : '—';
 }
 
-export default function PerfOverlay({ frameLoop, engine }: PerfOverlayProps) {
+export default function PerfOverlay({ frameLoop, engine, landmarks }: PerfOverlayProps) {
   const stats = useRef(new InferenceStats());
   const [view, setView] = useState<{ worker: InferenceSummary; hud: HudStats | null } | null>(null);
 
@@ -62,6 +87,15 @@ export default function PerfOverlay({ frameLoop, engine }: PerfOverlayProps) {
           <span>{value}</span>
         </div>
       ))}
+      {landmarks && (
+        <button
+          type="button"
+          className="pointer-events-auto mt-1 w-full rounded border border-emerald-400/40 px-1 py-0.5 text-left hover:bg-emerald-400/10"
+          onClick={() => downloadLandmarkLog(landmarks.toJSON())}
+        >
+          Export landmarks (numbers only) · {landmarks.length} frames{landmarks.full ? ' (full)' : ''}
+        </button>
+      )}
     </div>
   );
 }

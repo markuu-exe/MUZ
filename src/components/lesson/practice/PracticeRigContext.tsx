@@ -5,6 +5,7 @@
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useSyncExternalStore, type ReactNode } from 'react';
 import { PracticeRig, type RigState } from '../../../practice/PracticeRig';
+import { isPerfDebug } from './PerfOverlay';
 
 interface RigHandle {
   getRig: () => PracticeRig;
@@ -14,7 +15,8 @@ const RigContext = createContext<RigHandle | null>(null);
 
 export function PracticeRigProvider({ children }: { children: ReactNode }) {
   const rigRef = useRef<PracticeRig | null>(null);
-  const getRig = useCallback(() => (rigRef.current ??= new PracticeRig()), []);
+  // `?debug` also records landmark numbers for the PerfOverlay export (AI-3).
+  const getRig = useCallback(() => (rigRef.current ??= new PracticeRig({ debugLandmarks: isPerfDebug() })), []);
   const pendingDispose = useRef<number | null>(null);
   useEffect(() => {
     // React StrictMode unmounts and remounts once in development; only a real unmount disposes.

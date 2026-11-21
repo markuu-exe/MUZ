@@ -10,9 +10,10 @@
  * - every received frame is closed (GPU memory leak otherwise);
  * - init failures are reported as MODEL_LOAD_FAILED instead of an unhandled rejection.
  */
-import { createPoseFrame, extractPoseFrame, isUsable, POSE_LANDMARK_COUNT } from '../vision/posture/landmarks';
+import { createPoseFrame, extractPoseFrame } from '../vision/posture/landmarks';
 import { PostureAnalyzer } from '../vision/posture/PostureAnalyzer';
-import { HUD_STRIDE, type PostureWorkerRequest, type PostureWorkerResponse } from '../vision/posture/workerProtocol';
+import type { PostureWorkerRequest, PostureWorkerResponse } from '../vision/posture/workerProtocol';
+import { analyseFrame } from '../vision/posture/workerResult';
 
 // Typed view of the worker global without pulling in the "webworker" lib (it conflicts with "DOM").
 const ctx = self as unknown as {
@@ -39,6 +40,8 @@ ctx.import = async (url: string) => {
 let landmarker: any = null;
 let analyzer: PostureAnalyzer | null = null;
 let activeDelegate: 'GPU' | 'CPU' = 'GPU';
+/** AI-3: return the analyzer input with each RESULT (`?debug` sessions only). */
+let debugLandmarks = false;
 /** Must keep increasing for the landmarker's whole lifetime (MediaPipe rejects older timestamps). */
 let lastDetectTs = -Infinity;
 const frame = createPoseFrame();
@@ -49,6 +52,7 @@ function post(msg: PostureWorkerResponse, transfer: Transferable[] = []): void {
 
 async function init(msg: Extract<PostureWorkerRequest, { type: 'INIT' }>): Promise<void> {
   analyzer = new PostureAnalyzer(msg.config);
+  debugLandmarks = msg.debugLandmarks === true;
   if (landmarker) {
     post({ type: 'READY', delegate: activeDelegate });
     return;
@@ -94,16 +98,7 @@ function process(msg: Extract<PostureWorkerRequest, { type: 'PROCESS' }>): void 
     const inferenceMs = performance.now() - t0;
 
     extractPoseFrame(result, ts, frame);
-    const snapshot = analyzer.process(frame);
-
-    const hud = new Float32Array(POSE_LANDMARK_COUNT * HUD_STRIDE);
-    for (let i = 0; i < POSE_LANDMARK_COUNT; i++) {
-      const o = i * HUD_STRIDE;
-      hud[o] = frame.image[i * 3];
-      hud[o + 1] = frame.image[i * 3 + 1];
-      hud[o + 2] = isUsable(frame, i, analyzer.config.gate) ? 1 : 0;
-    }
-    post({ type: 'RESULT', snapshot, hud, inferenceMs }, [hud.buffer]);
+    analyseFrame(analyzer, frame, inferenceMs, debugLandmarks, post);
   } catch (err) {
     post({ type: 'ERROR', code: 'UNKNOWN', message: err instanceof Error ? err.message : 'Pose detection failed', fatal: false });
   } finally {
@@ -148,6 +143,7 @@ ctx.onmessage = async (event: MessageEvent<PostureWorkerRequest>) => {
       landmarker?.close();
       landmarker = null;
       analyzer = null;
+      debugLandmarks = false;
       lastDetectTs = -Infinity;
       post({ type: 'STOPPED' });
       return;
