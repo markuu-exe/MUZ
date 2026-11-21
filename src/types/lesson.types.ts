@@ -147,7 +147,7 @@ export interface TapExercise extends ExerciseBase {
 
 export interface PlayNoteExercise extends ExerciseBase {
   type: 'play-note';
-  /** MIDI. Graded by pitch class (see COURSE-5 NoteVerifier). */
+  /** MIDI, octave included: graded by PitchVerifier (T-07/T-08, SRS 3.1.6.2: ±35 cents of this exact note). */
   note: number;
 }
 

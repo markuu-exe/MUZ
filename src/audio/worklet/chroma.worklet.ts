@@ -3,8 +3,12 @@
  * thread. Loaded by AudioInputService via Vite's `?worker&url` import, which
  * bundles this file and its imports into one self-contained script.
  *
- * Cost per 128-sample render quantum: ~0 on 3 of 4 quanta, one 4096-pt + one
- * 1024-pt FFT on the 4th (hop 512) ≈ 0.1–0.2 ms, against a 2.67 ms budget.
+ * Cost: ~0 on 3 of 4 render quanta; on the 4th (hop 512) one 4096-pt + one 1024-pt
+ * FFT, chroma and onsets, plus pitchy on gated hops (T-08: an 8192-pt forward + inverse
+ * FFT, ≈ 0.5 ms on its own). Measured 2026-11-21 (dsp.test.ts, Node, dev laptop):
+ * 0.86–0.98 ms per hop, against the 2.67 ms render-quantum deadline (the whole hop runs
+ * inside one process() call). Roughly 2× the pre-pitchy cost: T-19 must measure it on
+ * low-end hardware (T-19_SESSION_PROCEDURE.md §8).
  * Raw audio never leaves this scope (SRS 3.5.1): only 12 floats + scalars are posted.
  */
 import { ChromaFrameProcessor, type ChromaFrame } from '../dsp/ChromaFrameProcessor';
@@ -75,6 +79,8 @@ class ChromaWorkletProcessor extends AudioWorkletProcessor {
       flux: f.flux,
       onset: f.onset,
       onsetTime: f.onsetTime,
+      pitchHz: f.pitchHz,
+      clarity: f.clarity,
     };
     this.port.postMessage(msg, [msg.chroma.buffer]);
   }

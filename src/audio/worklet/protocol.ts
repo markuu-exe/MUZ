@@ -18,6 +18,10 @@ export interface ChromaFrameMessage {
   flux: number;
   onset: boolean;
   onsetTime: number;
+  /** T-08: pitchy f0 (Hz) of the same window; null when below the gate or no pitch. */
+  pitchHz: number | null;
+  /** T-08: pitchy clarity 0..1. */
+  clarity: number;
 }
 
 /** Main thread → worklet. */
