@@ -49,6 +49,8 @@ export interface LessonPlayerProps {
    */
   onComplete?: (result: LessonResult) => LessonCompleteReturn | Promise<LessonCompleteReturn>;
   onClose: () => void;
+  /** D1: this run is developer test data (lesson opened while locked); results never show EXP. */
+  testRun?: boolean;
 }
 
 const STAGE_LABEL: Record<StageKind, string> = {
@@ -71,6 +73,7 @@ export default function LessonPlayer({
   registry = EXERCISE_REGISTRY,
   onComplete,
   onClose,
+  testRun = false,
 }: LessonPlayerProps) {
   const [run, setRun] = useState<LessonRunState>(() => createLessonRun(lessonId, payload, hearts, Date.now()));
   /** Outcome of an answer-type exercise, waiting for the learner to press Continue. */
@@ -232,6 +235,7 @@ export default function LessonPlayer({
             note={note}
             onRetry={retry}
             onClose={onClose}
+            testRun={testRun}
           />
         ) : (
           item &&

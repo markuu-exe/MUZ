@@ -9,6 +9,8 @@ interface LessonResultsProps {
   note?: string | null;
   onRetry: () => void;
   onClose: () => void;
+  /** D1: a developer test run (lesson opened while locked); never shown as learner progress. */
+  testRun?: boolean;
 }
 
 const HEADLINE: Record<LessonResult['status'], { title: string; body: string }> = {
@@ -21,18 +23,34 @@ const HEADLINE: Record<LessonResult['status'], { title: string; body: string }> 
   quit: { title: 'Lesson closed', body: '' },
 };
 
+const TEST_RUN_HEADLINE: Partial<Record<LessonResult['status'], { title: string; body: string }>> = {
+  passed: { title: 'Test run passed', body: 'Saved as developer test data. Your learner progress, EXP and streak did not change.' },
+  failed: { title: 'Test run failed', body: 'Saved as developer test data. Your learner progress, EXP and streak did not change.' },
+};
+
+/** Headline and EXP tile for the results screen. Pure, so D1's test-run copy is testable. */
+export function resultSummary(
+  result: Pick<LessonResult, 'status' | 'expAwarded'>,
+  { testRun }: { testRun: boolean },
+): { title: string; body: string; expLabel: string; expValue: string } {
+  const head = (testRun && TEST_RUN_HEADLINE[result.status]) || HEADLINE[result.status];
+  return testRun
+    ? { ...head, expLabel: 'EXP (test run)', expValue: '0' }
+    : { ...head, expLabel: 'EXP earned', expValue: `+${result.expAwarded}` };
+}
+
 function formatDuration(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
   return m > 0 ? `${m}m ${String(s).padStart(2, '0')}s` : `${s}s`;
 }
 
-export default function LessonResults({ title, result, note, onRetry, onClose }: LessonResultsProps) {
-  const head = HEADLINE[result.status];
+export default function LessonResults({ title, result, note, onRetry, onClose, testRun = false }: LessonResultsProps) {
+  const head = resultSummary(result, { testRun });
   const used = (engine: 'rhythm' | 'practice') => result.records.some((r) => r.engine === engine);
   const stats: Array<{ label: string; value: string; icon: typeof Target; tone: string }> = [
     { label: 'First-try accuracy', value: `${Math.round(result.accuracy)}%`, icon: Target, tone: 'text-cyan-300' },
-    { label: 'EXP earned', value: `+${result.expAwarded}`, icon: Sparkles, tone: 'text-violet-300' },
+    { label: head.expLabel, value: head.expValue, icon: Sparkles, tone: 'text-violet-300' },
     { label: 'Hearts', value: `${result.heartsEnd} / 5`, icon: Heart, tone: 'text-rose-300' },
     { label: 'Time', value: formatDuration(result.durationSec), icon: Timer, tone: 'text-slate-300' },
   ];

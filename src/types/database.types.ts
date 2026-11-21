@@ -132,6 +132,33 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['performance_records']['Row']>;
         Relationships: [];
       };
+      /** D1: developer test results, never part of learner progress (20261121000000_dev_test_results.sql). */
+      dev_test_results: {
+        Row: {
+          id: string;
+          user_id: string;
+          lesson_id: string;
+          recorded_at: string;
+          status: 'passed' | 'failed' | 'out-of-hearts' | 'quit';
+          passed: boolean;
+          accuracy: number;
+          hearts_lost: number;
+          metrics: Json;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          lesson_id: string;
+          recorded_at?: string;
+          status: 'passed' | 'failed' | 'out-of-hearts' | 'quit';
+          passed: boolean;
+          accuracy: number;
+          hearts_lost?: number;
+          metrics?: Json;
+        };
+        Update: never;
+        Relationships: [];
+      };
       achievements: {
         Row: { id: string; title: string; exp_reward: number };
         Insert: { id: string; title: string; exp_reward?: number };
