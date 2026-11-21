@@ -4,18 +4,18 @@
  * Framework-agnostic and deterministic, like the WaitStateMachine it drives: every
  * input carries its own timestamp and there are no timers, so tests replay audio
  * through it directly. Each step gets a fresh WaitStateMachine (KAN-267) with a
- * NoteVerifier or ChordVerifier; hearts carry over from step to step.
+ * PitchVerifier (notes; the chroma NoteVerifier only behind useChromaNoteVerifier)
+ * or a ChordVerifier; hearts carry over from step to step.
  */
 import { ChordMatcher } from '../audio/chords/ChordMatcher';
 import { DEFAULT_PRACTICE_CONFIG } from '../audio/config';
 import { parseChord } from '../audio/chords/vocabulary';
-import { PITCH_CLASS_NAMES } from '../audio/dsp/pitch';
+import { midiToNoteName, PITCH_CLASS_NAMES } from '../audio/dsp/pitch';
 import { NoteMatcher } from '../audio/notes/NoteMatcher';
 import { PitchVerifier } from '../audio/notes/PitchVerifier';
 import { ChordVerifier, type AcousticFrame, type AcousticVerifier, type AttemptKind } from '../audio/practice/ChordVerifier';
 import { NoteVerifier } from '../audio/practice/NoteVerifier';
 import { WaitStateMachine, type HeartLossReason, type WaitState } from '../audio/practice/WaitStateMachine';
-import { midiToName } from '../lib/theory/notes';
 import { Emitter } from '../vision/core/Emitter';
 import type { Exercise, SequenceStep } from '../types/lesson.types';
 
@@ -37,7 +37,7 @@ export function drillTargets(exercise: Exercise): DrillTarget[] {
 
 /** "C4", "F#3", "Am" — the label shown for a target. Notes carry their octave: it is checked (T-08). */
 export function targetLabel(target: DrillTarget): string {
-  return target.kind === 'note' ? midiToName(target.note) : parseChord(target.chord).label;
+  return target.kind === 'note' ? midiToNoteName(target.note) : parseChord(target.chord).label;
 }
 
 export interface DrillStats {
@@ -267,7 +267,7 @@ export class PracticeDrill extends Emitter<PracticeDrillEvents> {
     const v = this.noteVerifier;
     if (v) {
       // A pitch verifier knows the octave ("A3"); the chroma one only the pitch class ("A").
-      if ('lastHeardMidi' in v) return v.lastHeardMidi >= 0 ? midiToName(v.lastHeardMidi) : null;
+      if ('lastHeardMidi' in v) return v.lastHeardMidi >= 0 ? midiToNoteName(v.lastHeardMidi) : null;
       return v.lastHeardPc >= 0 ? PITCH_CLASS_NAMES[v.lastHeardPc] : null;
     }
     return closestChord && closestChord.length > 0 ? closestChord : null;
