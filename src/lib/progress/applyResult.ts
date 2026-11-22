@@ -66,6 +66,7 @@ export interface AppliedResult {
   completedNow: boolean;
   /** Short line for the results screen, or null. */
   note: string | null;
+  achievements?: string[];
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));

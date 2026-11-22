@@ -46,6 +46,43 @@ export function supabaseProgressStore(client: Client): ProgressStore {
       const { error } = await client.from('performance_records').insert({ user_id: userId, lesson_id: lessonId, ...row });
       check(error, 'Could not save the performance record');
     },
+    async getUnlockedAchievements(userId) {
+      const { data, error } = await client
+        .from('user_achievements')
+        .select('achievement_id')
+        .eq('user_id', userId);
+      check(error, 'Could not read your achievements');
+      return new Set((data ?? []).map((row) => row.achievement_id));
+    },
+    async getAchievementRewards() {
+      const { data, error } = await client.from('achievements').select('id, exp_reward');
+      check(error, 'Could not read achievement rewards');
+      const rewards: Record<string, number> = {};
+      for (const row of data ?? []) {
+        rewards[row.id] = row.exp_reward;
+      }
+      return rewards;
+    },
+    async insertAchievements(userId, ids) {
+      if (ids.length === 0) return;
+      const { error } = await client
+        .from('user_achievements')
+        .insert(ids.map((achievement_id) => ({ user_id: userId, achievement_id })));
+      if (error?.code === '23505' && ids.length > 1) {
+        for (const achievement_id of ids) {
+          const { error: singleError } = await client
+            .from('user_achievements')
+            .insert({ user_id: userId, achievement_id });
+          if (singleError && singleError.code !== '23505') {
+            check(singleError, 'Could not save unlocked achievements');
+          }
+        }
+        return;
+      }
+      if (error && error.code !== '23505') {
+        check(error, 'Could not save unlocked achievements');
+      }
+    },
     async updateProfile(userId, patch: ProfileSnapshot) {
       const { error } = await client.from('profiles').update(patch).eq('id', userId);
       check(error, 'Could not update your profile');
