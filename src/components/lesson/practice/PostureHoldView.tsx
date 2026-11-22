@@ -90,7 +90,7 @@ export default function PostureHoldView({ exercise, settings, onOutcome }: Exerc
       </div>
 
       {problems.length > 0 ? (
-        <MediaDiagnostics problems={problems} onRetry={() => void rig.startCamera()} />
+        <MediaDiagnostics problems={problems} onRetry={() => void rig.startCamera()} needsMic={false} />
       ) : (
         !ready && (
           <div className="rounded-2xl border border-violet-500/30 bg-violet-950/30 p-5">

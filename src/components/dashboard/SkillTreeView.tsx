@@ -7,6 +7,8 @@ import {
   type CurriculumNode,
 } from '../../lib/dashboard/curriculum';
 import type { UserProgress } from '../../types/database.types';
+import { isLessonPayload } from '../../types/lesson.types';
+import { lessonNeedsHearts } from '../../lesson/runner';
 
 interface SkillTreeViewProps {
   lessons: CurriculumNode[];
@@ -114,7 +116,11 @@ export default function SkillTreeView({
                   status === 'mastered' && (nextStatus === 'mastered' || nextStatus === 'current');
                 const isConnectorCurrent = status === 'current' || nextStatus === 'current';
 
-                const drillsDisabled = hearts === 0 && lesson.kind !== 'theory' && status !== 'locked';
+                const drillsDisabled =
+                  hearts === 0 &&
+                  isLessonPayload(lesson.payload) &&
+                  lessonNeedsHearts(lesson.payload) &&
+                  status !== 'locked';
 
                 return (
                   <div key={lesson.id} className="relative flex w-full flex-col items-center">
@@ -196,7 +202,7 @@ export default function SkillTreeView({
 
                           {status === 'mastered' && (
                             <span className="mt-0.5 block text-xs font-medium text-emerald-400">
-                              Mastered · +{lesson.required_exp || 50} XP
+                              Mastered · +{lesson.expReward} XP
                             </span>
                           )}
 

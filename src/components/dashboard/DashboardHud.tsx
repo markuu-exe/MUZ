@@ -6,6 +6,7 @@ interface DashboardHudProps {
   streak: number;
   exp: number;
   nextHeartLabel?: string;
+  loading?: boolean;
 }
 
 export default function DashboardHud({
@@ -13,6 +14,7 @@ export default function DashboardHud({
   streak,
   exp,
   nextHeartLabel,
+  loading = false,
 }: DashboardHudProps) {
   const clampedHearts = Math.max(0, Math.min(5, hearts));
   const progress = expProgress(exp);
@@ -22,7 +24,7 @@ export default function DashboardHud({
       {/* 1. Hearts / Stamina visual counter (0 to 5) */}
       <div
         className={`group relative flex items-center gap-2.5 rounded-2xl border px-3.5 py-2 transition-all ${
-          clampedHearts === 0
+          !loading && clampedHearts === 0
             ? 'border-rose-500/50 bg-rose-500/10 shadow-[0_0_16px_rgba(244,63,94,0.25)]'
             : 'border-slate-800/90 bg-slate-900/90 hover:border-rose-500/30'
         }`}
@@ -52,7 +54,7 @@ export default function DashboardHud({
               clampedHearts === 0 ? 'text-rose-400' : 'text-slate-200'
             }`}
           >
-            {clampedHearts}/5
+            {loading ? '—' : `${clampedHearts}/5`}
           </span>
           <span className="hidden text-[11px] font-medium uppercase tracking-wider text-slate-400 xl:inline">
             Hearts
@@ -74,7 +76,7 @@ export default function DashboardHud({
         </div>
         <div className="flex items-baseline gap-1">
           <span className="text-xs font-extrabold uppercase tracking-wide text-amber-300 tabular-nums">
-            {streak}
+            {loading ? '—' : streak}
           </span>
           <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400/90">
             {streak === 1 ? 'DAY' : 'DAYS'}
@@ -93,7 +95,7 @@ export default function DashboardHud({
             <span className="truncate max-w-[100px]">{progress.label.replace(' Learner', '')}</span>
           </span>
           <span className="font-mono font-bold text-slate-200 tabular-nums">
-            {exp.toLocaleString()} / {progress.nextAt.toLocaleString()} <span className="text-violet-400 font-sans text-[10px]">XP</span>
+            {loading ? '—' : `${exp.toLocaleString()} / ${progress.nextAt.toLocaleString()}`} {!loading && <span className="text-violet-400 font-sans text-[10px]">XP</span>}
           </span>
         </div>
 

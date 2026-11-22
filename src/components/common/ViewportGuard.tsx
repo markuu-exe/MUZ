@@ -1,4 +1,4 @@
-import { AlertTriangle, Monitor, Maximize2 } from 'lucide-react';
+import { AlertTriangle, Monitor } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export default function ViewportGuard() {
@@ -26,7 +26,7 @@ export default function ViewportGuard() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 p-6 backdrop-blur-md">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/95 p-6 backdrop-blur-md">
       <div className="relative max-w-lg overflow-hidden rounded-3xl border border-amber-500/40 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 p-8 text-center shadow-[0_0_50px_rgba(245,158,11,0.25)]">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)]">
           <Monitor className="h-8 w-8 animate-pulse" />
