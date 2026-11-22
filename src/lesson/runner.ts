@@ -44,6 +44,10 @@ export interface LessonRunState {
 const isGraded = (e: Exercise) => e.type !== 'concept-card';
 const needsHearts = (e: Exercise) => EXERCISE_ENGINE[e.type] === 'practice';
 
+export function lessonNeedsHearts(payload: LessonPayload): boolean {
+  return payload.stages.some((stage) => stage.exercises.some(needsHearts));
+}
+
 export function createLessonRun(lessonId: string, payload: LessonPayload, hearts: number, nowMs: number): LessonRunState {
   const queue: QueueItem[] = payload.stages.flatMap((stage, stageIndex) =>
     stage.exercises.map((exercise) => ({ exercise, stage: stage.kind, stageIndex, attempt: 1 })),

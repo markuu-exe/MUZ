@@ -88,6 +88,45 @@ describe('lesson runner', () => {
     expect(r.heartsEnd).toBe(4);
   });
 
+  it('restores one heart for exactly one first-try failure in a five-exercise theory lesson', () => {
+    let failures = 0;
+    const s = runAll(createLessonRun('pno-mod2-node1', payloadOf('pno-mod2-node1'), 3, 0), (state) => {
+      const item = currentItem(state);
+      if (item?.attempt === 1 && item.exercise.type !== 'concept-card' && failures === 0) {
+        failures += 1;
+        return FAIL;
+      }
+      return PASS;
+    });
+    const r = buildLessonResult(s);
+    expect(r.theoryScore).toBe(80);
+    expect(r.heartRestored).toBe(true);
+    expect(r.heartsEnd).toBe(4);
+  });
+
+  it('does not restore a heart when first-try theory is below 80 percent', () => {
+    let failures = 0;
+    const s = runAll(createLessonRun('pno-mod2-node1', payloadOf('pno-mod2-node1'), 3, 0), (state) => {
+      const item = currentItem(state);
+      if (item?.attempt === 1 && item.exercise.type !== 'concept-card' && failures < 2) {
+        failures += 1;
+        return FAIL;
+      }
+      return PASS;
+    });
+    const r = buildLessonResult(s);
+    expect(r.theoryScore).toBe(60);
+    expect(r.heartRestored).toBe(false);
+  });
+
+  it('does not restore a heart when the learner already has five', () => {
+    const s = runAll(createLessonRun('pno-mod2-node1', payloadOf('pno-mod2-node1'), 5, 0), () => PASS);
+    const r = buildLessonResult(s);
+    expect(r.theoryScore).toBe(100);
+    expect(r.heartRestored).toBe(false);
+    expect(r.heartsEnd).toBe(5);
+  });
+
   // T-06 (SRS 3.1.2.4): hearts lost inside a drill that has not reported its
   // outcome yet must stay lost when the learner quits.
   it('keeps hearts lost in an unfinished drill when the learner quits', () => {

@@ -8,6 +8,7 @@ import { useRhythmSession, type RhythmSessionResult } from '../../../hooks/useRh
 import type { ExerciseViewProps } from '../../../lesson/registry';
 import { cn } from '../../../lib/cn';
 import { buildRhythmPlan, scoreRhythm, type RhythmScore } from '../../../lib/rhythm/plan';
+import { POINTS } from '../../../lib/rhythm/timing';
 import type { TapExercise, TapExerciseType } from '../../../types/lesson.types';
 import BeatHighway from './BeatHighway';
 import RhythmNotation from './RhythmNotation';
@@ -139,6 +140,9 @@ export default function TapExerciseView({ exercise, payload, settings, onOutcome
           <span className="flex gap-4 font-bold">
             <span className="text-emerald-300">Perfect {counts.Perfect}</span>
             <span className="text-amber-300">Good {counts.Good}</span>
+            <span className="text-slate-200">
+              Score {counts.Perfect * POINTS.Perfect + counts.Good * POINTS.Good}
+            </span>
             <span className="text-slate-500">of {plan.targets.length}</span>
           </span>
         </div>
@@ -177,7 +181,7 @@ export default function TapExerciseView({ exercise, payload, settings, onOutcome
           </div>
           <p className="text-xs text-slate-400">
             Perfect is within 25 ms, Good within 50 ms. Average offset: {done.summary.avgDeviation} ms.
-            {!done.score.passed && ' You will try this rhythm again.'}
+            {!done.score.passed && !payload.isCheckpoint && ' You will try this rhythm again.'}
           </p>
           <button
             type="button"

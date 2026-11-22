@@ -48,6 +48,8 @@ import { saveRunResult } from '../../lib/progress/devTestResults';
 import { PLACEMENT_METADATA_KEY } from '../../lib/progress/placement';
 import { displayedStreak, toLocalDate } from '../../lib/progress/streak';
 import { persistRegeneratedHearts, savePlacement, supabaseDevTestStore, supabaseProgressStore } from '../../lib/progress/supabaseStore';
+import { lessonNeedsHearts } from '../../lesson/runner';
+import { blockingLesson } from '../../lib/dashboard/curriculum';
 
 interface NavItem {
   id: DashboardView;
@@ -79,11 +81,11 @@ export default function DashboardScreen() {
   const [lessonFilter, setLessonFilter] = useState<'all' | 'theory' | 'practice' | 'rhythm'>('all');
   const [placementDone, setPlacementDone] = useState(false);
 
-  const hearts = profile?.hearts ?? 4;
+  const hearts = profile?.hearts ?? 0;
   const streak = profile
     ? displayedStreak(profile.current_streak, profile.last_activity_date, toLocalDate(new Date()))
-    : 7;
-  const exp = profile?.exp ?? 1240;
+    : 0;
+  const exp = profile?.exp ?? 0;
   const username = displayNameFromProfile(profile, user?.email);
   const progressMeta = expProgress(exp);
   const regen = useHeartRegen(profile?.id ?? user?.id, hearts, {
@@ -163,8 +165,11 @@ export default function DashboardScreen() {
       window.setTimeout(() => setShakingId(null), 500);
 
       const requiredExp = lesson.required_exp ?? 0;
+      const blocking = blockingLesson(lesson, data.lessons, data.progress);
       let reason = 'You must complete the prerequisite lesson nodes to unlock this pathway.';
-      if (exp < requiredExp) {
+      if (blocking) {
+        reason = `Finish "${blocking.title}" first to unlock "${lesson.title}".`;
+      } else if (exp < requiredExp) {
         reason = `Requires ${requiredExp} EXP before this node can be unlocked (Current: ${exp} EXP).`;
       }
 
@@ -175,7 +180,7 @@ export default function DashboardScreen() {
       return;
     }
 
-    if (hearts === 0 && lesson.kind === 'practice') {
+    if (hearts === 0 && isLessonPayload(lesson.payload) && lessonNeedsHearts(lesson.payload)) {
       setSelected(null);
       setSelectedStatus(null);
       setShakingId(lesson.id);
@@ -338,6 +343,7 @@ export default function DashboardScreen() {
             streak={streak}
             exp={exp}
             nextHeartLabel={regen.label}
+            loading={!profile}
           />
         </header>
 
