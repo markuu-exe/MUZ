@@ -44,7 +44,13 @@ import AchievementToast, { type AchievementToastItem } from '../common/Achieveme
 import { lessonExp } from '../../content';
 import type { LessonResult } from '../../lesson/types';
 import { supabase } from '../../lib/supabase/client';
-import type { AchievementId } from '../../lib/progress/achievements';
+import { formatUnlockedBadgesNote, type AchievementId } from '../../lib/progress/achievements';
+import {
+  evaluateClientAchievementsForRun,
+  readClientAchievements,
+  syncClientAchievements,
+  type UnlockedAchievementsMap,
+} from '../../lib/progress/clientAchievements';
 import { canOpenLesson, isDevAccount, resultDestination, type ResultDestination } from '../../lib/progress/devAccess';
 import { saveRunResult } from '../../lib/progress/devTestResults';
 import { PLACEMENT_METADATA_KEY } from '../../lib/progress/placement';
@@ -82,6 +88,14 @@ export default function DashboardScreen() {
   const [placementDone, setPlacementDone] = useState(false);
   const [achievementToasts, setAchievementToasts] = useState<AchievementToastItem[]>([]);
   const toastTimers = useRef<Map<string, number>>(new Map());
+  const achievementUserId = isDemo ? 'demo' : (profile?.id ?? user?.id ?? 'demo');
+  const [unlockedAchievements, setUnlockedAchievements] = useState<UnlockedAchievementsMap>(() =>
+    readClientAchievements(achievementUserId),
+  );
+
+  useEffect(() => {
+    setUnlockedAchievements(readClientAchievements(achievementUserId));
+  }, [achievementUserId]);
 
   const dismissAchievementToast = useCallback((key: string) => {
     const timer = toastTimers.current.get(key);
@@ -152,30 +166,104 @@ export default function DashboardScreen() {
     data.reload();
   };
 
+  const evaluateClientSide = (
+    lesson: CurriculumNode,
+    payload: LessonPayload,
+    result: LessonResult,
+    ignoreExistingProgress = false,
+  ) => {
+    const existingProgress = ignoreExistingProgress ? undefined : data.progress[lesson.id];
+    const progressSnapshot = existingProgress
+      ? {
+          completed: existingProgress.completed,
+          accuracy_percentage: existingProgress.accuracy_percentage ?? 0,
+          posture_stability_score: existingProgress.posture_stability_score ?? 0,
+          completed_at: null,
+        }
+      : null;
+    const profileSnapshot = profile
+      ? {
+          exp: profile.exp,
+          hearts: profile.hearts,
+          current_streak: profile.current_streak,
+          last_activity_date: profile.last_activity_date,
+        }
+      : { exp, hearts, current_streak: streak, last_activity_date: null };
+
+    const out = evaluateClientAchievementsForRun({
+      userId: achievementUserId,
+      profile: profileSnapshot,
+      progress: progressSnapshot,
+      lesson: { passMark: payload.settings.passMark, expReward: lessonExp(payload) },
+      result,
+    });
+    setUnlockedAchievements(out.allUnlocked);
+    if (out.newlyUnlocked.length > 0) {
+      pushAchievementToasts(out.newlyUnlocked);
+    }
+    return out;
+  };
+
   // COURSE-6: save each finished run; demo mode saves nothing.
   // D1: a lesson a developer opened while it was locked is saved as test data only.
+  // Achievements are also evaluated client-side so unlocks & notifications work even before server lesson tables exist.
   const handleLessonComplete = async (
     lesson: CurriculumNode,
     result: LessonResult,
     destination: ResultDestination,
   ): Promise<LessonSaveFeedback> => {
-    if (isDemo || !profile) return { note: 'Demo mode: results are not saved.' };
     const payload = lesson.payload as unknown as LessonPayload;
-    const feedback = await saveRunResult(
-      {
-        destination,
-        userId: profile.id,
-        lesson: { passMark: payload.settings.passMark, expReward: lessonExp(payload) },
-        result,
-      },
-      { progress: supabaseProgressStore(supabase), devTest: supabaseDevTestStore(supabase) },
-    );
-    if (feedback.achievements && feedback.achievements.length > 0) {
-      pushAchievementToasts(feedback.achievements);
+
+    if (isDemo || !profile) {
+      const clientOut =
+        destination === 'dev-test' ? null : evaluateClientSide(lesson, payload, result, true);
+      const badgeNote =
+        clientOut && clientOut.newlyUnlocked.length > 0
+          ? formatUnlockedBadgesNote(clientOut.newlyUnlocked)
+          : null;
+      return {
+        note: badgeNote
+          ? `Demo mode: results are not saved.\n${badgeNote}`
+          : 'Demo mode: results are not saved.',
+      };
     }
-    await refreshProfile();
-    data.reload();
-    return feedback;
+
+    try {
+      const feedback = await saveRunResult(
+        {
+          destination,
+          userId: profile.id,
+          lesson: { passMark: payload.settings.passMark, expReward: lessonExp(payload) },
+          result,
+        },
+        { progress: supabaseProgressStore(supabase), devTest: supabaseDevTestStore(supabase) },
+      );
+      if (destination !== 'dev-test') {
+        if (feedback.achievements && feedback.achievements.length > 0) {
+          const merged = syncClientAchievements(achievementUserId, feedback.achievements);
+          setUnlockedAchievements(merged);
+          pushAchievementToasts(feedback.achievements);
+        } else {
+          evaluateClientSide(lesson, payload, result);
+        }
+      }
+      await refreshProfile();
+      data.reload();
+      return feedback;
+    } catch {
+      if (destination === 'dev-test') {
+        return { note: 'Your result could not be saved.' };
+      }
+      const clientOut = evaluateClientSide(lesson, payload, result);
+      const badgeNote =
+        clientOut.newlyUnlocked.length > 0 ? formatUnlockedBadgesNote(clientOut.newlyUnlocked) : null;
+      return {
+        note: badgeNote
+          ? `Could not save to server; achievements checked locally.\n${badgeNote}`
+          : 'Your result could not be saved.',
+        expAwarded: 0,
+      };
+    }
   };
 
   const masteredCount = useMemo(
@@ -446,6 +534,7 @@ export default function DashboardScreen() {
               userEmail={user?.email}
               masteredCount={masteredCount}
               totalLessons={data.lessons.length}
+              unlockedAchievements={unlockedAchievements}
             />
           )}
 

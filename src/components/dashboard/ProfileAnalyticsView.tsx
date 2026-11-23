@@ -37,6 +37,10 @@ import {
   ACHIEVEMENT_TITLES,
   type AchievementId,
 } from '../../lib/progress/achievements';
+import {
+  ACHIEVEMENT_REWARDS,
+  type UnlockedAchievementsMap,
+} from '../../lib/progress/clientAchievements';
 
 // Register ChartJS modules
 ChartJS.register(
@@ -58,6 +62,7 @@ interface ProfileAnalyticsViewProps {
   userEmail?: string | null;
   masteredCount: number;
   totalLessons: number;
+  unlockedAchievements?: UnlockedAchievementsMap;
 }
 
 interface Achievement {
@@ -78,6 +83,7 @@ export default function ProfileAnalyticsView({
   userEmail,
   masteredCount,
   totalLessons,
+  unlockedAchievements = {},
 }: ProfileAnalyticsViewProps) {
   const [range, setRange] = useState<DateRange>('7d');
 
@@ -290,58 +296,39 @@ export default function ProfileAnalyticsView({
     ],
   };
 
-  // Database-seeded Milestone Achievements (public.achievements)
+  const formatUnlockedAt = (iso: string) => {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return 'Unlocked';
+    return `Unlocked ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+  };
+
+  const makeAchievement = (
+    id: AchievementId,
+    category: Achievement['category'],
+    icon: typeof Trophy,
+    color: string,
+  ): Achievement => {
+    const unlockedAtIso = unlockedAchievements[id];
+    return {
+      id,
+      title: ACHIEVEMENT_TITLES[id],
+      description: ACHIEVEMENT_DESCRIPTIONS[id],
+      category,
+      unlocked: Boolean(unlockedAtIso),
+      unlockedAt: unlockedAtIso ? formatUnlockedAt(unlockedAtIso) : undefined,
+      progressText: `Reward: +${ACHIEVEMENT_REWARDS[id]} EXP`,
+      icon,
+      color,
+    };
+  };
+
+  // Database-seeded Milestone Achievements (public.achievements), tracked client-side
   const achievements: Achievement[] = [
-    {
-      id: 'first-lesson',
-      title: ACHIEVEMENT_TITLES['first-lesson'],
-      description: ACHIEVEMENT_DESCRIPTIONS['first-lesson'],
-      category: 'theory',
-      unlocked: false,
-      progressText: 'Reward: +50 EXP',
-      icon: Music,
-      color: 'text-violet-400 bg-violet-500/15 border-violet-500/40',
-    },
-    {
-      id: 'streak-7-days',
-      title: ACHIEVEMENT_TITLES['streak-7-days'],
-      description: ACHIEVEMENT_DESCRIPTIONS['streak-7-days'],
-      category: 'streak',
-      unlocked: false,
-      progressText: 'Reward: +50 EXP',
-      icon: Flame,
-      color: 'text-amber-400 bg-amber-500/15 border-amber-500/40',
-    },
-    {
-      id: 'streak-30-days',
-      title: ACHIEVEMENT_TITLES['streak-30-days'],
-      description: ACHIEVEMENT_DESCRIPTIONS['streak-30-days'],
-      category: 'streak',
-      unlocked: false,
-      progressText: 'Reward: +100 EXP',
-      icon: Trophy,
-      color: 'text-rose-400 bg-rose-500/15 border-rose-500/40',
-    },
-    {
-      id: 'exp-500',
-      title: ACHIEVEMENT_TITLES['exp-500'],
-      description: ACHIEVEMENT_DESCRIPTIONS['exp-500'],
-      category: 'technique',
-      unlocked: false,
-      progressText: 'Reward: +50 EXP',
-      icon: Zap,
-      color: 'text-sky-400 bg-sky-500/15 border-sky-500/40',
-    },
-    {
-      id: 'posture-stable',
-      title: ACHIEVEMENT_TITLES['posture-stable'],
-      description: ACHIEVEMENT_DESCRIPTIONS['posture-stable'],
-      category: 'posture',
-      unlocked: false,
-      progressText: 'Reward: +50 EXP',
-      icon: ShieldCheck,
-      color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/40',
-    },
+    makeAchievement('first-lesson', 'theory', Music, 'text-violet-400 bg-violet-500/15 border-violet-500/40'),
+    makeAchievement('streak-7-days', 'streak', Flame, 'text-amber-400 bg-amber-500/15 border-amber-500/40'),
+    makeAchievement('streak-30-days', 'streak', Trophy, 'text-rose-400 bg-rose-500/15 border-rose-500/40'),
+    makeAchievement('exp-500', 'technique', Zap, 'text-sky-400 bg-sky-500/15 border-sky-500/40'),
+    makeAchievement('posture-stable', 'posture', ShieldCheck, 'text-emerald-400 bg-emerald-500/15 border-emerald-500/40'),
   ];
 
   return (
