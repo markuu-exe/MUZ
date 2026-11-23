@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   BookOpen,
@@ -40,9 +40,11 @@ import LessonPlayer, { type LessonSaveFeedback } from '../lesson/LessonPlayer';
 import { isLessonPayload, type LessonPayload } from '../../types/lesson.types';
 import ProfileAnalyticsView from './ProfileAnalyticsView';
 import PlacementModal from './PlacementModal';
+import AchievementToast, { type AchievementToastItem } from '../common/AchievementToast';
 import { lessonExp } from '../../content';
 import type { LessonResult } from '../../lesson/types';
 import { supabase } from '../../lib/supabase/client';
+import type { AchievementId } from '../../lib/progress/achievements';
 import { canOpenLesson, isDevAccount, resultDestination, type ResultDestination } from '../../lib/progress/devAccess';
 import { saveRunResult } from '../../lib/progress/devTestResults';
 import { PLACEMENT_METADATA_KEY } from '../../lib/progress/placement';
@@ -78,6 +80,41 @@ export default function DashboardScreen() {
   const [activeDestination, setActiveDestination] = useState<ResultDestination>('learner');
   const [lessonFilter, setLessonFilter] = useState<'all' | 'theory' | 'practice' | 'rhythm'>('all');
   const [placementDone, setPlacementDone] = useState(false);
+  const [achievementToasts, setAchievementToasts] = useState<AchievementToastItem[]>([]);
+  const toastTimers = useRef<Map<string, number>>(new Map());
+
+  const dismissAchievementToast = useCallback((key: string) => {
+    const timer = toastTimers.current.get(key);
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+      toastTimers.current.delete(key);
+    }
+    setAchievementToasts((prev) => prev.filter((item) => item.key !== key));
+  }, []);
+
+  const pushAchievementToasts = useCallback(
+    (ids: readonly AchievementId[]) => {
+      if (ids.length === 0) return;
+      const created = ids.map((id, idx) => ({
+        key: `${id}-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 7)}`,
+        id,
+      }));
+      setAchievementToasts((prev) => [...prev, ...created]);
+      for (const item of created) {
+        const timer = window.setTimeout(() => dismissAchievementToast(item.key), 6000);
+        toastTimers.current.set(item.key, timer);
+      }
+    },
+    [dismissAchievementToast],
+  );
+
+  useEffect(() => {
+    const timers = toastTimers.current;
+    return () => {
+      for (const timer of timers.values()) window.clearTimeout(timer);
+      timers.clear();
+    };
+  }, []);
 
   const hearts = profile?.hearts ?? 4;
   const streak = profile
@@ -133,6 +170,9 @@ export default function DashboardScreen() {
       },
       { progress: supabaseProgressStore(supabase), devTest: supabaseDevTestStore(supabase) },
     );
+    if (feedback.achievements && feedback.achievements.length > 0) {
+      pushAchievementToasts(feedback.achievements);
+    }
     await refreshProfile();
     data.reload();
     return feedback;
@@ -673,6 +713,7 @@ export default function DashboardScreen() {
       )}
 
       {needsPlacement && <PlacementModal onChoose={choosePlacement} />}
+      <AchievementToast toasts={achievementToasts} onDismiss={dismissAchievementToast} />
     </div>
   );
 }

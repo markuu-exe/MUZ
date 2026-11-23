@@ -13,6 +13,14 @@ export const ACHIEVEMENT_TITLES: Record<AchievementId, string> = {
   'posture-stable': 'Steady Hands',
 };
 
+export const ACHIEVEMENT_DESCRIPTIONS: Record<AchievementId, string> = {
+  'first-lesson': 'Completed your first piano lesson.',
+  'streak-7-days': 'Practiced 7 days in a row.',
+  'streak-30-days': 'Practiced 30 days in a row.',
+  'exp-500': 'Earned 500 total EXP.',
+  'posture-stable': 'Maintained 90%+ posture score in a practice session.',
+};
+
 export interface AchievementInput {
   completedNow: boolean;
   exp: number;

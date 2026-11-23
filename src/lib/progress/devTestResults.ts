@@ -8,6 +8,7 @@
  */
 import type { LessonResult } from '../../lesson/types';
 import { MAX_HEARTS } from '../../lesson/runner';
+import type { AchievementId } from './achievements';
 import type { AppliedResult, LessonFacts } from './applyResult';
 import type { ResultDestination } from './devAccess';
 import { saveLessonResult, type ProgressStore } from './saveLessonResult';
@@ -77,6 +78,7 @@ export interface SaveRunInput {
 export interface SaveRunFeedback {
   note: string | null;
   expAwarded: number;
+  achievements?: AchievementId[];
 }
 
 /** Save one finished run where D1 says it belongs. */
@@ -89,5 +91,9 @@ export async function saveRunResult(
     return { note: DEV_TEST_NOTE, expAwarded: 0 };
   }
   const applied: AppliedResult = await saveLessonResult(stores.progress, { userId, lesson, result, now });
-  return { note: applied.note, expAwarded: applied.expGained };
+  return {
+    note: applied.note,
+    expAwarded: applied.expGained,
+    achievements: applied.achievements as AchievementId[] | undefined,
+  };
 }

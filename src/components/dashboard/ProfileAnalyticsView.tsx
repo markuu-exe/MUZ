@@ -32,6 +32,11 @@ import {
 import { Line, Bar } from 'react-chartjs-2';
 import type { UserProfile } from '../../types/auth.types';
 import { expProgress } from '../../lib/dashboard/curriculum';
+import {
+  ACHIEVEMENT_DESCRIPTIONS,
+  ACHIEVEMENT_TITLES,
+  type AchievementId,
+} from '../../lib/progress/achievements';
 
 // Register ChartJS modules
 ChartJS.register(
@@ -56,7 +61,7 @@ interface ProfileAnalyticsViewProps {
 }
 
 interface Achievement {
-  id: string;
+  id: AchievementId;
   title: string;
   description: string;
   category: 'streak' | 'accuracy' | 'theory' | 'posture' | 'technique';
@@ -285,91 +290,57 @@ export default function ProfileAnalyticsView({
     ],
   };
 
-  // Milestone Achievements with distinct Unlocked vs Locked visual states
+  // Database-seeded Milestone Achievements (public.achievements)
   const achievements: Achievement[] = [
     {
-      id: 'ach-1',
-      title: '7-Day Streak',
-      description: 'Logged consecutive practice sessions for 7 days without interruption.',
+      id: 'first-lesson',
+      title: ACHIEVEMENT_TITLES['first-lesson'],
+      description: ACHIEVEMENT_DESCRIPTIONS['first-lesson'],
+      category: 'theory',
+      unlocked: false,
+      progressText: 'Reward: +50 EXP',
+      icon: Music,
+      color: 'text-violet-400 bg-violet-500/15 border-violet-500/40',
+    },
+    {
+      id: 'streak-7-days',
+      title: ACHIEVEMENT_TITLES['streak-7-days'],
+      description: ACHIEVEMENT_DESCRIPTIONS['streak-7-days'],
       category: 'streak',
-      unlocked: true,
-      unlockedAt: 'Unlocked Nov 2',
+      unlocked: false,
+      progressText: 'Reward: +50 EXP',
       icon: Flame,
       color: 'text-amber-400 bg-amber-500/15 border-amber-500/40',
     },
     {
-      id: 'ach-2',
-      title: 'Perfect Score',
-      description: 'Achieved 100% pitch accuracy on an entire practice drill.',
-      category: 'accuracy',
-      unlocked: true,
-      unlockedAt: 'Unlocked Oct 29',
-      icon: Target,
-      color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/40',
+      id: 'streak-30-days',
+      title: ACHIEVEMENT_TITLES['streak-30-days'],
+      description: ACHIEVEMENT_DESCRIPTIONS['streak-30-days'],
+      category: 'streak',
+      unlocked: false,
+      progressText: 'Reward: +100 EXP',
+      icon: Trophy,
+      color: 'text-rose-400 bg-rose-500/15 border-rose-500/40',
     },
     {
-      id: 'ach-3',
-      title: 'Theory Master',
-      description: 'Completed all 5 core keyboard theory and stave reading units.',
-      category: 'theory',
-      unlocked: true,
-      unlockedAt: 'Unlocked Oct 22',
-      icon: Award,
-      color: 'text-violet-400 bg-violet-500/15 border-violet-500/40',
-    },
-    {
-      id: 'ach-4',
-      title: 'Metronome Master',
-      description: 'Kept note latency jitter under 15ms over 60 continuous seconds.',
+      id: 'exp-500',
+      title: ACHIEVEMENT_TITLES['exp-500'],
+      description: ACHIEVEMENT_DESCRIPTIONS['exp-500'],
       category: 'technique',
-      unlocked: true,
-      unlockedAt: 'Unlocked Nov 1',
-      icon: Music,
+      unlocked: false,
+      progressText: 'Reward: +50 EXP',
+      icon: Zap,
       color: 'text-sky-400 bg-sky-500/15 border-sky-500/40',
     },
     {
-      id: 'ach-5',
-      title: 'Posture Perfectionist',
-      description: 'Maintained 95%+ posture compliance over 10 consecutive sessions.',
+      id: 'posture-stable',
+      title: ACHIEVEMENT_TITLES['posture-stable'],
+      description: ACHIEVEMENT_DESCRIPTIONS['posture-stable'],
       category: 'posture',
       unlocked: false,
-      progressText: '7 of 10 sessions logged',
-      progressPercent: 70,
+      progressText: 'Reward: +50 EXP',
       icon: ShieldCheck,
-      color: 'text-emerald-400',
-    },
-    {
-      id: 'ach-6',
-      title: 'Polyphonic Prodigy',
-      description: 'Execute a four-bar two-hand independent harmony drill.',
-      category: 'technique',
-      unlocked: false,
-      progressText: 'Prerequisite: Module 2 Node 1',
-      progressPercent: 40,
-      icon: Piano,
-      color: 'text-violet-400',
-    },
-    {
-      id: 'ach-7',
-      title: 'Velocity Virtuoso',
-      description: 'Perform a full C-Major octave run at 140 BPM with zero dropped notes.',
-      category: 'technique',
-      unlocked: false,
-      progressText: 'Best tempo: 116 BPM',
-      progressPercent: 65,
-      icon: Zap,
-      color: 'text-amber-400',
-    },
-    {
-      id: 'ach-8',
-      title: 'Grand Maestro',
-      description: 'Master all 24 curriculum nodes and achieve Gold tier standing.',
-      category: 'theory',
-      unlocked: false,
-      progressText: `${masteredCount || 10} / ${totalLessons || 24} nodes mastered`,
-      progressPercent: Math.round(((masteredCount || 10) / (totalLessons || 24)) * 100),
-      icon: Trophy,
-      color: 'text-rose-400',
+      color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/40',
     },
   ];
 
@@ -611,7 +582,7 @@ export default function ProfileAnalyticsView({
           </span>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {achievements.map((badge) => {
             const Icon = badge.icon;
             return (
