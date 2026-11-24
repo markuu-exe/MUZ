@@ -5,21 +5,17 @@ import {
   GitBranch,
   Heart,
   LogOut,
-  Music2,
   Piano,
   Settings,
   UserRound,
   Play,
   RotateCcw,
   Sparkles,
-  ShieldAlert,
   CheckCircle2,
   Sliders,
   Volume2,
   Camera,
   Layers,
-  ChevronRight,
-  Flame,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useDashboardData } from '../../hooks/useDashboardData';
