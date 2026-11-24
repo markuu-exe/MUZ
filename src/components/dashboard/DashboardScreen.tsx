@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useDashboardData } from '../../hooks/useDashboardData';
+import { useAnalyticsData } from '../../hooks/useAnalyticsData';
 import { useHeartRegen } from '../../hooks/useHeartRegen';
 import { cn } from '../../lib/cn';
 import {
@@ -38,7 +39,7 @@ import DashboardHud from './DashboardHud';
 import SkillTreeView from './SkillTreeView';
 import LessonPlayer, { type LessonSaveFeedback } from '../lesson/LessonPlayer';
 import { isLessonPayload, type LessonPayload } from '../../types/lesson.types';
-import ProfileAnalyticsView from './ProfileAnalyticsView';
+import ProfileAnalyticsView, { type AnalyticsDateRange } from './ProfileAnalyticsView';
 import PlacementModal from './PlacementModal';
 import AchievementToast, { type AchievementToastItem } from '../common/AchievementToast';
 import { lessonExp } from '../../content';
@@ -88,6 +89,8 @@ export default function DashboardScreen() {
   const [activeDestination, setActiveDestination] = useState<ResultDestination>('learner');
   const [lessonFilter, setLessonFilter] = useState<'all' | 'theory' | 'practice' | 'rhythm'>('all');
   const [placementDone, setPlacementDone] = useState(false);
+  const [analyticsRange, setAnalyticsRange] = useState<AnalyticsDateRange>('7d');
+  const analytics = useAnalyticsData(isDemo ? null : (profile?.id ?? user?.id ?? null), analyticsRange, isDemo);
   const [achievementToasts, setAchievementToasts] = useState<AchievementToastItem[]>([]);
   const toastTimers = useRef<Map<string, number>>(new Map());
   const achievementUserId = isDemo ? 'demo' : (profile?.id ?? user?.id ?? 'demo');
@@ -98,6 +101,16 @@ export default function DashboardScreen() {
   useEffect(() => {
     setUnlockedAchievements(readClientAchievements(achievementUserId));
   }, [achievementUserId]);
+
+  const mergedAchievements = useMemo<UnlockedAchievementsMap>(() => {
+    const merged: UnlockedAchievementsMap = { ...unlockedAchievements };
+    for (const badge of analytics.badges) {
+      if (badge.unlockedAt && !merged[badge.id as AchievementId]) {
+        merged[badge.id as AchievementId] = badge.unlockedAt;
+      }
+    }
+    return merged;
+  }, [unlockedAchievements, analytics.badges]);
 
   const dismissAchievementToast = useCallback((key: string) => {
     const timer = toastTimers.current.get(key);
@@ -251,6 +264,7 @@ export default function DashboardScreen() {
       }
       await refreshProfile();
       data.reload();
+      analytics.reload();
       return feedback;
     } catch {
       if (destination === 'dev-test') {
@@ -540,7 +554,13 @@ export default function DashboardScreen() {
               userEmail={user?.email}
               masteredCount={masteredCount}
               totalLessons={data.lessons.length}
-              unlockedAchievements={unlockedAchievements}
+              unlockedAchievements={mergedAchievements}
+              sessions={analytics.sessions}
+              rhythmHistogram={analytics.rhythmHistogram}
+              range={analyticsRange}
+              onRangeChange={setAnalyticsRange}
+              loading={analytics.loading}
+              error={analytics.error}
             />
           )}
 

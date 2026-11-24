@@ -106,6 +106,7 @@ describe('clientAchievements', () => {
       profile: { exp: 500, hearts: 5, current_streak: 7, last_activity_date: '2026-11-22' },
       progress: null,
       lesson: { passMark: 0.7, expReward: 50 },
+      now: new Date('2026-11-23T12:00:00Z'),
       result: makeResult({
         records: [
           {
