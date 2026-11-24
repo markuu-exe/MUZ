@@ -164,3 +164,18 @@ textarea {
 .animate-pulse-subtle {
   animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+@keyframes achievement-toast-in {
+  0% {
+    opacity: 0;
+    transform: translateX(24px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.animate-achievement-toast-in {
+  animation: achievement-toast-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}

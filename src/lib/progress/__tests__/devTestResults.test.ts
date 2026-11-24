@@ -48,6 +48,9 @@ function stores(profile: ProfileSnapshot = PROFILE) {
     getProgress: async () => null,
     upsertProgress: async (_u, _l, _r: ProgressSnapshot) => void writes.push('user_progress'),
     insertPerformance: async (_u, _l, _r: PerformanceRow) => void writes.push('performance_records'),
+    getUnlockedAchievements: async () => new Set(),
+    getAchievementRewards: async () => ({}),
+    insertAchievements: async () => undefined,
     updateProfile: async (_u, patch) => {
       writes.push(`profile:${Object.keys(patch).sort().join(',')}`);
       current = { ...current, ...patch };

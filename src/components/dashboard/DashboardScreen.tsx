@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   BookOpen,
@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useDashboardData } from '../../hooks/useDashboardData';
+import { useAnalyticsData } from '../../hooks/useAnalyticsData';
 import { useHeartRegen } from '../../hooks/useHeartRegen';
 import { cn } from '../../lib/cn';
 import {
@@ -38,11 +39,19 @@ import DashboardHud from './DashboardHud';
 import SkillTreeView from './SkillTreeView';
 import LessonPlayer, { type LessonSaveFeedback } from '../lesson/LessonPlayer';
 import { isLessonPayload, type LessonPayload } from '../../types/lesson.types';
-import ProfileAnalyticsView from './ProfileAnalyticsView';
+import ProfileAnalyticsView, { type AnalyticsDateRange } from './ProfileAnalyticsView';
 import PlacementModal from './PlacementModal';
+import AchievementToast, { type AchievementToastItem } from '../common/AchievementToast';
 import { lessonExp } from '../../content';
 import type { LessonResult } from '../../lesson/types';
 import { supabase } from '../../lib/supabase/client';
+import { formatUnlockedBadgesNote, type AchievementId } from '../../lib/progress/achievements';
+import {
+  evaluateClientAchievementsForRun,
+  readClientAchievements,
+  syncClientAchievements,
+  type UnlockedAchievementsMap,
+} from '../../lib/progress/clientAchievements';
 import { canOpenLesson, isDevAccount, resultDestination, type ResultDestination } from '../../lib/progress/devAccess';
 import { saveRunResult } from '../../lib/progress/devTestResults';
 import { PLACEMENT_METADATA_KEY } from '../../lib/progress/placement';
@@ -80,6 +89,61 @@ export default function DashboardScreen() {
   const [activeDestination, setActiveDestination] = useState<ResultDestination>('learner');
   const [lessonFilter, setLessonFilter] = useState<'all' | 'theory' | 'practice' | 'rhythm'>('all');
   const [placementDone, setPlacementDone] = useState(false);
+  const [analyticsRange, setAnalyticsRange] = useState<AnalyticsDateRange>('7d');
+  const analytics = useAnalyticsData(isDemo ? null : (profile?.id ?? user?.id ?? null), analyticsRange, isDemo);
+  const [achievementToasts, setAchievementToasts] = useState<AchievementToastItem[]>([]);
+  const toastTimers = useRef<Map<string, number>>(new Map());
+  const achievementUserId = isDemo ? 'demo' : (profile?.id ?? user?.id ?? 'demo');
+  const [unlockedAchievements, setUnlockedAchievements] = useState<UnlockedAchievementsMap>(() =>
+    readClientAchievements(achievementUserId),
+  );
+
+  useEffect(() => {
+    setUnlockedAchievements(readClientAchievements(achievementUserId));
+  }, [achievementUserId]);
+
+  const mergedAchievements = useMemo<UnlockedAchievementsMap>(() => {
+    const merged: UnlockedAchievementsMap = { ...unlockedAchievements };
+    for (const badge of analytics.badges) {
+      if (badge.unlockedAt && !merged[badge.id as AchievementId]) {
+        merged[badge.id as AchievementId] = badge.unlockedAt;
+      }
+    }
+    return merged;
+  }, [unlockedAchievements, analytics.badges]);
+
+  const dismissAchievementToast = useCallback((key: string) => {
+    const timer = toastTimers.current.get(key);
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+      toastTimers.current.delete(key);
+    }
+    setAchievementToasts((prev) => prev.filter((item) => item.key !== key));
+  }, []);
+
+  const pushAchievementToasts = useCallback(
+    (ids: readonly AchievementId[]) => {
+      if (ids.length === 0) return;
+      const created = ids.map((id, idx) => ({
+        key: `${id}-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 7)}`,
+        id,
+      }));
+      setAchievementToasts((prev) => [...prev, ...created]);
+      for (const item of created) {
+        const timer = window.setTimeout(() => dismissAchievementToast(item.key), 6000);
+        toastTimers.current.set(item.key, timer);
+      }
+    },
+    [dismissAchievementToast],
+  );
+
+  useEffect(() => {
+    const timers = toastTimers.current;
+    return () => {
+      for (const timer of timers.values()) window.clearTimeout(timer);
+      timers.clear();
+    };
+  }, []);
 
   const hearts = profile?.hearts ?? 0;
   const streak = profile
@@ -117,27 +181,105 @@ export default function DashboardScreen() {
     data.reload();
   };
 
+  const evaluateClientSide = (
+    lesson: CurriculumNode,
+    payload: LessonPayload,
+    result: LessonResult,
+    ignoreExistingProgress = false,
+  ) => {
+    const existingProgress = ignoreExistingProgress ? undefined : data.progress[lesson.id];
+    const progressSnapshot = existingProgress
+      ? {
+          completed: existingProgress.completed,
+          accuracy_percentage: existingProgress.accuracy_percentage ?? 0,
+          posture_stability_score: existingProgress.posture_stability_score ?? 0,
+          completed_at: null,
+        }
+      : null;
+    const profileSnapshot = profile
+      ? {
+          exp: profile.exp,
+          hearts: profile.hearts,
+          current_streak: profile.current_streak,
+          last_activity_date: profile.last_activity_date,
+        }
+      : { exp, hearts, current_streak: streak, last_activity_date: null };
+
+    const out = evaluateClientAchievementsForRun({
+      userId: achievementUserId,
+      profile: profileSnapshot,
+      progress: progressSnapshot,
+      lesson: { passMark: payload.settings.passMark, expReward: lessonExp(payload) },
+      result,
+    });
+    setUnlockedAchievements(out.allUnlocked);
+    if (out.newlyUnlocked.length > 0) {
+      pushAchievementToasts(out.newlyUnlocked);
+    }
+    return out;
+  };
+
   // COURSE-6: save each finished run; demo mode saves nothing.
   // D1: a lesson a developer opened while it was locked is saved as test data only.
+  // Achievements are also evaluated client-side so unlocks & notifications work even before server lesson tables exist.
   const handleLessonComplete = async (
     lesson: CurriculumNode,
     result: LessonResult,
     destination: ResultDestination,
   ): Promise<LessonSaveFeedback> => {
-    if (isDemo || !profile) return { note: 'Demo mode: results are not saved.' };
     const payload = lesson.payload as unknown as LessonPayload;
-    const feedback = await saveRunResult(
-      {
-        destination,
-        userId: profile.id,
-        lesson: { passMark: payload.settings.passMark, expReward: lessonExp(payload) },
-        result,
-      },
-      { progress: supabaseProgressStore(supabase), devTest: supabaseDevTestStore(supabase) },
-    );
-    await refreshProfile();
-    data.reload();
-    return feedback;
+
+    if (isDemo || !profile) {
+      const clientOut =
+        destination === 'dev-test' ? null : evaluateClientSide(lesson, payload, result, true);
+      const badgeNote =
+        clientOut && clientOut.newlyUnlocked.length > 0
+          ? formatUnlockedBadgesNote(clientOut.newlyUnlocked)
+          : null;
+      return {
+        note: badgeNote
+          ? `Demo mode: results are not saved.\n${badgeNote}`
+          : 'Demo mode: results are not saved.',
+      };
+    }
+
+    try {
+      const feedback = await saveRunResult(
+        {
+          destination,
+          userId: profile.id,
+          lesson: { passMark: payload.settings.passMark, expReward: lessonExp(payload) },
+          result,
+        },
+        { progress: supabaseProgressStore(supabase), devTest: supabaseDevTestStore(supabase) },
+      );
+      if (destination !== 'dev-test') {
+        if (feedback.achievements && feedback.achievements.length > 0) {
+          const merged = syncClientAchievements(achievementUserId, feedback.achievements);
+          setUnlockedAchievements(merged);
+          pushAchievementToasts(feedback.achievements);
+        } else {
+          evaluateClientSide(lesson, payload, result);
+        }
+      }
+      await refreshProfile();
+      data.reload();
+      analytics.reload();
+      return feedback;
+    } catch {
+      if (destination === 'dev-test') {
+        return { note: 'Your result could not be saved.' };
+      }
+      const clientOut = evaluateClientSide(lesson, payload, result);
+      const badgeNote =
+        clientOut.newlyUnlocked.length > 0 ? formatUnlockedBadgesNote(clientOut.newlyUnlocked) : null;
+      return {
+        note: badgeNote
+          ? `Could not save to server; achievements checked locally.\n${badgeNote}`
+          : 'Your result could not be saved.',
+        expAwarded: 0,
+      };
+    }
   };
 
   const masteredCount = useMemo(
@@ -412,6 +554,13 @@ export default function DashboardScreen() {
               userEmail={user?.email}
               masteredCount={masteredCount}
               totalLessons={data.lessons.length}
+              unlockedAchievements={mergedAchievements}
+              sessions={analytics.sessions}
+              rhythmHistogram={analytics.rhythmHistogram}
+              range={analyticsRange}
+              onRangeChange={setAnalyticsRange}
+              loading={analytics.loading}
+              error={analytics.error}
             />
           )}
 
@@ -679,6 +828,7 @@ export default function DashboardScreen() {
       )}
 
       {needsPlacement && <PlacementModal onChoose={choosePlacement} />}
+      <AchievementToast toasts={achievementToasts} onDismiss={dismissAchievementToast} />
     </div>
   );
 }
