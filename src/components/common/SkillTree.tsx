@@ -28,6 +28,7 @@ export const SkillTree: FC<SkillTreeProps> = ({
       progress={userProgress}
       exp={profile.exp}
       hearts={profile.hearts}
+      profileLoaded
       shakingId={null}
       selectedId={null}
       onSelect={(lesson) => onSelectLesson(lesson.id)}
