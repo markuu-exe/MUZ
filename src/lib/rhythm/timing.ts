@@ -51,7 +51,10 @@ export function summarize(taps: JudgedTap[], passedBeats: number): RhythmSummary
       ? matched.reduce((sum, t) => sum + Math.abs(t.deltaMs), 0) / matched.length
       : 0;
   const consistency = passedBeats > 0
-    ? Math.round((100 * matched.reduce((sum, t) => sum + Math.max(0, 1 - Math.abs(t.deltaMs) / GOOD_MS), 0)) / passedBeats)
+    ? Math.min(
+        100,
+        Math.round((100 * matched.reduce((sum, t) => sum + Math.max(0, 1 - Math.abs(t.deltaMs) / GOOD_MS), 0)) / passedBeats),
+      )
     : 0;
 
   return {

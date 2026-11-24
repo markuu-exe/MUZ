@@ -40,4 +40,16 @@ describe('rhythm timing', () => {
     }));
     expect(summarize(taps, 2).consistency).toBe(50);
   });
+
+  it('returns zero consistency when no beats passed', () => {
+    expect(summarize([], 0).consistency).toBe(0);
+  });
+
+  it('never reports consistency above 100', () => {
+    const taps: JudgedTap[] = [
+      { rating: 'Perfect', deltaMs: 0, beatIndex: 0 },
+      { rating: 'Perfect', deltaMs: 0, beatIndex: 1 },
+    ];
+    expect(summarize(taps, 1).consistency).toBe(100);
+  });
 });
