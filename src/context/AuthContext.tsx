@@ -1,7 +1,13 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import type { User, Session, Provider } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase/client';
-import type { AuthContextType, InstrumentFocus, UserProfile } from '../types/auth.types';
+import { bootstrapProfile, type ProfileClient } from '../lib/auth/profileBootstrap';
+import type {
+  AuthContextType,
+  InstrumentFocus,
+  ProfileStatus,
+  UserProfile,
+} from '../types/auth.types';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -13,13 +19,35 @@ const getMetadataUsername = (user: User): string | undefined => {
   return typeof username === 'string' && username.trim() ? username.trim() : undefined;
 };
 
-const getMetadataInstrument = (user: User): InstrumentFocus => {
-  const instrument = user.user_metadata?.instrument_focus;
-  if (instrument === 'piano' || instrument === 'guitar' || instrument === 'violin' || instrument === 'vocals') {
-    return instrument;
-  }
-  return 'piano';
-};
+const getMetadataInstrument = (_user?: User): InstrumentFocus => 'piano';
+
+const resolveProfileUsername = (user: User): string =>
+  getMetadataUsername(user) || user.email?.split('@')[0] || 'Pianist';
+
+const createProfileClient = (): ProfileClient => ({
+  select: async (userId) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
+    return {
+      data: (data as UserProfile | null) ?? null,
+      error: error ? { code: error.code, message: error.message } : null,
+    };
+  },
+  insert: async (row) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .insert(row)
+      .select()
+      .single();
+    return {
+      data: (data as UserProfile | null) ?? null,
+      error: error ? { code: error.code, message: error.message } : null,
+    };
+  },
+});
 
 const DEMO_PROFILES: Record<string, UserProfile> = {
   virtuoso: {
@@ -48,88 +76,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileStatus, setProfileStatus] = useState<ProfileStatus>('loading');
   const [loading, setLoading] = useState(true);
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   const [isDemo, setIsDemo] = useState<boolean>(() => {
     return sessionStorage.getItem(DEMO_USER_KEY) === 'true';
   });
 
-  const fetchProfile = useCallback(async (
-    userId: string,
-    userEmail?: string,
-    preferredUsername?: string,
-    preferredInstrument?: InstrumentFocus,
-  ): Promise<UserProfile | null> => {
+  const mountedRef = useRef(true);
+  const profileReqIdRef = useRef(0);
+
+  const loadProfile = useCallback(async (targetUser: User): Promise<UserProfile | null> => {
+    const reqId = ++profileReqIdRef.current;
+    setProfileStatus('loading');
+    setProfileError(null);
+
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+      const result = await bootstrapProfile(
+        createProfileClient(),
+        targetUser.id,
+        resolveProfileUsername(targetUser),
+      );
 
-      if (error && error.code !== 'PGRST116') {
-        console.warn('Could not fetch user profile:', error.message);
+      if (!mountedRef.current || reqId !== profileReqIdRef.current) {
+        return null;
       }
 
-      if (data) {
-        const updates: Partial<UserProfile> = {};
-        if (preferredUsername && data.username !== preferredUsername) {
-          updates.username = preferredUsername;
-        }
-        if (preferredInstrument && data.instrument_focus !== preferredInstrument) {
-          updates.instrument_focus = preferredInstrument;
-        }
-
-        if (Object.keys(updates).length > 0) {
-          const { data: updated, error: updateError } = await supabase
-            .from('profiles')
-            .update(updates)
-            .eq('id', userId)
-            .select()
-            .maybeSingle();
-
-          if (updateError) {
-            console.warn('Could not update profile metadata:', updateError.message);
-          } else if (updated) {
-            return updated;
-          }
-        }
-
-        return data as UserProfile;
+      if (result.profile === null) {
+        setProfile(null);
+        setProfileError(result.error);
+        setProfileStatus('failed');
+        return null;
       }
 
-      // If profile not found, try to upsert a default profile
-      const defaultProfile: UserProfile = {
-        id: userId,
-        username: preferredUsername || userEmail?.split('@')[0] || 'Pianist',
-        instrument_focus: preferredInstrument || 'piano',
-        current_streak: 1,
-        last_activity_date: new Date().toISOString(),
-        exp: 100,
-        hearts: 5,
-        created_at: new Date().toISOString(),
-      };
-
-      const { data: inserted, error: insertError } = await supabase
-        .from('profiles')
-        .upsert(defaultProfile)
-        .select()
-        .single();
-
-      if (insertError) {
-        console.warn('Default profile creation skipped:', insertError.message);
-        return defaultProfile;
-      }
-
-      return (inserted as UserProfile) || defaultProfile;
+      setProfile(result.profile);
+      setProfileError(null);
+      setProfileStatus('loaded');
+      return result.profile;
     } catch (err) {
-      console.error('Error handling profile:', err);
+      if (!mountedRef.current || reqId !== profileReqIdRef.current) {
+        return null;
+      }
+      const message = err instanceof Error ? err.message : 'Failed to load profile.';
+      setProfile(null);
+      setProfileError(message);
+      setProfileStatus('failed');
       return null;
     }
   }, []);
 
   useEffect(() => {
     let mounted = true;
+    mountedRef.current = true;
+    let pendingProfileTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const clearPendingProfileTimer = () => {
+      if (pendingProfileTimer !== null) {
+        clearTimeout(pendingProfileTimer);
+        pendingProfileTimer = null;
+      }
+    };
 
     async function initializeAuth() {
       if (isDemo) {
@@ -141,12 +148,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           app_metadata: {},
           user_metadata: {
             username: chosenProfile.username,
-            instrument_focus: chosenProfile.instrument_focus,
+            instrument_focus: getMetadataInstrument(),
           },
           aud: 'authenticated',
           created_at: chosenProfile.created_at || '',
         } as unknown as User);
         setProfile(chosenProfile);
+        setProfileError(null);
+        setProfileStatus('loaded');
         setLoading(false);
         return;
       }
@@ -161,17 +170,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (initialSession?.user) {
             setSession(initialSession);
             setUser(initialSession.user);
-            const userProf = await fetchProfile(
-              initialSession.user.id,
-              initialSession.user.email,
-              getMetadataUsername(initialSession.user),
-              getMetadataInstrument(initialSession.user),
-            );
-            if (mounted) setProfile(userProf);
           } else {
             setSession(null);
             setUser(null);
             setProfile(null);
+            setProfileError(null);
+            setProfileStatus('not_found');
           }
         }
       } catch (err) {
@@ -185,9 +189,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initializeAuth();
 
+    // Keep callback synchronous to avoid supabase-js auth lock deadlocks.
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (!mounted) return;
 
       if (event === 'PASSWORD_RECOVERY') {
@@ -201,16 +206,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(newSession);
       setUser(newSession?.user ?? null);
 
-      if (newSession?.user) {
-        const userProf = await fetchProfile(
-          newSession.user.id,
-          newSession.user.email,
-          getMetadataUsername(newSession.user),
-          getMetadataInstrument(newSession.user),
-        );
-        if (mounted) setProfile(userProf);
-      } else {
+      if (event === 'TOKEN_REFRESHED') {
+        setLoading(false);
+        return;
+      }
+
+      if (
+        newSession?.user &&
+        (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'USER_UPDATED')
+      ) {
+        clearPendingProfileTimer();
+        setProfileStatus('loading');
+        setProfileError(null);
+        const targetUser = newSession.user;
+        pendingProfileTimer = setTimeout(() => {
+          pendingProfileTimer = null;
+          if (mounted) {
+            void loadProfile(targetUser);
+          }
+        }, 0);
+      } else if (!newSession?.user) {
+        clearPendingProfileTimer();
+        profileReqIdRef.current += 1;
         setProfile(null);
+        setProfileError(null);
+        setProfileStatus('not_found');
       }
 
       setLoading(false);
@@ -218,9 +238,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       mounted = false;
+      mountedRef.current = false;
+      clearPendingProfileTimer();
       subscription.unsubscribe();
     };
-  }, [fetchProfile, isDemo]);
+  }, [loadProfile, isDemo]);
 
   const signInWithEmail = async (email: string, password: string) => {
     setIsDemo(false);
@@ -239,13 +261,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.session) {
         setSession(data.session);
         setUser(data.user);
-        const userProf = await fetchProfile(
-          data.user.id,
-          data.user.email,
-          getMetadataUsername(data.user),
-          getMetadataInstrument(data.user),
-        );
-        setProfile(userProf);
       }
 
       return { error: null };
@@ -284,13 +299,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.session && data.user) {
         setSession(data.session);
         setUser(data.user);
-        const userProf = await fetchProfile(
-          data.user.id,
-          email,
-          profileUsername,
-          instrumentFocus,
-        );
-        setProfile(userProf);
       }
 
       return { error: null, session: data.session };
@@ -375,6 +383,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     setIsPasswordRecovery(false);
+    profileReqIdRef.current += 1;
     if (isDemo) {
       setIsDemo(false);
       sessionStorage.removeItem(DEMO_USER_KEY);
@@ -382,6 +391,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       setSession(null);
       setProfile(null);
+      setProfileError(null);
+      setProfileStatus('not_found');
       return;
     }
 
@@ -393,6 +404,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       setSession(null);
       setProfile(null);
+      setProfileError(null);
+      setProfileStatus('not_found');
     }
   };
 
@@ -413,18 +426,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       created_at: chosenProfile.created_at || '',
     } as unknown as User);
     setProfile(chosenProfile);
+    setProfileError(null);
+    setProfileStatus('loaded');
     setLoading(false);
   };
 
   const refreshProfile = async () => {
-    if (user) {
-      const prof = await fetchProfile(
-        user.id,
-        user.email,
-        getMetadataUsername(user),
-        getMetadataInstrument(user),
-      );
-      setProfile(prof);
+    if (user && !isDemo) {
+      await loadProfile(user);
     }
   };
 
@@ -434,6 +443,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         session,
         profile,
+        profileError,
+        profileStatus,
         loading,
         isDemo,
         isPasswordRecovery,

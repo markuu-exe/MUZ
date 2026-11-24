@@ -178,7 +178,7 @@ describe('zero-heart rule still applies to developers (D1)', () => {
     const dashboard = readFileSync(fileURLToPath(new URL('../../../components/dashboard/DashboardScreen.tsx', import.meta.url)), 'utf8');
     const select = dashboard.slice(dashboard.indexOf('const handleSelect'));
     expect(select.indexOf('canOpenLesson(')).toBeGreaterThan(-1);
-    expect(select.indexOf("hearts === 0 && lesson.kind === 'practice'")).toBeGreaterThan(select.indexOf('canOpenLesson('));
+    expect(select.indexOf('lessonNeedsHearts(lesson.payload)')).toBeGreaterThan(select.indexOf('canOpenLesson('));
   });
 });
 

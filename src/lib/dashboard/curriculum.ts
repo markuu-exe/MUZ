@@ -144,6 +144,31 @@ export function nodeStatus(
   return 'locked';
 }
 
+export function blockingLesson(
+  lesson: CurriculumNode,
+  catalog: CurriculumNode[],
+  progress: ProgressMap,
+): CurriculumNode | null {
+  const moduleLessons = catalog
+    .filter((item) => item.module_index === lesson.module_index)
+    .sort((a, b) => a.node_index - b.node_index);
+  const indexInModule = moduleLessons.findIndex((item) => item.id === lesson.id);
+  if (indexInModule > 0) {
+    const previousNode = moduleLessons[indexInModule - 1];
+    if (!progress[previousNode.id]?.completed) return previousNode;
+  }
+
+  if (lesson.module_index > 1) {
+    const previousModule = catalog
+      .filter((item) => item.module_index === lesson.module_index - 1)
+      .sort((a, b) => a.node_index - b.node_index);
+    const incomplete = previousModule.find((item) => !progress[item.id]?.completed);
+    if (incomplete) return incomplete;
+  }
+
+  return null;
+}
+
 export function groupByModule(lessons: CurriculumNode[]): Array<{ moduleIndex: number; lessons: CurriculumNode[] }> {
   const map = new Map<number, CurriculumNode[]>();
   for (const lesson of lessons) {

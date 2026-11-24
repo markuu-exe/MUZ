@@ -50,9 +50,10 @@ export function mediaProblems(state: RigState, needMic: boolean): MediaProblem[]
 interface MediaDiagnosticsProps {
   problems: MediaProblem[];
   onRetry: () => void;
+  needsMic?: boolean;
 }
 
-export default function MediaDiagnostics({ problems, onRetry }: MediaDiagnosticsProps) {
+export default function MediaDiagnostics({ problems, onRetry, needsMic = true }: MediaDiagnosticsProps) {
   const canRetry = problems.some((p) => p.code !== 'UNSUPPORTED' && p.code !== 'INSECURE_CONTEXT');
   return (
     <div role="alert" className="muz-rise space-y-4 rounded-2xl border border-rose-500/40 bg-rose-950/40 p-6">
@@ -72,7 +73,10 @@ export default function MediaDiagnostics({ problems, onRetry }: MediaDiagnostics
         ))}
       </ul>
       <p className="text-sm text-slate-400">
-        Practice exercises need both. Your video and sound are checked on this computer only and are never recorded or uploaded.
+        {needsMic
+          ? 'Practice exercises need both.'
+          : 'This exercise needs the camera.'}{' '}
+        Your video and sound are checked on this computer only and are never recorded or uploaded.
         You can leave the lesson with ✕; theory and rhythm lessons work without a camera or microphone.
       </p>
       {canRetry && (
