@@ -5,21 +5,17 @@ import {
   GitBranch,
   Heart,
   LogOut,
-  Music2,
   Piano,
   Settings,
   UserRound,
   Play,
   RotateCcw,
   Sparkles,
-  ShieldAlert,
   CheckCircle2,
   Sliders,
   Volume2,
   Camera,
   Layers,
-  ChevronRight,
-  Flame,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useDashboardData } from '../../hooks/useDashboardData';
@@ -75,7 +71,9 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export default function DashboardScreen() {
-  const { user, profile, isDemo, signOut, refreshProfile } = useAuth();
+  const { user, profile, profileStatus, isDemo, signOut, refreshProfile } = useAuth();
+  const profileIsLoaded = profileStatus === 'loaded' && profile !== null;
+  const hudProfileStatus = profileStatus === 'loaded' && !profile ? 'failed' : profileStatus;
   // AUX-TEST-ACCESS-01: developer accounts may open locked lessons (access only, never progress).
   const isDev = isDevAccount(profile, isDemo);
   const data = useDashboardData(profile, isDemo);
@@ -97,6 +95,12 @@ export default function DashboardScreen() {
   const [unlockedAchievements, setUnlockedAchievements] = useState<UnlockedAchievementsMap>(() =>
     readClientAchievements(achievementUserId),
   );
+
+  useEffect(() => {
+    if (profileStatus === 'not_found' && user?.id) {
+      console.error('Profile not found for user', user.id);
+    }
+  }, [profileStatus, user?.id]);
 
   useEffect(() => {
     setUnlockedAchievements(readClientAchievements(achievementUserId));
@@ -322,7 +326,7 @@ export default function DashboardScreen() {
       return;
     }
 
-    if (hearts === 0 && isLessonPayload(lesson.payload) && lessonNeedsHearts(lesson.payload)) {
+    if (profileIsLoaded && hearts === 0 && isLessonPayload(lesson.payload) && lessonNeedsHearts(lesson.payload)) {
       setSelected(null);
       setSelectedStatus(null);
       setShakingId(lesson.id);
@@ -424,7 +428,7 @@ export default function DashboardScreen() {
               <div className="min-w-0">
                 <p className="truncate text-xs font-bold text-white">{username}</p>
                 <p className="truncate text-[10px] font-semibold text-violet-300">
-                  {progressMeta.label}
+                  {profileIsLoaded ? progressMeta.label : 'Profile unavailable'}
                 </p>
               </div>
             </div>
@@ -485,7 +489,8 @@ export default function DashboardScreen() {
             streak={streak}
             exp={exp}
             nextHeartLabel={regen.label}
-            loading={!profile}
+            profileStatus={hudProfileStatus}
+            onRetry={() => void refreshProfile()}
           />
         </header>
 
@@ -518,7 +523,7 @@ export default function DashboardScreen() {
         )}
 
         {/* Depleted Stamina Notification Bar */}
-        {hearts === 0 && !banner && (
+        {profileIsLoaded && hearts === 0 && !banner && (
           <div className="flex items-center justify-between border-b border-rose-500/30 bg-rose-500/15 px-8 py-2.5 text-xs text-rose-100">
             <div className="flex items-center gap-2 font-medium">
               <Heart className="h-4 w-4 fill-rose-500 text-rose-500" />
@@ -541,6 +546,7 @@ export default function DashboardScreen() {
               progress={data.progress}
               exp={exp}
               hearts={hearts}
+              profileLoaded={profileIsLoaded}
               shakingId={shakingId}
               selectedId={selected?.id ?? null}
               onSelect={handleSelect}

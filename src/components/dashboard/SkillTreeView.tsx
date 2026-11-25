@@ -15,6 +15,7 @@ interface SkillTreeViewProps {
   progress: Record<string, UserProgress | Pick<UserProgress, 'lesson_id' | 'completed'>>;
   exp: number;
   hearts: number;
+  profileLoaded: boolean;
   shakingId: string | null;
   selectedId: string | null;
   onSelect: (lesson: CurriculumNode, status: ReturnType<typeof nodeStatus>) => void;
@@ -49,6 +50,7 @@ export default function SkillTreeView({
   progress,
   exp,
   hearts,
+  profileLoaded,
   shakingId,
   selectedId,
   onSelect,
@@ -117,6 +119,7 @@ export default function SkillTreeView({
                 const isConnectorCurrent = status === 'current' || nextStatus === 'current';
 
                 const drillsDisabled =
+                  profileLoaded &&
                   hearts === 0 &&
                   isLessonPayload(lesson.payload) &&
                   lessonNeedsHearts(lesson.payload) &&
