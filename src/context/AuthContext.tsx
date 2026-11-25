@@ -13,6 +13,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const DEMO_USER_KEY = 'muz_demo_session_active';
 const DEMO_ROLE_KEY = 'muz_demo_session_role';
+const RECOVERY_KEY = 'muz_password_recovery';
 
 const getMetadataUsername = (user: User): string | undefined => {
   const username = user.user_metadata?.username || user.user_metadata?.full_name || user.user_metadata?.name;
@@ -79,7 +80,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileStatus, setProfileStatus] = useState<ProfileStatus>('loading');
   const [loading, setLoading] = useState(true);
-  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState<boolean>(() => {
+    const fromHash = typeof window !== 'undefined' && window.location.hash.includes('type=recovery');
+    if (fromHash) {
+      sessionStorage.setItem(RECOVERY_KEY, 'true');
+      return true;
+    }
+    return sessionStorage.getItem(RECOVERY_KEY) === 'true';
+  });
   const [isDemo, setIsDemo] = useState<boolean>(() => {
     return sessionStorage.getItem(DEMO_USER_KEY) === 'true';
   });
@@ -196,6 +204,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!mounted) return;
 
       if (event === 'PASSWORD_RECOVERY') {
+        sessionStorage.setItem(RECOVERY_KEY, 'true');
         setIsPasswordRecovery(true);
       }
 
@@ -373,6 +382,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password: newPassword,
       });
       if (!error) {
+        sessionStorage.removeItem(RECOVERY_KEY);
         setIsPasswordRecovery(false);
       }
       return { error };
@@ -382,6 +392,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    sessionStorage.removeItem(RECOVERY_KEY);
     setIsPasswordRecovery(false);
     profileReqIdRef.current += 1;
     if (isDemo) {

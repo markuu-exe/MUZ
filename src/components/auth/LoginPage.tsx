@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-type AuthMode = 'signin' | 'signup' | 'forgot';
+type AuthMode = 'signin' | 'signup' | 'forgot' | 'recovery';
 
 interface LoginPageProps {
   onSuccess?: () => void;
@@ -29,13 +29,18 @@ const BLACK_KEY_OFFSETS = [0, 1, 3, 4, 5, 7, 8, 10, 11, 12, 14, 15, 17, 18, 19];
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
   const {
+    isPasswordRecovery,
     signInWithEmail,
     signUpWithEmail,
+    signInWithOAuth,
+    resendVerificationEmail,
     resetPasswordForEmail,
+    updatePassword,
     enterDemoMode,
   } = useAuth();
 
-  const [mode, setMode] = useState<AuthMode>('signin');
+  const [mode, setMode] = useState<AuthMode>(() => (isPasswordRecovery ? 'recovery' : 'signin'));
+  const activeMode: AuthMode = isPasswordRecovery ? 'recovery' : mode;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -43,12 +48,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
   const [showPassword, setShowPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
+  const [resendingVerification, setResendingVerification] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const handleModeChange = (newMode: AuthMode) => {
     setErrorMessage(null);
     setSuccessMessage(null);
+    setUnverifiedEmail(false);
     setMode(newMode);
   };
 
@@ -56,6 +64,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
     e.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
+    setUnverifiedEmail(false);
 
     if (!email.trim() || !password) {
       setErrorMessage('Please enter both your email and password.');
@@ -67,8 +76,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
     setLoading(false);
 
     if (error) {
+      const msg = error.message.toLowerCase();
+      if (msg.includes('email not confirmed') || msg.includes('not confirmed')) {
+        setUnverifiedEmail(true);
+      }
       setErrorMessage(
-        error.message.toLowerCase().includes('invalid login credentials')
+        msg.includes('invalid login credentials')
           ? 'Invalid email or password.'
           : error.message
       );
@@ -129,6 +142,61 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
       setErrorMessage(error.message);
     } else {
       setSuccessMessage('Password reset link sent to your email.');
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    if (password.length < 6) {
+      setErrorMessage('Password must be at least 6 characters.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setErrorMessage('Passwords do not match.');
+      return;
+    }
+
+    setLoading(true);
+    const { error } = await updatePassword(password);
+    setLoading(false);
+
+    if (error) {
+      setErrorMessage(error.message);
+    } else {
+      setPassword('');
+      setConfirmPassword('');
+      setSuccessMessage('Password updated.');
+      if (onSuccess) onSuccess();
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setUnverifiedEmail(false);
+    setLoading(true);
+    const { error } = await signInWithOAuth('google');
+    setLoading(false);
+    if (error) {
+      setErrorMessage(error.message);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!email.trim()) return;
+    setResendingVerification(true);
+    const { error } = await resendVerificationEmail(email.trim());
+    setResendingVerification(false);
+    if (error) {
+      setErrorMessage(error.message);
+    } else {
+      setUnverifiedEmail(false);
+      setErrorMessage(null);
+      setSuccessMessage('Verification email resent! Please check your inbox.');
     }
   };
 
@@ -425,27 +493,29 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
             </span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">
-            {mode === 'signin' && 'Welcome back'}
-            {mode === 'signup' && 'Create an account'}
-            {mode === 'forgot' && 'Reset password'}
+            {activeMode === 'signin' && 'Welcome back'}
+            {activeMode === 'signup' && 'Create an account'}
+            {activeMode === 'forgot' && 'Reset password'}
+            {activeMode === 'recovery' && 'Set new password'}
           </h1>
           <p className="mt-1 text-xs text-muz-muted">
-            {mode === 'signin' && 'Sign in to continue to MUZ Studio'}
-            {mode === 'signup' && 'Start your piano practice journey today'}
-            {mode === 'forgot' && "We'll send a recovery link to your inbox"}
+            {activeMode === 'signin' && 'Sign in to continue to MUZ Studio'}
+            {activeMode === 'signup' && 'Start your piano practice journey today'}
+            {activeMode === 'forgot' && "We'll send a recovery link to your inbox"}
+            {activeMode === 'recovery' && 'Choose a new password for your account'}
           </p>
         </div>
 
         {/* Auth Card */}
         <div className="rounded-3xl border border-slate-800/90 bg-muz-panel/90 p-6 shadow-2xl backdrop-blur-xl">
           {/* Segmented Switcher */}
-          {mode !== 'forgot' && (
+          {(activeMode === 'signin' || activeMode === 'signup') && (
             <div className="mb-5 grid grid-cols-2 rounded-xl bg-slate-950/80 p-1 border border-slate-800/80">
               <button
                 type="button"
                 onClick={() => handleModeChange('signin')}
                 className={`rounded-lg py-2 text-xs font-semibold transition-all ${
-                  mode === 'signin'
+                  activeMode === 'signin'
                     ? 'bg-muz-accent text-slate-950 shadow-sm'
                     : 'text-muz-muted hover:text-white'
                 }`}
@@ -456,7 +526,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                 type="button"
                 onClick={() => handleModeChange('signup')}
                 className={`rounded-lg py-2 text-xs font-semibold transition-all ${
-                  mode === 'signup'
+                  activeMode === 'signup'
                     ? 'bg-muz-accent text-slate-950 shadow-sm'
                     : 'text-muz-muted hover:text-white'
                 }`}
@@ -468,29 +538,43 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
 
           {/* Feedback Alert */}
           {errorMessage && (
-            <div className="mb-4 flex items-center gap-2 rounded-xl border border-muz-danger/30 bg-muz-danger/10 px-3 py-2 text-xs text-muz-danger">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              <span className="truncate">{errorMessage}</span>
+            <div className="mb-4 rounded-xl border border-muz-danger/30 bg-muz-danger/10 px-3 py-2 text-xs text-muz-danger">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span className="break-words">{errorMessage}</span>
+              </div>
+              {unverifiedEmail && email.trim() && (
+                <button
+                  type="button"
+                  onClick={handleResendVerification}
+                  disabled={resendingVerification}
+                  className="mt-2 ml-6 inline-flex items-center gap-1.5 font-semibold text-muz-accent hover:underline disabled:opacity-50"
+                >
+                  {resendingVerification && <Loader2 className="h-3 w-3 animate-spin" />}
+                  <span>Resend verification email</span>
+                </button>
+              )}
             </div>
           )}
 
           {successMessage && (
-            <div className="mb-4 flex items-center gap-2 rounded-xl border border-muz-accent/30 bg-muz-accent/10 px-3 py-2 text-xs text-muz-accent">
-              <CheckCircle2 className="h-4 w-4 shrink-0" />
-              <span className="truncate">{successMessage}</span>
+            <div className="mb-4 flex items-start gap-2 rounded-xl border border-muz-accent/30 bg-muz-accent/10 px-3 py-2 text-xs text-muz-accent">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+              <span className="break-words">{successMessage}</span>
             </div>
           )}
 
           {/* Sign In Form (2 input rows + button) */}
-          {mode === 'signin' && (
+          {activeMode === 'signin' && (
             <form onSubmit={handleSignIn} className="space-y-3.5">
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-300">
+                <label htmlFor="signin-email" className="mb-1 block text-xs font-medium text-slate-300">
                   Email
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muz-muted" />
                   <input
+                    id="signin-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -504,7 +588,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
 
               <div>
                 <div className="mb-1 flex items-center justify-between">
-                  <label className="text-xs font-medium text-slate-300">Password</label>
+                  <label htmlFor="signin-password" className="text-xs font-medium text-slate-300">Password</label>
                   <button
                     type="button"
                     onClick={() => handleModeChange('forgot')}
@@ -516,6 +600,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muz-muted" />
                   <input
+                    id="signin-password"
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -527,6 +612,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muz-muted hover:text-white"
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -552,16 +638,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
           )}
 
           {/* Sign Up Form (2x2 grid = exact same 2 input rows + button height as Sign In) */}
-          {mode === 'signup' && (
+          {activeMode === 'signup' && (
             <form onSubmit={handleSignUp} className="space-y-3.5">
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-300">
+                  <label htmlFor="signup-username" className="mb-1 block text-xs font-medium text-slate-300">
                     Username
                   </label>
                   <div className="relative">
                     <UserIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muz-muted" />
                     <input
+                      id="signup-username"
                       type="text"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
@@ -573,12 +660,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-300">
+                  <label htmlFor="signup-email" className="mb-1 block text-xs font-medium text-slate-300">
                     Email
                   </label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muz-muted" />
                     <input
+                      id="signup-email"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -593,12 +681,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
 
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-300">
+                  <label htmlFor="signup-password" className="mb-1 block text-xs font-medium text-slate-300">
                     Password
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muz-muted" />
                     <input
+                      id="signup-password"
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -610,6 +699,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muz-muted hover:text-white"
                     >
                       {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
@@ -618,12 +708,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-300">
+                  <label htmlFor="signup-confirm-password" className="mb-1 block text-xs font-medium text-slate-300">
                     Confirm
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muz-muted" />
                     <input
+                      id="signup-confirm-password"
                       type={showPassword ? 'text' : 'password'}
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
@@ -654,20 +745,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
           )}
 
           {/* Forgot Password Form */}
-          {mode === 'forgot' && (
+          {activeMode === 'forgot' && (
             <form onSubmit={handleForgotPassword} className="space-y-3.5">
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-300">
+                <label htmlFor="forgot-email" className="mb-1 block text-xs font-medium text-slate-300">
                   Email Address
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muz-muted" />
                   <input
+                    id="forgot-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
                     required
+                    autoComplete="email"
                     className="h-10 w-full rounded-xl border border-slate-700/80 bg-slate-900/80 pl-10 pr-3.5 text-sm text-white placeholder-slate-500 transition-colors focus:border-muz-accent focus:outline-none"
                   />
                 </div>
@@ -696,24 +789,115 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
             </form>
           )}
 
-          {/* Divider & Guest Button */}
-          <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-800" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="bg-muz-panel px-2.5 text-muz-muted">or</span>
-            </div>
-          </div>
+          {/* Password Recovery Form */}
+          {activeMode === 'recovery' && (
+            <form onSubmit={handleUpdatePassword} className="space-y-3.5">
+              <div>
+                <label htmlFor="recovery-password" className="mb-1 block text-xs font-medium text-slate-300">
+                  New Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muz-muted" />
+                  <input
+                    id="recovery-password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="6+ chars"
+                    required
+                    minLength={6}
+                    autoComplete="new-password"
+                    className="h-10 w-full rounded-xl border border-slate-700/80 bg-slate-900/80 pl-10 pr-10 text-sm text-white placeholder-slate-500 transition-colors focus:border-muz-accent focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muz-muted hover:text-white"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
 
-          <button
-            type="button"
-            onClick={handleDemoSignIn}
-            className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/60 text-xs font-medium text-slate-200 transition hover:border-muz-accent/50 hover:bg-slate-800/80 hover:text-white"
-          >
-            <span>Continue as Guest</span>
-            <ArrowRight className="h-3.5 w-3.5 text-muz-accent" />
-          </button>
+              <div>
+                <label htmlFor="recovery-confirm-password" className="mb-1 block text-xs font-medium text-slate-300">
+                  Confirm Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muz-muted" />
+                  <input
+                    id="recovery-confirm-password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Repeat password"
+                    required
+                    minLength={6}
+                    autoComplete="new-password"
+                    className="h-10 w-full rounded-xl border border-slate-700/80 bg-slate-900/80 pl-10 pr-3.5 text-sm text-white placeholder-slate-500 transition-colors focus:border-muz-accent focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-muz-accent to-muz-accentStrong text-sm font-semibold text-slate-950 shadow-glow transition hover:opacity-95 disabled:opacity-50"
+              >
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <span>Update Password</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
+              </button>
+            </form>
+          )}
+
+          {/* Divider, Google OAuth & Guest Button */}
+          {activeMode !== 'recovery' && (
+            <>
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-800" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-muz-panel px-2.5 text-muz-muted">or</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {(activeMode === 'signin' || activeMode === 'signup') && (
+                  <button
+                    type="button"
+                    onClick={handleGoogleSignIn}
+                    disabled={loading}
+                    className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/80 text-xs font-medium text-slate-100 transition hover:border-slate-500 hover:bg-slate-800 disabled:opacity-50"
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        fill="#EA4335"
+                        d="M12 10.2v3.9h5.5c-.2 1.2-1.4 3.6-5.5 3.6-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.7 3.1 14.6 2.2 12 2.2 6.6 2.2 2.2 6.6 2.2 12s4.4 9.8 9.8 9.8c5.7 0 9.4-4 9.4-9.6 0-.6-.1-1.1-.2-1.6H12z"
+                      />
+                    </svg>
+                    <span>Continue with Google</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleDemoSignIn}
+                  className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/60 text-xs font-medium text-slate-200 transition hover:border-muz-accent/50 hover:bg-slate-800/80 hover:text-white"
+                >
+                  <span>Continue as Guest</span>
+                  <ArrowRight className="h-3.5 w-3.5 text-muz-accent" />
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
