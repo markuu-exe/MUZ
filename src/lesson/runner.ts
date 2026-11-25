@@ -30,6 +30,8 @@ export interface QueueItem {
 
 export interface LessonRunState {
   lessonId: string;
+  /** T-13: one id per attempt. "Retry" creates a new run, so it gets a new id. */
+  runId: string; // T-13
   payload: LessonPayload;
   queue: QueueItem[];
   cursor: number;
@@ -48,13 +50,20 @@ export function lessonNeedsHearts(payload: LessonPayload): boolean {
   return payload.stages.some((stage) => stage.exercises.some(needsHearts));
 }
 
-export function createLessonRun(lessonId: string, payload: LessonPayload, hearts: number, nowMs: number): LessonRunState {
+export function createLessonRun(
+  lessonId: string,
+  payload: LessonPayload,
+  hearts: number,
+  nowMs: number,
+  runId: string = crypto.randomUUID(), // T-13
+): LessonRunState {
   const queue: QueueItem[] = payload.stages.flatMap((stage, stageIndex) =>
     stage.exercises.map((exercise) => ({ exercise, stage: stage.kind, stageIndex, attempt: 1 })),
   );
   const h = Math.max(0, Math.min(MAX_HEARTS, Math.floor(hearts)));
   const state: LessonRunState = {
     lessonId,
+    runId, // T-13
     payload,
     queue,
     cursor: 0,
@@ -176,6 +185,7 @@ export function buildLessonResult(state: LessonRunState): LessonResult {
   const passed = status === 'passed';
 
   return {
+    runId: state.runId, // T-13: copied from the state, never generated here (a quit calls this twice)
     lessonId: state.lessonId,
     status,
     passed,
