@@ -118,6 +118,8 @@ export interface Database {
           rhythm_consistency: number;
           posture_score: number;
           drill_duration_sec: number;
+          /** T-13: attempt id (migration 20261125120000). Optional so databases without the column still type-check. */
+          run_id?: string | null;
         };
         Insert: {
           id?: string;
@@ -128,6 +130,7 @@ export interface Database {
           rhythm_consistency: number;
           posture_score: number;
           drill_duration_sec: number;
+          run_id?: string | null;
         };
         Update: Partial<Database['public']['Tables']['performance_records']['Row']>;
         Relationships: [];
