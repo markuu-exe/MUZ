@@ -134,6 +134,19 @@ textarea {
 .animate-edge-glow { animation: edge-glow-pulse 8s ease-in-out infinite; }
 .animate-edge-glow-delayed { animation: edge-glow-pulse 10s ease-in-out infinite 4s; }
 
+@keyframes scroll-ltr {
+  0% {
+    transform: translate3d(-50%, 0, 0);
+  }
+  100% {
+    transform: translate3d(0%, 0, 0);
+  }
+}
+
+.animate-scroll-ltr-fast { animation: scroll-ltr 22s linear infinite; }
+.animate-scroll-ltr-medium { animation: scroll-ltr 30s linear infinite; }
+.animate-scroll-ltr-slow { animation: scroll-ltr 40s linear infinite; }
+
 /* Interactive Gamification Animations */
 @keyframes node-shake {
   0%, 100% { transform: translateX(0); }
