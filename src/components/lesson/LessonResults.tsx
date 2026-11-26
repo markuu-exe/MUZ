@@ -1,3 +1,6 @@
+import { useEffect, useState } from 'react';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
+import { playSfx } from '../../lib/sfx';
 import { OFFLINE_NOTE } from '../../lib/sync/syncLoop';
 import { Heart, RotateCcw, Sparkles, Target, Timer } from 'lucide-react';
 import type { LessonResult } from '../../lesson/types';
@@ -46,8 +49,55 @@ function formatDuration(sec: number): string {
   return m > 0 ? `${m}m ${String(s).padStart(2, '0')}s` : `${s}s`;
 }
 
+/** Star burst around the result badge on a pass (12 dots on a ring, staggered). */
+const BURST = Array.from({ length: 12 }, (_, i) => {
+  const a = (i / 12) * Math.PI * 2;
+  const r = 56 + (i % 3) * 10;
+  return {
+    dx: Math.round(Math.cos(a) * r),
+    dy: Math.round(Math.sin(a) * r),
+    delay: (i % 4) * 40,
+    color: ['#34d399', '#a78bfa', '#fbbf24', '#f472b6'][i % 4],
+  };
+});
+
+/** Counts the first number in `text` up from 0 (e.g. "+20", "85%"), keeping the rest. */
+function CountUp({ text, animate }: { text: string; animate: boolean }) {
+  const match = /^(\D*)(\d+)(.*)$/.exec(text);
+  const target = match ? Number(match[2]) : 0;
+  const [shown, setShown] = useState(animate && match ? 0 : target);
+  useEffect(() => {
+    if (!animate || !match) {
+      setShown(target);
+      return;
+    }
+    let raf = 0;
+    const start = performance.now();
+    const step = (now: number) => {
+      const p = Math.min(1, (now - start) / 700);
+      setShown(Math.round(target * (1 - (1 - p) ** 3)));
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [animate, target]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!match) return <>{text}</>;
+  return (
+    <>
+      {match[1]}
+      {shown}
+      {match[3]}
+    </>
+  );
+}
+
 export default function LessonResults({ title, result, note, onRetry, onClose, testRun = false }: LessonResultsProps) {
   const head = resultSummary(result, { testRun });
+  const reduced = useReducedMotion();
+  // One chime when the results appear (the lesson, and any microphone, has finished).
+  useEffect(() => {
+    if (result.passed) playSfx('complete');
+  }, [result.passed]);
   const used = (engine: 'rhythm' | 'practice') => result.records.some((r) => r.engine === engine);
   const stats: Array<{ label: string; value: string; icon: typeof Target; tone: string }> = [
     { label: 'First-try accuracy', value: `${Math.round(result.accuracy)}%`, icon: Target, tone: 'text-cyan-300' },
@@ -60,13 +110,24 @@ export default function LessonResults({ title, result, note, onRetry, onClose, t
     <div className="muz-rise mx-auto w-full max-w-xl space-y-6 text-center">
       <div
         className={cn(
-          'mx-auto flex h-20 w-20 items-center justify-center rounded-full border text-4xl',
+          'relative mx-auto flex h-20 w-20 items-center justify-center rounded-full border text-4xl',
           result.passed
             ? 'border-emerald-400/60 bg-emerald-500/15 shadow-[0_0_40px_rgba(52,211,153,0.45)]'
             : 'border-rose-400/60 bg-rose-500/15 shadow-[0_0_40px_rgba(244,63,94,0.35)]',
         )}
       >
         {result.passed ? '★' : result.status === 'out-of-hearts' ? '♡' : '↻'}
+        {result.passed && !reduced && (
+          <span className="pointer-events-none absolute inset-0" aria-hidden="true">
+            {BURST.map((b, i) => (
+              <span
+                key={i}
+                className="muz-burst absolute left-1/2 top-1/2 h-2 w-2 rounded-full"
+                style={{ background: b.color, ['--dx' as string]: `${b.dx}px`, ['--dy' as string]: `${b.dy}px`, animationDelay: `${b.delay}ms` }}
+              />
+            ))}
+          </span>
+        )}
       </div>
       <div>
         <p className="text-xs font-bold uppercase tracking-widest text-violet-300">{title}</p>
@@ -89,7 +150,9 @@ export default function LessonResults({ title, result, note, onRetry, onClose, t
               <Icon className={cn('h-3.5 w-3.5', tone)} />
               {label}
             </div>
-            <p className={cn('mt-1 text-2xl font-bold', tone)}>{value}</p>
+            <p className={cn('mt-1 text-2xl font-bold tabular-nums', tone)}>
+              <CountUp text={value} animate={!reduced} />
+            </p>
           </div>
         ))}
       </div>
