@@ -69,7 +69,7 @@ import { createMemorySyncQueue, isNetworkError, openSyncQueue, type SyncQueue } 
 import { OFFLINE_NOTE, queueForUser, startQueueSync } from '../../lib/sync/syncLoop';
 import { PLACEMENT_METADATA_KEY } from '../../lib/progress/placement';
 import { displayedStreak, toLocalDate } from '../../lib/progress/streak';
-import { persistRegeneratedHearts, savePlacement, supabaseDevTestStore, supabaseProgressStore } from '../../lib/progress/supabaseStore';
+import { persistHeartAnchor, persistRegeneratedHearts, savePlacement, supabaseDevTestStore, supabaseProgressStore } from '../../lib/progress/supabaseStore';
 import { lessonNeedsHearts } from '../../lesson/runner';
 import { blockingLesson } from '../../lib/dashboard/curriculum';
 
@@ -183,11 +183,19 @@ export default function DashboardScreen() {
   const look: ProfileLook = isDemo ? demoLook : readLook(user?.user_metadata);
   const progressMeta = expProgress(exp);
   const regen = useHeartRegen(profile?.id ?? user?.id, hearts, {
+    dbAnchorIso: isDemo || !profile ? undefined : profile.last_heart_update,
+    onSyncAnchor:
+      isDemo || !profile
+        ? undefined
+        : async (anchorIso, expectedHearts) => {
+            const updated = await persistHeartAnchor(supabase, profile.id, expectedHearts, anchorIso);
+            if (updated) await refreshProfile();
+          },
     onRegenerate:
       isDemo || !profile
         ? undefined
-        : async (to, from) => {
-            const written = await persistRegeneratedHearts(supabase, profile.id, from, to);
+        : async (to, from, nextAnchorIso) => {
+            const written = await persistRegeneratedHearts(supabase, profile.id, from, to, nextAnchorIso);
             await refreshProfile();
             return written;
           },
@@ -551,7 +559,7 @@ export default function DashboardScreen() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-muz-bg">
         {isDemo && <DemoBanner onExit={() => void signOut()} />}
         {/* TOP GAMIFICATION HEADER */}
-        <header className="flex h-20 shrink-0 items-center justify-between border-b border-slate-800/90 bg-muz-sidebar/90 px-8 backdrop-blur-md">
+        <header className="flex min-h-20 shrink-0 flex-wrap items-center justify-between gap-4 border-b border-slate-800/90 bg-muz-sidebar/90 px-8 py-3 backdrop-blur-md">
           <div className="flex items-center gap-4">
             <div>
               <div className="flex items-center gap-2">

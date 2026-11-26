@@ -27,3 +27,29 @@ export function msUntilNextHeart(state: RegenState, nowMs: number, periodMs = HE
   if (state.anchorMs === null) return periodMs;
   return Math.min(periodMs, Math.max(0, periodMs - (nowMs - state.anchorMs)));
 }
+
+/** Parse an ISO timestamp from `profiles.last_heart_update` into epoch ms, or null if absent/invalid. */
+export function parseHeartAnchor(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/**
+ * Compute the next `profiles.last_heart_update` value after a heart write:
+ *  - full hearts clear the timer (`null`);
+ *  - below full keeps an active timer from `prevAnchorIso` if `prevHearts < MAX_HEARTS`;
+ *  - otherwise starts a new timer at `nowIso`.
+ */
+export function nextHeartUpdateTimestamp(
+  prevHearts: number,
+  nextHearts: number,
+  prevAnchorIso: string | null | undefined,
+  nowIso: string,
+): string | null {
+  if (nextHearts >= MAX_HEARTS) return null;
+  if (prevHearts < MAX_HEARTS && parseHeartAnchor(prevAnchorIso) !== null) {
+    return prevAnchorIso as string;
+  }
+  return nowIso;
+}

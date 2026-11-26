@@ -3,8 +3,10 @@
  * applyResult / placement / heartRegen and are tested there.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { MAX_HEARTS } from '../../lesson/runner';
 import type { Database } from '../../types/database.types';
 import type { PerformanceRow, ProfileSnapshot, ProgressSnapshot } from './applyResult';
+import { nextHeartUpdateTimestamp } from './heartRegen';
 import { PLACEMENT_METADATA_KEY, placementPlan } from './placement';
 import type { DevTestRow, DevTestStore } from './devTestResults';
 import type { ProgressStore } from './saveLessonResult';
@@ -20,16 +22,40 @@ export function isMissingRunIdColumn(error: { code?: string; message?: string })
   return (error.code === 'PGRST204' || error.code === '42703') && /run_id/.test(error.message ?? '');
 }
 
+/** PostgREST / Postgres errors meaning "profiles has no last_heart_update column". */
+export function isMissingLastHeartUpdateColumn(error: { code?: string; message?: string }): boolean {
+  return (error.code === 'PGRST204' || error.code === '42703') && /last_heart_update/.test(error.message ?? '');
+}
+
 export function supabaseProgressStore(client: Client): ProgressStore {
+  const heartAnchors = new Map<string, { hearts: number; lastHeartUpdate: string | null }>();
+
   return {
     async getProfile(userId) {
-      const { data, error } = await client
+      let { data, error } = await client
         .from('profiles')
-        .select('exp, hearts, current_streak, last_activity_date')
+        .select('exp, hearts, current_streak, last_activity_date, last_heart_update')
         .eq('id', userId)
         .maybeSingle();
+      if (error && isMissingLastHeartUpdateColumn(error)) {
+        ({ data, error } = await client
+          .from('profiles')
+          .select('exp, hearts, current_streak, last_activity_date')
+          .eq('id', userId)
+          .maybeSingle());
+      }
       check(error, 'Could not read your profile');
-      return data;
+      if (!data) return null;
+      heartAnchors.set(userId, {
+        hearts: data.hearts,
+        lastHeartUpdate: (data as { last_heart_update?: string | null }).last_heart_update ?? null,
+      });
+      return {
+        exp: data.exp,
+        hearts: data.hearts,
+        current_streak: data.current_streak,
+        last_activity_date: data.last_activity_date,
+      };
     },
     async getProgress(userId, lessonId) {
       const { data, error } = await client
@@ -96,43 +122,121 @@ export function supabaseProgressStore(client: Client): ProgressStore {
       }
     },
     async updateProfile(userId, patch: ProfileSnapshot) {
-      const { error } = await client.from('profiles').update(patch).eq('id', userId);
+      const prev = heartAnchors.get(userId) ?? { hearts: MAX_HEARTS, lastHeartUpdate: null };
+      const lastHeartUpdate = nextHeartUpdateTimestamp(
+        prev.hearts,
+        patch.hearts,
+        prev.lastHeartUpdate,
+        new Date().toISOString(),
+      );
+      let { error } = await client
+        .from('profiles')
+        .update({ ...patch, last_heart_update: lastHeartUpdate })
+        .eq('id', userId);
+      if (error && isMissingLastHeartUpdateColumn(error)) {
+        ({ error } = await client.from('profiles').update(patch).eq('id', userId));
+      }
       check(error, 'Could not update your profile');
+      heartAnchors.set(userId, { hearts: patch.hearts, lastHeartUpdate });
     },
   };
 }
 
 /** D1: storage for developer test runs. Writes dev_test_results and profiles.hearts only. */
 export function supabaseDevTestStore(client: Client): DevTestStore {
+  const heartAnchors = new Map<string, { hearts: number; lastHeartUpdate: string | null }>();
+
   return {
     async getHearts(userId) {
-      const { data, error } = await client.from('profiles').select('hearts').eq('id', userId).maybeSingle();
+      let { data, error } = await client
+        .from('profiles')
+        .select('hearts, last_heart_update')
+        .eq('id', userId)
+        .maybeSingle();
+      if (error && isMissingLastHeartUpdateColumn(error)) {
+        ({ data, error } = await client.from('profiles').select('hearts').eq('id', userId).maybeSingle());
+      }
       check(error, 'Could not read your profile');
-      return data?.hearts ?? null;
+      if (!data) return null;
+      heartAnchors.set(userId, {
+        hearts: data.hearts,
+        lastHeartUpdate: (data as { last_heart_update?: string | null }).last_heart_update ?? null,
+      });
+      return data.hearts;
     },
     async insertDevTestResult(userId, lessonId, row: DevTestRow) {
       const { error } = await client.from('dev_test_results').insert({ user_id: userId, lesson_id: lessonId, ...row });
       check(error, 'Could not save the developer test result');
     },
     async updateHearts(userId, hearts) {
-      const { error } = await client.from('profiles').update({ hearts }).eq('id', userId);
+      const prev = heartAnchors.get(userId) ?? { hearts: MAX_HEARTS, lastHeartUpdate: null };
+      const lastHeartUpdate = nextHeartUpdateTimestamp(
+        prev.hearts,
+        hearts,
+        prev.lastHeartUpdate,
+        new Date().toISOString(),
+      );
+      let { error } = await client
+        .from('profiles')
+        .update({ hearts, last_heart_update: lastHeartUpdate })
+        .eq('id', userId);
+      if (error && isMissingLastHeartUpdateColumn(error)) {
+        ({ error } = await client.from('profiles').update({ hearts }).eq('id', userId));
+      }
       check(error, 'Could not update your hearts');
+      heartAnchors.set(userId, { hearts, lastHeartUpdate });
     },
   };
 }
 
 /**
- * Write regenerated hearts only if the stored value is still `from`, so a lesson
- * saved at the same moment is never overwritten. Returns whether the row changed.
+ * Write regenerated hearts and the next `last_heart_update` anchor only if the stored
+ * value is still `from`, so a lesson saved at the same moment is never overwritten.
+ * Returns whether the row changed.
  */
-export async function persistRegeneratedHearts(client: Client, userId: string, from: number, to: number): Promise<boolean> {
-  const { data, error } = await client
+export async function persistRegeneratedHearts(
+  client: Client,
+  userId: string,
+  from: number,
+  to: number,
+  nextAnchorIso: string | null = to >= MAX_HEARTS ? null : new Date().toISOString(),
+): Promise<boolean> {
+  let { data, error } = await client
     .from('profiles')
-    .update({ hearts: to })
+    .update({ hearts: to, last_heart_update: nextAnchorIso })
     .eq('id', userId)
     .eq('hearts', from)
     .select('id');
+  if (error && isMissingLastHeartUpdateColumn(error)) {
+    ({ data, error } = await client
+      .from('profiles')
+      .update({ hearts: to })
+      .eq('id', userId)
+      .eq('hearts', from)
+      .select('id'));
+  }
   check(error, 'Could not restore hearts');
+  return (data?.length ?? 0) > 0;
+}
+
+/**
+ * Persist an initial `last_heart_update` anchor when hearts < 5 and DB has none yet,
+ * or clear a stale anchor when hearts === 5. Returns whether the row changed.
+ */
+export async function persistHeartAnchor(
+  client: Client,
+  userId: string,
+  expectedHearts: number,
+  anchorIso: string | null,
+): Promise<boolean> {
+  const query = client.from('profiles').update({ last_heart_update: anchorIso }).eq('id', userId).eq('hearts', expectedHearts);
+  const { data, error } = await (anchorIso === null
+    ? query.not('last_heart_update', 'is', null).select('id')
+    : query.is('last_heart_update', null).select('id'));
+  if (error && isMissingLastHeartUpdateColumn(error)) {
+    return false;
+  }
+  check(error, 'Could not sync heart timer');
   return (data?.length ?? 0) > 0;
 }
 
