@@ -51,6 +51,9 @@ import {
 } from '../../lib/progress/clientAchievements';
 import { canOpenLesson, isDevAccount, resultDestination, type ResultDestination } from '../../lib/progress/devAccess';
 import { saveRunResult } from '../../lib/progress/devTestResults';
+import { saveLessonResult } from '../../lib/progress/saveLessonResult';
+import { createMemorySyncQueue, isNetworkError, openSyncQueue, type SyncQueue } from '../../lib/sync/queue';
+import { OFFLINE_NOTE, queueForUser, startQueueSync } from '../../lib/sync/syncLoop';
 import { PLACEMENT_METADATA_KEY } from '../../lib/progress/placement';
 import { displayedStreak, toLocalDate } from '../../lib/progress/streak';
 import { persistRegeneratedHearts, savePlacement, supabaseDevTestStore, supabaseProgressStore } from '../../lib/progress/supabaseStore';
@@ -225,6 +228,45 @@ export default function DashboardScreen() {
     return out;
   };
 
+  // T-13 (SRS 3.3.2, SDD C-08): offline queue for lesson saves. IndexedDB when available, memory otherwise.
+  const syncQueueRef = useRef<SyncQueue | null>(null);
+  const afterSyncRef = useRef<() => void>(() => {});
+  afterSyncRef.current = () => {
+    void refreshProfile();
+    data.reload();
+    analytics.reload();
+  };
+  const syncUserId = !isDemo && profile ? profile.id : null;
+  useEffect(() => {
+    if (!syncUserId) {
+      syncQueueRef.current = null;
+      return;
+    }
+    let stop: (() => void) | null = null;
+    let cancelled = false;
+    void (async () => {
+      let base: SyncQueue;
+      try {
+        base = await openSyncQueue();
+      } catch {
+        base = createMemorySyncQueue();
+      }
+      if (cancelled) return;
+      const queue = queueForUser(base, syncUserId);
+      syncQueueRef.current = queue;
+      stop = startQueueSync({
+        queue,
+        save: (input) => saveLessonResult(supabaseProgressStore(supabase), input),
+        onSynced: () => afterSyncRef.current(),
+      });
+    })();
+    return () => {
+      cancelled = true;
+      stop?.();
+      syncQueueRef.current = null;
+    };
+  }, [syncUserId]);
+
   // COURSE-6: save each finished run; demo mode saves nothing.
   // D1: a lesson a developer opened while it was locked is saved as test data only.
   // Achievements are also evaluated client-side so unlocks & notifications work even before server lesson tables exist.
@@ -272,9 +314,23 @@ export default function DashboardScreen() {
       data.reload();
       analytics.reload();
       return feedback;
-    } catch {
+    } catch (err) {
       if (destination === 'dev-test') {
         return { note: 'Your result could not be saved.' };
+      }
+      // T-13 (SRS 3.3.2): offline, keep the run in the local queue and sync it when the connection returns.
+      if (isNetworkError(err) && syncQueueRef.current) {
+        try {
+          await syncQueueRef.current.enqueue({
+            userId: profile.id,
+            lesson: { passMark: payload.settings.passMark, expReward: lessonExp(payload) },
+            result,
+            now: new Date(),
+          });
+          return { note: OFFLINE_NOTE, expAwarded: 0 };
+        } catch {
+          // Could not even store it locally: fall through to the normal failure message.
+        }
       }
       const clientOut = evaluateClientSide(lesson, payload, result);
       const badgeNote =
