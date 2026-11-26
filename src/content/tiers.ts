@@ -7,6 +7,8 @@ export interface TierInfo {
   blurb: string;
   /** Units (module_index) that belong to this tier, inclusive. */
   units: [number, number];
+  /** Rhythm timing windows in ms (ruling R1, 2026-11-27). Virtuoso keeps SRS 3.1.4.3 (25 / 50). */
+  rhythm: { perfectMs: number; goodMs: number };
   defaults: LessonSettings;
 }
 
@@ -21,6 +23,7 @@ export const TIERS: Readonly<Record<Tier, TierInfo>> = Object.freeze({
     level: 'Beginner',
     blurb: 'Find your way around the keyboard, read the staff and play your first chords.',
     units: [1, 4],
+    rhythm: { perfectMs: 40, goodMs: 90 },
     defaults: {
       passMark: 0.7,
       timeoutSec: 15,
@@ -39,6 +42,7 @@ export const TIERS: Readonly<Record<Tier, TierInfo>> = Object.freeze({
     level: 'Intermediate',
     blurb: 'Richer rhythms, scales and keys, minor harmony and real progressions.',
     units: [5, 8],
+    rhythm: { perfectMs: 35, goodMs: 70 },
     defaults: {
       passMark: 0.8,
       timeoutSec: 15,
@@ -57,6 +61,7 @@ export const TIERS: Readonly<Record<Tier, TierInfo>> = Object.freeze({
     level: 'Advanced',
     blurb: 'Syncopation and speed, seventh chords, colour chords and performance runs.',
     units: [9, 12],
+    rhythm: { perfectMs: 25, goodMs: 50 },
     defaults: {
       passMark: 0.85,
       timeoutSec: 15, // SRS 3.1.2.4; ruling D5: 15 s in every tier

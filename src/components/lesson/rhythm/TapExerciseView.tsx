@@ -2,6 +2,10 @@
  * COURSE-4: the rhythm game. One view serves tap-along, tap-echo and tap-read;
  * the only differences are in the plan (src/lib/rhythm/plan.ts) and the copy below.
  */
+import { hasTapCalibration } from '../../../lib/rhythm/calibration';
+import TapCalibration from './TapCalibration';
+import { meanSignedOffsetMs } from '../../../lib/rhythm/timing';
+import { TIERS } from '../../../content';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { exerciseBpm, getPattern } from '../../../content';
 import { useRhythmSession, type RhythmSessionResult } from '../../../hooks/useRhythmSession';
@@ -31,6 +35,9 @@ const COPY: Record<TapExerciseType, { title: string; how: string; showNotation: 
   },
 };
 
+/** Show the 'you tend to be early/late' hint from this average drift (ms). */
+const DRIFT_HINT_MS = 20;
+
 const RATING_STYLE = { Perfect: 'text-emerald-300', Good: 'text-amber-300', Miss: 'text-rose-300' } as const;
 
 export default function TapExerciseView({ exercise, payload, settings, onOutcome }: ExerciseViewProps<TapExercise>) {
@@ -48,11 +55,19 @@ export default function TapExerciseView({ exercise, payload, settings, onOutcome
   );
   const [done, setDone] = useState<(RhythmSessionResult & { score: RhythmScore }) | null>(null);
 
-  const session = useRhythmSession(plan, (result) => {
-    setDone({ ...result, score: scoreRhythm(result.summary, result.taps, plan.targets.length, settings.passMark) });
-  });
+  // Ruling R1: timing windows grow stricter with the tier (Virtuoso = SRS 25 / 50 ms).
+  const windows = TIERS[payload.tier].rhythm;
+  const session = useRhythmSession(
+    plan,
+    (result) => {
+      setDone({ ...result, score: scoreRhythm(result.summary, result.taps, plan.targets.length, settings.passMark) });
+    },
+    windows,
+  );
   const copy = COPY[exercise.type];
+  const [needsCalibration, setNeedsCalibration] = useState(() => !hasTapCalibration());
   const last = session.taps[session.taps.length - 1];
+  const drift = done ? meanSignedOffsetMs(done.taps) : null;
   const counts = {
     Perfect: session.taps.filter((t) => t.beatIndex !== null && t.rating === 'Perfect').length,
     Good: session.taps.filter((t) => t.beatIndex !== null && t.rating === 'Good').length,
@@ -114,10 +129,29 @@ export default function TapExerciseView({ exercise, payload, settings, onOutcome
             className={cn('muz-float-up pointer-events-none absolute left-[20%] top-2 -translate-x-1/2 text-lg font-black', RATING_STYLE[last.rating])}
           >
             {last.rating}
-            {last.beatIndex !== null && last.rating !== 'Perfect' ? (last.deltaMs < 0 ? ' · early' : ' · late') : ''}
+            {last.beatIndex === null
+              ? ' · extra tap'
+              : last.rating !== 'Perfect'
+                ? ` · ${Math.abs(last.deltaMs)} ms ${last.deltaMs < 0 ? 'early' : 'late'}`
+                : ''}
           </p>
         )}
       </div>
+
+      {session.phase === 'idle' && !done && needsCalibration && (
+        <details className="rounded-xl border border-cyan-500/30 bg-cyan-950/30 p-4 text-sm text-cyan-100" open>
+          <summary className="cursor-pointer font-semibold">
+            First rhythm exercise on this device? Take the 10-second tap test first.
+          </summary>
+          <p className="mt-2 text-xs text-cyan-100/80">
+            Speakers and especially Bluetooth headphones delay the clicks you hear, which makes every tap look late. The tap
+            test measures that delay once and corrects for it. You can redo it later in Settings.
+          </p>
+          <div className="mt-3">
+            <TapCalibration onSaved={() => setNeedsCalibration(false)} />
+          </div>
+        </details>
+      )}
 
       {session.phase === 'idle' && !done && (
         <button
@@ -180,7 +214,12 @@ export default function TapExerciseView({ exercise, payload, settings, onOutcome
             </div>
           </div>
           <p className="text-xs text-slate-400">
-            Perfect is within 25 ms, Good within 50 ms. Average offset: {done.summary.avgDeviation} ms.
+            At this level Perfect is within {windows.perfectMs} ms and Good within {windows.goodMs} ms. Average offset:{' '}
+            {done.summary.avgDeviation} ms.
+            {drift !== null && Math.abs(drift) >= DRIFT_HINT_MS &&
+              ` You tended to tap ${Math.abs(drift)} ms ${drift > 0 ? 'late' : 'early'}${
+                drift > 0 ? '. If every tap feels late, run the tap test in Settings to correct for your speakers or headphones.' : '.'
+              }`}
             {!done.score.passed && !payload.isCheckpoint && ' You will try this rhythm again.'}
           </p>
           <button
