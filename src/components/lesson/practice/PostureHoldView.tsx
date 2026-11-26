@@ -8,6 +8,7 @@ import { PostureHold } from '../../../practice/PostureHold';
 import { NOT_VISIBLE_MESSAGE, NotVisibleTimer } from '../../../practice/visibilityCue';
 import type { PostureHoldExercise } from '../../../types/lesson.types';
 import CameraPanel from './CameraPanel';
+import CameraSetupGuide from './CameraSetupGuide';
 import MediaDiagnostics, { mediaProblems } from './MediaDiagnostics';
 import { usePracticeRig } from './PracticeRigContext';
 import { Ring } from './PracticeWidgets';
@@ -76,6 +77,12 @@ export default function PostureHoldView({ exercise, settings, onOutcome }: Exerc
       <h2 className="text-2xl font-bold text-white">
         {exercise.prompt ?? `Hold a good playing posture for ${settings.postureHoldSec} seconds`}
       </h2>
+      {problems.length > 0 ? (
+        <MediaDiagnostics problems={problems} onRetry={() => void rig.startCamera()} needsMic={false} />
+      ) : (
+        !ready && <CameraSetupGuide needsMic={false} starting={starting} onStart={() => void rig.startCamera()} />
+      )}
+
       <div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
         <CameraPanel rig={rig} state={state} />
         <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-6 text-center">
@@ -89,25 +96,6 @@ export default function PostureHoldView({ exercise, settings, onOutcome }: Exerc
         </div>
       </div>
 
-      {problems.length > 0 ? (
-        <MediaDiagnostics problems={problems} onRetry={() => void rig.startCamera()} needsMic={false} />
-      ) : (
-        !ready && (
-          <div className="rounded-2xl border border-violet-500/30 bg-violet-950/30 p-5">
-            <p className="text-sm text-slate-300">
-              This exercise uses your camera to check your posture. The video stays on this computer.
-            </p>
-            <button
-              type="button"
-              disabled={starting}
-              onClick={() => void rig.startCamera()}
-              className="mt-4 w-full rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 py-3 text-sm font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(168,85,247,0.45)] transition hover:brightness-110 active:scale-[0.98] disabled:cursor-wait disabled:opacity-60"
-            >
-              {starting ? 'Starting camera…' : 'Turn on camera'}
-            </button>
-          </div>
-        )
-      )}
     </div>
   );
 }
