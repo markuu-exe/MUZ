@@ -4,6 +4,7 @@
  * spacebar, and judges taps with the existing useRhythmJudge against the plan's
  * targets (SRS 3.1.4.2–3.1.4.4). All timing uses AudioContext time, never setTimeout.
  */
+import { clickVoice } from '../lib/rhythm/clickVoice';
 import { readTapLatencyMs } from '../lib/rhythm/calibration';
 import { SRS_WINDOWS, captureWindowMs, type RhythmWindows } from '../lib/rhythm/timing';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -21,15 +22,17 @@ const TAIL_SEC = 0.35;
 /** Per-device tap latency (ms) from the tap test; see src/lib/rhythm/calibration.ts. */
 export { readTapLatencyMs } from '../lib/rhythm/calibration';
 
-function scheduleClick(ctx: AudioContext, time: number, accent: boolean): void {
+function scheduleClick(ctx: AudioContext, time: number, accent: boolean, countIn: boolean): void {
+  const v = clickVoice(accent, countIn);
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
-  osc.frequency.value = accent ? 1000 : 800;
-  gain.gain.setValueAtTime(0.3, time);
-  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+  osc.type = v.type;
+  osc.frequency.value = v.freq;
+  gain.gain.setValueAtTime(v.gain, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + v.decaySec);
   osc.connect(gain).connect(ctx.destination);
   osc.start(time);
-  osc.stop(time + 0.06);
+  osc.stop(time + v.decaySec + 0.01);
 }
 
 function scheduleTone(ctx: AudioContext, time: number): void {
@@ -108,7 +111,7 @@ export function useRhythmSession(
     const t0 = ctx.currentTime + START_DELAY_SEC;
     startTimeRef.current = t0;
     targetTimesRef.current = p.targets.map((t) => t0 + t);
-    for (const c of p.clicks) scheduleClick(ctx, t0 + c.time, c.accent);
+    for (const c of p.clicks) scheduleClick(ctx, t0 + c.time, c.accent, c.countIn);
     for (const t of p.tones) scheduleTone(ctx, t0 + t);
     reset();
     setPhase('running');

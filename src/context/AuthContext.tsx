@@ -53,7 +53,7 @@ const createProfileClient = (): ProfileClient => ({
 const DEMO_PROFILES: Record<string, UserProfile> = {
   virtuoso: {
     id: 'demo-user-muz-01',
-    username: 'ChopinVirtuoso',
+    username: 'JohnPiano',
     instrument_focus: 'piano',
     current_streak: 14,
     last_activity_date: new Date().toISOString(),

@@ -148,10 +148,13 @@ textarea {
 .animate-scroll-ltr-slow { animation: scroll-ltr 40s linear infinite; }
 
 /* Interactive Gamification Animations */
+/* Uses the independent `translate` property so the shake ADDS to an element's own
+   transform (Skill Tree nodes are centred with translate(-50%, -50%)) instead of
+   replacing it, which made locked nodes jump off their spot while shaking. */
 @keyframes node-shake {
-  0%, 100% { transform: translateX(0); }
-  20%, 60% { transform: translateX(-8px); }
-  40%, 80% { transform: translateX(8px); }
+  0%, 100% { translate: 0 0; }
+  20%, 60% { translate: -8px 0; }
+  40%, 80% { translate: 8px 0; }
 }
 
 .animate-node-shake {
