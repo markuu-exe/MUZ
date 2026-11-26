@@ -21,13 +21,17 @@ type AuthMode = 'signin' | 'signup' | 'forgot' | 'recovery';
 
 interface LoginPageProps {
   onSuccess?: () => void;
+  /** Which form to open first (the landing page links straight to Sign Up). */
+  initialMode?: 'signin' | 'signup';
+  /** When set, shows a "Back to home" link above the form. */
+  onBack?: () => void;
 }
 
 // White key x-offsets and black key positions for a seamless 1440px-periodic wireframe piano wave (24 keys * 60px = 1440px)
 const WHITE_KEY_INDICES = Array.from({ length: 24 }, (_, i) => i);
 const BLACK_KEY_OFFSETS = [0, 1, 3, 4, 5, 7, 8, 10, 11, 12, 14, 15, 17, 18, 19, 21, 22];
 
-export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
+export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, initialMode = 'signin', onBack }) => {
   const {
     isPasswordRecovery,
     signInWithEmail,
@@ -39,7 +43,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
     enterDemoMode,
   } = useAuth();
 
-  const [mode, setMode] = useState<AuthMode>(() => (isPasswordRecovery ? 'recovery' : 'signin'));
+  const [mode, setMode] = useState<AuthMode>(() => (isPasswordRecovery ? 'recovery' : initialMode));
   const activeMode: AuthMode = isPasswordRecovery ? 'recovery' : mode;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -494,6 +498,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
       </div>
 
       <div className="relative z-10 w-full max-w-[400px]">
+        {onBack && activeMode !== 'recovery' && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="mb-3 inline-flex items-center gap-1.5 text-xs font-medium text-muz-muted transition hover:text-white"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+            Back to home
+          </button>
+        )}
         {/* Minimal Brand Header with App Name Cleanly Above Form */}
         <div className="mb-5 text-center">
           <div className="mb-2.5 inline-flex items-center gap-2.5 rounded-2xl border border-slate-800/90 bg-muz-panel/90 px-3.5 py-1.5 shadow-glow backdrop-blur-md">
@@ -904,7 +918,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                   onClick={handleDemoSignIn}
                   className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/60 text-xs font-medium text-slate-200 transition hover:border-muz-accent/50 hover:bg-slate-800/80 hover:text-white"
                 >
-                  <span>Continue as Guest</span>
+                  <span>Try Demo Mode · nothing is saved</span>
                   <ArrowRight className="h-3.5 w-3.5 text-muz-accent" />
                 </button>
               </div>

@@ -40,6 +40,7 @@ import { isLessonPayload, type LessonPayload } from '../../types/lesson.types';
 import ProfileAnalyticsView, { type AnalyticsDateRange } from './ProfileAnalyticsView';
 import PlacementModal from './PlacementModal';
 import OnboardingWelcome from './OnboardingWelcome';
+import DemoBanner from '../common/DemoBanner';
 import ConnectionStatus from '../common/ConnectionStatus';
 import AchievementToast, { type AchievementToastItem } from '../common/AchievementToast';
 import { lessonExp } from '../../content';
@@ -535,6 +536,7 @@ export default function DashboardScreen() {
           MAIN APPLICATION WORKSPACE (TOP HEADER & VIEWPORT)
           ========================================================================= */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#070b14]">
+        {isDemo && <DemoBanner onExit={() => void signOut()} />}
         {/* TOP GAMIFICATION HEADER */}
         <header className="flex h-20 shrink-0 items-center justify-between border-b border-slate-800/90 bg-[#0c1220]/90 px-8 backdrop-blur-md">
           <div className="flex items-center gap-4">
@@ -543,11 +545,6 @@ export default function DashboardScreen() {
                 <span className="text-xs font-bold uppercase tracking-[0.2em] text-violet-400">
                   Desktop Studio
                 </span>
-                {isDemo && (
-                  <span className="rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-300">
-                    Guest Demo
-                  </span>
-                )}
                 {isDev && (
                   <span
                     className="rounded-full border border-sky-500/40 bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-sky-300"
