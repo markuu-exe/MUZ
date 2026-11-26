@@ -19,6 +19,8 @@ interface DashboardData {
   usingFallback: boolean;
   /** Re-read progress after a lesson finishes (COURSE-6). */
   reload: () => void;
+  /** Profile id whose lessons and progress have finished loading at least once; null before that. */
+  loadedFor: string | null;
 }
 
 function asProgressMap(rows: UserProgress[]): ProgressMap {
@@ -38,6 +40,7 @@ export function useDashboardData(profile: UserProfile | null, isDemo: boolean): 
   const [loading, setLoading] = useState(!isDemo);
   const [usingFallback, setUsingFallback] = useState(true);
   const [version, setVersion] = useState(0);
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
 
   useEffect(() => {
     if (isDemo || !profile?.id) {
@@ -76,7 +79,10 @@ export function useDashboardData(profile: UserProfile | null, isDemo: boolean): 
         setLessons(DEMO_CURRICULUM);
         setUsingFallback(true);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setLoadedFor(profile.id);
+        }
       }
     };
 
@@ -87,7 +93,7 @@ export function useDashboardData(profile: UserProfile | null, isDemo: boolean): 
   }, [isDemo, profile?.id, profile?.exp, version]);
 
   return useMemo(
-    () => ({ lessons, progress, loading, usingFallback, reload: () => setVersion((v) => v + 1) }),
-    [lessons, progress, loading, usingFallback],
+    () => ({ lessons, progress, loading, usingFallback, loadedFor, reload: () => setVersion((v) => v + 1) }),
+    [lessons, progress, loading, usingFallback, loadedFor],
   );
 }

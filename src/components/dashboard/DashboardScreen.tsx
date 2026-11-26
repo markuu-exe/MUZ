@@ -32,6 +32,7 @@ import {
 } from '../../lib/dashboard/curriculum';
 import DashboardHud from './DashboardHud';
 import SkillTreeView from './SkillTreeView';
+import SkillTreeSkeleton from './SkillTreeSkeleton';
 import LessonNotesView from './LessonNotesView';
 import LessonPlayer, { type LessonSaveFeedback } from '../lesson/LessonPlayer';
 import { isLessonPayload, type LessonPayload } from '../../types/lesson.types';
@@ -154,6 +155,10 @@ export default function DashboardScreen() {
     };
   }, []);
 
+  // Until this learner's own lessons and progress have loaded once, show a skeleton instead of the
+  // bundled course with no progress, which looks like the learner's data was reset.
+  const treeReady =
+    isDemo || (profileStatus !== 'loading' && (!profile || data.loadedFor === profile.id));
   const hearts = profile?.hearts ?? 0;
   const streak = profile
     ? displayedStreak(profile.current_streak, profile.last_activity_date, toLocalDate(new Date()))
@@ -593,7 +598,8 @@ export default function DashboardScreen() {
         {/* Scrollable Main Content Container */}
         <main className="relative flex-1 overflow-y-auto px-8 py-8">
           {/* VIEW 1: SKILL TREE PROGRESSION (Default State) */}
-          {view === 'skill-tree' && (
+          {view === 'skill-tree' && !treeReady && <SkillTreeSkeleton />}
+          {view === 'skill-tree' && treeReady && (
             <SkillTreeView
               lessons={data.lessons}
               progress={data.progress}
