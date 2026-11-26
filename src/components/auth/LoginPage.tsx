@@ -23,9 +23,9 @@ interface LoginPageProps {
   onSuccess?: () => void;
 }
 
-// White key x-offsets and black key positions for a 3-octave wireframe piano wave
-const WHITE_KEY_INDICES = Array.from({ length: 22 }, (_, i) => i);
-const BLACK_KEY_OFFSETS = [0, 1, 3, 4, 5, 7, 8, 10, 11, 12, 14, 15, 17, 18, 19];
+// White key x-offsets and black key positions for a seamless 1440px-periodic wireframe piano wave (24 keys * 60px = 1440px)
+const WHITE_KEY_INDICES = Array.from({ length: 24 }, (_, i) => i);
+const BLACK_KEY_OFFSETS = [0, 1, 3, 4, 5, 7, 8, 10, 11, 12, 14, 15, 17, 18, 19, 21, 22];
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
   const {
@@ -205,10 +205,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
     if (onSuccess) onSuccess();
   };
 
-  // Helper to compute smooth wave Y offset for the wireframe piano keys
+  // Periodic wave (period = 1440px) so duplicated SVG tiles join seamlessly
   const getWaveY = (x: number) =>
-    Math.sin((x / 1440) * Math.PI * 2.2) * 28 +
-    Math.cos((x / 1440) * Math.PI * 1.1) * 12;
+    Math.sin((x / 1440) * Math.PI * 2) * 26 +
+    Math.cos((x / 1440) * Math.PI * 4) * 10;
 
   return (
     <div className="relative flex h-dvh w-full items-center justify-center overflow-hidden bg-muz-bg px-4 text-muz-text selection:bg-muz-accent selection:text-slate-950">
@@ -243,191 +243,203 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
           <circle cx="200" cy="200" r="150" stroke="currentColor" strokeWidth="0.4" strokeDasharray="2 8" />
         </svg>
 
-        {/* Subtle Drifting Stave Lines (Upper & Mid Ribbon) */}
-        <svg
-          className="animate-staff-wave absolute -left-[5%] top-[10%] h-[260px] w-[110%]"
-          viewBox="0 0 1440 260"
-          fill="none"
-          preserveAspectRatio="none"
-        >
-          <defs>
-            <linearGradient id="staveGradPrimary" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#73e0a9" stopOpacity="0" />
-              <stop offset="20%" stopColor="#73e0a9" stopOpacity="0.16" />
-              <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.1" />
-              <stop offset="80%" stopColor="#73e0a9" stopOpacity="0.16" />
-              <stop offset="100%" stopColor="#73e0a9" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          {[0, 12, 24, 36, 48].map((offset) => (
-            <path
-              key={`upper-stave-${offset}`}
-              d={`M -40 ${90 + offset} C 320 ${35 + offset}, 680 ${150 + offset}, 1060 ${70 + offset} C 1260 ${30 + offset}, 1380 ${95 + offset}, 1480 ${80 + offset}`}
-              stroke="url(#staveGradPrimary)"
-              strokeWidth="1"
-            />
+        {/* Infinite Left-to-Right Drifting Stave Lines (Upper Ribbon) */}
+        <div className="animate-scroll-ltr-slow absolute left-0 top-[10%] flex h-[260px] w-[200%] opacity-60">
+          {[0, 1].map((tile) => (
+            <svg
+              key={`upper-tile-${tile}`}
+              className="h-full w-1/2 shrink-0"
+              viewBox="0 0 1440 260"
+              fill="none"
+              preserveAspectRatio="none"
+            >
+              <defs>
+                <linearGradient id={`staveGradPrimary-${tile}`} x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#73e0a9" stopOpacity="0.14" />
+                  <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.18" />
+                  <stop offset="100%" stopColor="#73e0a9" stopOpacity="0.14" />
+                </linearGradient>
+              </defs>
+              {[0, 12, 24, 36, 48].map((offset) => {
+                const y = 85 + offset;
+                return (
+                  <path
+                    key={`upper-stave-${tile}-${offset}`}
+                    d={`M 0 ${y} C 360 ${y - 45}, 360 ${y - 45}, 720 ${y} C 1080 ${y + 45}, 1080 ${y + 45}, 1440 ${y}`}
+                    stroke={`url(#staveGradPrimary-${tile})`}
+                    strokeWidth="1"
+                  />
+                );
+              })}
+              <line x1="280" y1="62" x2="280" y2="110" stroke="#73e0a9" strokeOpacity="0.16" strokeWidth="1" />
+              <line x1="1000" y1="106" x2="1000" y2="154" stroke="#38bdf8" strokeOpacity="0.16" strokeWidth="1" />
+              <circle cx="220" cy="78" r="3" fill="#73e0a9" fillOpacity="0.24" />
+              <circle cx="340" cy="96" r="2.5" fill="#38bdf8" fillOpacity="0.22" />
+              <circle cx="960" cy="118" r="3" fill="#73e0a9" fillOpacity="0.24" />
+              <circle cx="1120" cy="128" r="2.5" fill="#38bdf8" fillOpacity="0.2" />
+            </svg>
           ))}
-          {/* Subtle Measure Barlines & Harmonic Nodes on Stave */}
-          <line x1="280" y1="73" x2="280" y2="121" stroke="#73e0a9" strokeOpacity="0.12" strokeWidth="1" />
-          <line x1="1150" y1="58" x2="1150" y2="106" stroke="#38bdf8" strokeOpacity="0.12" strokeWidth="1" />
-          <circle cx="220" cy="88" r="3" fill="#73e0a9" fillOpacity="0.22" />
-          <circle cx="340" cy="103" r="2.5" fill="#38bdf8" fillOpacity="0.2" />
-          <circle cx="1090" cy="79" r="3" fill="#73e0a9" fillOpacity="0.22" />
-          <circle cx="1210" cy="94" r="2.5" fill="#38bdf8" fillOpacity="0.18" />
-        </svg>
+        </div>
 
-        {/* Secondary Counter-Drifting Stave Lines */}
-        <svg
-          className="animate-staff-wave-slow absolute -left-[5%] bottom-[16%] h-[220px] w-[110%]"
-          viewBox="0 0 1440 220"
-          fill="none"
-          preserveAspectRatio="none"
-        >
-          <defs>
-            <linearGradient id="staveGradSecondary" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#38bdf8" stopOpacity="0" />
-              <stop offset="25%" stopColor="#38bdf8" stopOpacity="0.13" />
-              <stop offset="50%" stopColor="#73e0a9" stopOpacity="0.08" />
-              <stop offset="75%" stopColor="#73e0a9" stopOpacity="0.14" />
-              <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          {[0, 11, 22, 33, 44].map((offset) => (
-            <path
-              key={`lower-stave-${offset}`}
-              d={`M -40 ${110 + offset} C 380 ${165 + offset}, 760 ${45 + offset}, 1140 ${125 + offset} C 1300 ${155 + offset}, 1400 ${105 + offset}, 1480 ${115 + offset}`}
-              stroke="url(#staveGradSecondary)"
-              strokeWidth="0.9"
-            />
+        {/* Infinite Left-to-Right Secondary Stave Lines */}
+        <div className="animate-scroll-ltr-medium absolute bottom-[16%] left-0 flex h-[220px] w-[200%] opacity-55">
+          {[0, 1].map((tile) => (
+            <svg
+              key={`lower-tile-${tile}`}
+              className="h-full w-1/2 shrink-0"
+              viewBox="0 0 1440 220"
+              fill="none"
+              preserveAspectRatio="none"
+            >
+              <defs>
+                <linearGradient id={`staveGradSecondary-${tile}`} x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.13" />
+                  <stop offset="50%" stopColor="#73e0a9" stopOpacity="0.16" />
+                  <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.13" />
+                </linearGradient>
+              </defs>
+              {[0, 11, 22, 33, 44].map((offset) => {
+                const y = 95 + offset;
+                return (
+                  <path
+                    key={`lower-stave-${tile}-${offset}`}
+                    d={`M 0 ${y} C 360 ${y + 42}, 360 ${y + 42}, 720 ${y} C 1080 ${y - 42}, 1080 ${y - 42}, 1440 ${y}`}
+                    stroke={`url(#staveGradSecondary-${tile})`}
+                    strokeWidth="0.9"
+                  />
+                );
+              })}
+            </svg>
           ))}
-        </svg>
+        </div>
 
-        {/* Minimalist Wireframe Piano Key Wave with Slow Floating Physics */}
-        <svg
-          className="animate-piano-wave absolute -left-[4%] bottom-[3%] h-[190px] w-[108%]"
-          viewBox="0 0 1440 200"
-          fill="none"
-          preserveAspectRatio="none"
-        >
-          <defs>
-            <linearGradient id="pianoWireframeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#73e0a9" stopOpacity="0" />
-              <stop offset="15%" stopColor="#73e0a9" stopOpacity="0.22" />
-              <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.16" />
-              <stop offset="85%" stopColor="#73e0a9" stopOpacity="0.22" />
-              <stop offset="100%" stopColor="#73e0a9" stopOpacity="0" />
-            </linearGradient>
-            <linearGradient id="blackKeyFillGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#73e0a9" stopOpacity="0.12" />
-              <stop offset="100%" stopColor="#070b14" stopOpacity="0.35" />
-            </linearGradient>
-          </defs>
+        {/* Infinite Left-to-Right Minimalist Wireframe Piano Key Wave */}
+        <div className="animate-scroll-ltr-fast absolute bottom-[3%] left-0 flex h-[190px] w-[200%] opacity-70">
+          {[0, 1].map((tile) => (
+            <svg
+              key={`piano-tile-${tile}`}
+              className="h-full w-1/2 shrink-0"
+              viewBox="0 0 1440 200"
+              fill="none"
+              preserveAspectRatio="none"
+            >
+              <defs>
+                <linearGradient id={`pianoWireframeGrad-${tile}`} x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#73e0a9" stopOpacity="0.2" />
+                  <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.22" />
+                  <stop offset="100%" stopColor="#73e0a9" stopOpacity="0.2" />
+                </linearGradient>
+                <linearGradient id={`blackKeyFillGrad-${tile}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#73e0a9" stopOpacity="0.12" />
+                  <stop offset="100%" stopColor="#070b14" stopOpacity="0.35" />
+                </linearGradient>
+              </defs>
 
-          {/* Upper and Lower Continuous Wave Rails */}
-          <path
-            d={`M ${WHITE_KEY_INDICES.map((i) => {
-              const x = 60 + i * 60;
-              const y = 68 + getWaveY(x);
-              return `${i === 0 ? '' : 'L '}${x} ${y.toFixed(1)}`;
-            }).join(' ')}`}
-            stroke="url(#pianoWireframeGrad)"
-            strokeWidth="1"
-          />
-          <path
-            d={`M ${WHITE_KEY_INDICES.map((i) => {
-              const x = 42 + i * 60;
-              const y = 148 + getWaveY(x) * 1.08;
-              return `${i === 0 ? '' : 'L '}${x} ${y.toFixed(1)}`;
-            }).join(' ')}`}
-            stroke="url(#pianoWireframeGrad)"
-            strokeWidth="1.1"
-          />
-          <path
-            d={`M ${WHITE_KEY_INDICES.map((i) => {
-              const x = 42 + i * 60;
-              const y = 155 + getWaveY(x) * 1.08;
-              return `${i === 0 ? '' : 'L '}${x} ${y.toFixed(1)}`;
-            }).join(' ')}`}
-            stroke="url(#pianoWireframeGrad)"
-            strokeWidth="0.6"
-            strokeDasharray="3 5"
-          />
+              {/* Upper and Lower Continuous Wave Rails */}
+              <path
+                d={`M ${Array.from({ length: 25 }, (_, i) => {
+                  const x = i * 60;
+                  const y = 68 + getWaveY(x);
+                  return `${i === 0 ? '' : 'L '}${x} ${y.toFixed(1)}`;
+                }).join(' ')}`}
+                stroke={`url(#pianoWireframeGrad-${tile})`}
+                strokeWidth="1"
+              />
+              <path
+                d={`M ${Array.from({ length: 25 }, (_, i) => {
+                  const x = i * 60 - 18;
+                  const y = 148 + getWaveY(x) * 1.08;
+                  return `${i === 0 ? '' : 'L '}${x} ${y.toFixed(1)}`;
+                }).join(' ')}`}
+                stroke={`url(#pianoWireframeGrad-${tile})`}
+                strokeWidth="1.1"
+              />
+              <path
+                d={`M ${Array.from({ length: 25 }, (_, i) => {
+                  const x = i * 60 - 18;
+                  const y = 155 + getWaveY(x) * 1.08;
+                  return `${i === 0 ? '' : 'L '}${x} ${y.toFixed(1)}`;
+                }).join(' ')}`}
+                stroke={`url(#pianoWireframeGrad-${tile})`}
+                strokeWidth="0.6"
+                strokeDasharray="3 5"
+              />
 
-          {/* White Key Wireframe Divisions & Lip Ticks */}
-          {WHITE_KEY_INDICES.map((i) => {
-            const xTop = 60 + i * 60;
-            const yTop = 68 + getWaveY(xTop);
-            const xBot = 42 + i * 60;
-            const yBot = 148 + getWaveY(xTop) * 1.08;
-            return (
-              <g key={`wk-${i}`}>
-                <line
-                  x1={xTop}
-                  y1={yTop}
-                  x2={xBot}
-                  y2={yBot}
-                  stroke="url(#pianoWireframeGrad)"
-                  strokeWidth="0.85"
-                />
-                <line
-                  x1={xBot}
-                  y1={yBot}
-                  x2={xBot}
-                  y2={yBot + 7}
-                  stroke="url(#pianoWireframeGrad)"
-                  strokeWidth="0.85"
-                />
-              </g>
-            );
-          })}
+              {/* White Key Wireframe Divisions & Lip Ticks */}
+              {WHITE_KEY_INDICES.map((i) => {
+                const xTop = i * 60;
+                const yTop = 68 + getWaveY(xTop);
+                const xBot = xTop - 18;
+                const yBot = 148 + getWaveY(xTop) * 1.08;
+                return (
+                  <g key={`wk-${tile}-${i}`}>
+                    <line
+                      x1={xTop}
+                      y1={yTop}
+                      x2={xBot}
+                      y2={yBot}
+                      stroke={`url(#pianoWireframeGrad-${tile})`}
+                      strokeWidth="0.85"
+                    />
+                    <line
+                      x1={xBot}
+                      y1={yBot}
+                      x2={xBot}
+                      y2={yBot + 7}
+                      stroke={`url(#pianoWireframeGrad-${tile})`}
+                      strokeWidth="0.85"
+                    />
+                  </g>
+                );
+              })}
 
-          {/* Raised Minimalist Wireframe Black Keys */}
-          {BLACK_KEY_OFFSETS.map((keyIdx) => {
-            const xTop = 60 + (keyIdx + 0.68) * 60;
-            const yTop = 64 + getWaveY(xTop);
-            const xBot = 50 + (keyIdx + 0.68) * 60;
-            const yBot = 112 + getWaveY(xTop) * 1.04;
-            const w = 22;
-            const hLift = 6;
+              {/* Raised Minimalist Wireframe Black Keys */}
+              {BLACK_KEY_OFFSETS.map((keyIdx) => {
+                const xTop = (keyIdx + 0.68) * 60;
+                const yTop = 64 + getWaveY(xTop);
+                const xBot = xTop - 10;
+                const yBot = 112 + getWaveY(xTop) * 1.04;
+                const w = 22;
+                const hLift = 6;
 
-            return (
-              <g key={`bk-${keyIdx}`}>
-                {/* 3D Top Face of Black Key */}
-                <polygon
-                  points={`${xTop},${yTop - hLift} ${xTop + w},${yTop - hLift + 1.5} ${xBot + w},${yBot - hLift + 1.5} ${xBot},${yBot - hLift}`}
-                  fill="url(#blackKeyFillGrad)"
-                  stroke="url(#pianoWireframeGrad)"
-                  strokeWidth="0.95"
-                />
-                {/* Front Bevel Wireframe Lines */}
-                <line
-                  x1={xBot}
-                  y1={yBot - hLift}
-                  x2={xBot}
-                  y2={yBot}
-                  stroke="url(#pianoWireframeGrad)"
-                  strokeWidth="0.8"
-                />
-                <line
-                  x1={xBot + w}
-                  y1={yBot - hLift + 1.5}
-                  x2={xBot + w}
-                  y2={yBot + 1.5}
-                  stroke="url(#pianoWireframeGrad)"
-                  strokeWidth="0.8"
-                />
-                <line
-                  x1={xBot}
-                  y1={yBot}
-                  x2={xBot + w}
-                  y2={yBot + 1.5}
-                  stroke="url(#pianoWireframeGrad)"
-                  strokeWidth="0.8"
-                />
-              </g>
-            );
-          })}
-        </svg>
+                return (
+                  <g key={`bk-${tile}-${keyIdx}`}>
+                    <polygon
+                      points={`${xTop},${yTop - hLift} ${xTop + w},${yTop - hLift + 1.5} ${xBot + w},${yBot - hLift + 1.5} ${xBot},${yBot - hLift}`}
+                      fill={`url(#blackKeyFillGrad-${tile})`}
+                      stroke={`url(#pianoWireframeGrad-${tile})`}
+                      strokeWidth="0.95"
+                    />
+                    <line
+                      x1={xBot}
+                      y1={yBot - hLift}
+                      x2={xBot}
+                      y2={yBot}
+                      stroke={`url(#pianoWireframeGrad-${tile})`}
+                      strokeWidth="0.8"
+                    />
+                    <line
+                      x1={xBot + w}
+                      y1={yBot - hLift + 1.5}
+                      x2={xBot + w}
+                      y2={yBot + 1.5}
+                      stroke={`url(#pianoWireframeGrad-${tile})`}
+                      strokeWidth="0.8"
+                    />
+                    <line
+                      x1={xBot}
+                      y1={yBot}
+                      x2={xBot + w}
+                      y2={yBot + 1.5}
+                      stroke={`url(#pianoWireframeGrad-${tile})`}
+                      strokeWidth="0.8"
+                    />
+                  </g>
+                );
+              })}
+            </svg>
+          ))}
+        </div>
 
         {/* Small Floating Music Notes (Slow Floating Physics around Perimeter) */}
         <div className="animate-music-drift-1 absolute left-[10%] top-[18%] text-muz-accent/30 drop-shadow-[0_0_10px_rgba(115,224,169,0.35)]">
