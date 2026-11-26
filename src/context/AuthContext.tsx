@@ -95,44 +95,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const mountedRef = useRef(true);
   const profileReqIdRef = useRef(0);
 
-  const loadProfile = useCallback(async (targetUser: User): Promise<UserProfile | null> => {
-    const reqId = ++profileReqIdRef.current;
-    setProfileStatus('loading');
-    setProfileError(null);
-
-    try {
-      const result = await bootstrapProfile(
-        createProfileClient(),
-        targetUser.id,
-        resolveProfileUsername(targetUser),
-      );
-
-      if (!mountedRef.current || reqId !== profileReqIdRef.current) {
-        return null;
+  const loadProfile = useCallback(
+    async (targetUser: User, options?: { silent?: boolean }): Promise<UserProfile | null> => {
+      const reqId = ++profileReqIdRef.current;
+      const silent = options?.silent ?? false;
+      if (!silent) {
+        setProfileStatus('loading');
+        setProfileError(null);
       }
 
-      if (result.profile === null) {
-        setProfile(null);
-        setProfileError(result.error);
-        setProfileStatus('failed');
-        return null;
-      }
+      try {
+        const result = await bootstrapProfile(
+          createProfileClient(),
+          targetUser.id,
+          resolveProfileUsername(targetUser),
+        );
 
-      setProfile(result.profile);
-      setProfileError(null);
-      setProfileStatus('loaded');
-      return result.profile;
-    } catch (err) {
-      if (!mountedRef.current || reqId !== profileReqIdRef.current) {
+        if (!mountedRef.current || reqId !== profileReqIdRef.current) {
+          return null;
+        }
+
+        if (result.profile === null) {
+          if (!silent) {
+            setProfile(null);
+            setProfileError(result.error);
+            setProfileStatus('failed');
+          }
+          return null;
+        }
+
+        setProfile(result.profile);
+        setProfileError(null);
+        setProfileStatus('loaded');
+        return result.profile;
+      } catch (err) {
+        if (!mountedRef.current || reqId !== profileReqIdRef.current) {
+          return null;
+        }
+        if (!silent) {
+          const message = err instanceof Error ? err.message : 'Failed to load profile.';
+          setProfile(null);
+          setProfileError(message);
+          setProfileStatus('failed');
+        }
         return null;
       }
-      const message = err instanceof Error ? err.message : 'Failed to load profile.';
-      setProfile(null);
-      setProfileError(message);
-      setProfileStatus('failed');
-      return null;
-    }
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -442,9 +452,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(false);
   };
 
+  useEffect(() => {
+    if (!user || isDemo) return undefined;
+
+    let lastSyncAt = 0;
+    const syncProfile = () => {
+      const now = Date.now();
+      if (now - lastSyncAt < 2000) return;
+      lastSyncAt = now;
+      void loadProfile(user, { silent: true });
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncProfile();
+      }
+    };
+
+    window.addEventListener('focus', syncProfile);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    const channel = supabase
+      .channel(`profile-sync-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
+        (payload) => {
+          if (mountedRef.current && payload.new) {
+            setProfile(payload.new as UserProfile);
+            setProfileError(null);
+            setProfileStatus('loaded');
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      window.removeEventListener('focus', syncProfile);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      void supabase.removeChannel(channel);
+    };
+  }, [user, isDemo, loadProfile]);
+
   const refreshProfile = async () => {
     if (user && !isDemo) {
-      await loadProfile(user);
+      await loadProfile(user, { silent: profileStatus === 'loaded' });
     }
   };
 

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { HEART_REGEN_MS, msUntilNextHeart, regenStep } from '../heartRegen';
+import {
+  HEART_REGEN_MS,
+  msUntilNextHeart,
+  nextHeartUpdateTimestamp,
+  parseHeartAnchor,
+  regenStep,
+} from '../heartRegen';
 
 const P = HEART_REGEN_MS;
 const T0 = 1_000_000;
@@ -50,5 +56,35 @@ describe('msUntilNextHeart', () => {
   });
   it('never exceeds a full period when the clock read is older than the timer start', () => {
     expect(msUntilNextHeart({ hearts: 4, anchorMs: T0 + 5000 }, T0)).toBe(P);
+  });
+});
+
+describe('parseHeartAnchor', () => {
+  it('parses valid ISO timestamps and rejects missing or malformed values', () => {
+    expect(parseHeartAnchor('2026-11-27T07:30:00.000Z')).toBe(Date.parse('2026-11-27T07:30:00.000Z'));
+    expect(parseHeartAnchor(null)).toBeNull();
+    expect(parseHeartAnchor(undefined)).toBeNull();
+    expect(parseHeartAnchor('not-a-date')).toBeNull();
+  });
+});
+
+describe('nextHeartUpdateTimestamp', () => {
+  const OLD = '2026-11-27T07:00:00.000Z';
+  const NOW = '2026-11-27T07:10:00.000Z';
+
+  it('clears the timer when hearts reach 5', () => {
+    expect(nextHeartUpdateTimestamp(4, 5, OLD, NOW)).toBeNull();
+    expect(nextHeartUpdateTimestamp(5, 5, null, NOW)).toBeNull();
+  });
+
+  it('starts a new timer when dropping from 5 or when no valid prior anchor exists', () => {
+    expect(nextHeartUpdateTimestamp(5, 4, null, NOW)).toBe(NOW);
+    expect(nextHeartUpdateTimestamp(3, 2, null, NOW)).toBe(NOW);
+    expect(nextHeartUpdateTimestamp(3, 2, 'bad-iso', NOW)).toBe(NOW);
+  });
+
+  it('preserves an existing active timer when losing another heart below 5', () => {
+    expect(nextHeartUpdateTimestamp(4, 3, OLD, NOW)).toBe(OLD);
+    expect(nextHeartUpdateTimestamp(2, 0, OLD, NOW)).toBe(OLD);
   });
 });

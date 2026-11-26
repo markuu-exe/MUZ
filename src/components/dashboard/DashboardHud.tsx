@@ -1,4 +1,4 @@
-import { Flame, Heart, Sparkles, AlertCircle } from 'lucide-react';
+import { Flame, Heart, Sparkles, AlertCircle, Clock } from 'lucide-react';
 import { expProgress } from '../../lib/dashboard/curriculum';
 import { profileHudPresentation } from '../../lib/dashboard/profileHud';
 import type { ProfileStatus } from '../../types/auth.types';
@@ -72,6 +72,15 @@ export default function DashboardHud({
           <span className="hidden text-[11px] font-medium uppercase tracking-wider text-slate-400 xl:inline">
             Hearts
           </span>
+          {showValues && clampedHearts < 5 && nextHeartLabel && (
+            <span
+              className="inline-flex items-center gap-1 rounded-md border border-rose-500/30 bg-rose-500/15 px-1.5 py-0.5 text-[11px] font-bold text-rose-300 tabular-nums whitespace-nowrap"
+              aria-label={`Next heart in ${nextHeartLabel}`}
+            >
+              <Clock className="h-3 w-3 shrink-0" />
+              {nextHeartLabel}
+            </span>
+          )}
         </div>
 
         {showValues && clampedHearts === 0 && (
