@@ -39,6 +39,8 @@ export interface LessonSettings {
   /** EXP for completing a normal lesson / a checkpoint. */
   exp: number;
   checkpointExp: number;
+  /** Hearts a drill timeout or 3 misses cost. Unset = 1 (SRS 3.1.2.4); 0 in warm-up units (ruling W1). */
+  drillHeartCost?: 0 | 1;
 }
 
 /** Overrides an author may put on a unit, lesson or exercise. */

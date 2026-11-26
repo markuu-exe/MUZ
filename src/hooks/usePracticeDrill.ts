@@ -12,6 +12,8 @@ export interface UsePracticeDrillOptions {
   targets: readonly DrillTarget[];
   hearts: number;
   timeoutSec: number;
+  /** 0 in warm-up units (ruling W1). */
+  heartCost?: 0 | 1;
   /** True while the camera, pose model or microphone is not live: the drill timer is frozen. */
   suspended?: boolean;
   onComplete: (stats: DrillStats) => void;
@@ -28,7 +30,7 @@ export interface PracticeDrillView extends DrillSnapshot {
 }
 
 export function usePracticeDrill(options: UsePracticeDrillOptions) {
-  const { rig, targets, hearts, timeoutSec } = options;
+  const { rig, targets, hearts, timeoutSec, heartCost } = options;
   const callbacks = useRef(options);
   callbacks.current = options;
 
@@ -61,7 +63,7 @@ export function usePracticeDrill(options: UsePracticeDrillOptions) {
   /** Arm the drill. The rig's camera and microphone must already be running. */
   const start = useCallback(() => {
     if (drillRef.current) return;
-    const drill = new PracticeDrill(targets, { hearts, timeoutMs: timeoutSec * 1000 });
+    const drill = new PracticeDrill(targets, { hearts, timeoutMs: timeoutSec * 1000, heartCost });
     drillRef.current = drill;
     drill.on('change', refresh);
     drill.on('heartLost', refresh);
@@ -70,7 +72,7 @@ export function usePracticeDrill(options: UsePracticeDrillOptions) {
     rig.resetAudioAnalysis();
     drill.start(performance.now());
     refresh();
-  }, [rig, targets, hearts, timeoutSec, refresh]);
+  }, [rig, targets, hearts, timeoutSec, heartCost, refresh]);
 
   useEffect(() => {
     const offAudio = rig.on('audio', (frame) => {

@@ -21,8 +21,9 @@ describe('band classification (SRS 3.1.5.4 / 3.1.5.5)', () => {
     expect(classifyBand(110, elbow)).toBe('ok');
     expect(classifyBand(79.99, elbow)).toBe('low');
     expect(classifyBand(110.01, elbow)).toBe('high');
-    expect(classifyBand(150, wrist)).toBe('ok');
-    expect(classifyBand(149.99, wrist)).toBe('low');
+    // Ruling W2: wrist band 140–180° (SRS said 150°).
+    expect(classifyBand(140, wrist)).toBe('ok');
+    expect(classifyBand(139.99, wrist)).toBe('low');
     expect(classifyBand(NaN, wrist)).toBe('unknown');
   });
 
@@ -57,10 +58,10 @@ describe('PostureAnalyzer rules (KAN-253)', () => {
   });
 
   it('distinguishes wrist droop from a raised wrist', () => {
-    const droop = run(new PostureAnalyzer(noSmoothing), { wristFlexDeg: -40 }, 0, 800);
+    const droop = run(new PostureAnalyzer(noSmoothing), { wristFlexDeg: -50 }, 0, 800);
     expect(droop.cues.map((c) => c.code)).toEqual(['WRIST_DROOP', 'WRIST_DROOP']);
     expect(droop.arms.left.wrist.state).toBe('low');
-    const raised = run(new PostureAnalyzer(noSmoothing), { wristFlexDeg: 40 }, 0, 800);
+    const raised = run(new PostureAnalyzer(noSmoothing), { wristFlexDeg: 50 }, 0, 800);
     expect(raised.cues.every((c) => c.code === 'WRIST_RAISED')).toBe(true);
   });
 

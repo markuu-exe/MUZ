@@ -92,7 +92,7 @@ export const NOVICE_UNITS = [
           learn(
             card('Curved fingers', 'Rest your hand as if holding a small ball. Fingertips touch the keys, not the flat pads.'),
             card('Level forearm', 'Sit so your elbow bends between 80° and 110°. Your forearm should be roughly level with the keys.'),
-            card('Neutral wrist', 'Keep your wrist in line with your forearm (150° or straighter). No dipping, no bumps.'),
+            card('Neutral wrist', 'Keep your wrist close to in line with your forearm (140° or straighter). No big dip, no big bump.'),
             card('Finger numbers', 'Thumbs are finger 1, index 2, middle 3, ring 4, pinky 5, on both hands.'),
           ),
           check(

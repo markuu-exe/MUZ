@@ -14,7 +14,7 @@ export const DEFAULT_POSTURE_CONFIG: PostureConfig = {
   smoothing: DEFAULT_SMOOTHING,
   thresholds: {
     elbow: { min: 80, max: 110 },
-    wrist: { min: 150, max: 180 },
+    wrist: { min: 140, max: 180 }, // ruling W2 (2026-11-27): SRS 150° widened by 10°, both bend directions
     wristFlexDeadbandDeg: 3,
     forearmPitch: { min: -15, max: 15 },
     trunkFlexion: { min: -90, max: 20 },

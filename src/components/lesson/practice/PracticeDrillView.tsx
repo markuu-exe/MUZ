@@ -84,6 +84,7 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
     targets,
     hearts,
     timeoutSec: settings.timeoutSec,
+    heartCost: settings.drillHeartCost ?? 1,
     suspended: !canRun,
     onComplete: (stats) => setEnded({ passed: true, stats }),
     onLocked: (stats) => setEnded({ passed: false, stats }),
@@ -139,7 +140,7 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
   else if (drill.state === 'verifying') status = { text: 'Listening…', tone: 'cyan' };
   else if (drill.lastAttempt === 'miss')
     status = {
-      text: `${drill.lastHeard ? `That sounded like ${drill.lastHeard}. ` : 'Not quite. '}Try again (${drill.consecutiveMisses} of 3 wrong tries before a heart is lost).`,
+      text: `${drill.lastHeard ? `That sounded like ${drill.lastHeard}. ` : 'Not quite. '}Try again${settings.drillHeartCost === 0 ? '. Warm-up lesson: no hearts are lost.' : ` (${drill.consecutiveMisses} of 3 wrong tries before a heart is lost).`}`,
       tone: 'rose',
     };
   else status = { text: 'Play it on your piano now.', tone: 'slate' };

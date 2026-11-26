@@ -94,6 +94,8 @@ export interface PracticeDrillOptions {
   hearts: number;
   /** settings.timeoutSec × 1000. */
   timeoutMs: number;
+  /** Hearts a timeout or 3 misses cost (WaitStateConfig.heartCost). Default 1. */
+  heartCost?: 0 | 1;
   /** Single-note verifier override (tests). Default: see `useChromaNoteVerifier`. */
   createNoteVerifier?: NoteVerifierFactory;
   /**
@@ -117,6 +119,7 @@ export class PracticeDrill extends Emitter<PracticeDrillEvents> {
   readonly targets: readonly DrillTarget[];
   private readonly timeoutMs: number;
   private readonly heartsStart: number;
+  private readonly heartCost: 0 | 1;
 
   private machine: WaitStateMachine | null = null;
   private readonly createNoteVerifier: NoteVerifierFactory;
@@ -142,6 +145,7 @@ export class PracticeDrill extends Emitter<PracticeDrillEvents> {
     const useChroma = options.useChromaNoteVerifier ?? DEFAULT_PRACTICE_CONFIG.useChromaNoteVerifier;
     this.createNoteVerifier = options.createNoteVerifier ?? (useChroma ? chromaNoteVerifier : pitchNoteVerifier);
     this.heartsStart = Math.max(0, Math.floor(options.hearts));
+    this.heartCost = options.heartCost ?? 1;
     this.hearts = this.heartsStart;
   }
 
@@ -228,7 +232,7 @@ export class PracticeDrill extends Emitter<PracticeDrillEvents> {
     const target = this.targets[this.stepIndex];
     this.noteVerifier = target.kind === 'note' ? this.createNoteVerifier(target.note) : null;
     const verifier = this.noteVerifier ?? new ChordVerifier(chordMatcher, (target as { chord: string }).chord);
-    const machine = new WaitStateMachine(verifier, { timeoutMs: this.timeoutMs });
+    const machine = new WaitStateMachine(verifier, { timeoutMs: this.timeoutMs, heartCost: this.heartCost });
     this.machine = machine;
     this.offs = [
       machine.on('state', (e) => {

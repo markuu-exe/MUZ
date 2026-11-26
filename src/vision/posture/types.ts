@@ -17,7 +17,7 @@ export interface BandThreshold {
 export interface PostureThresholds {
   /** SRS 3.1.5.4 — 80° ≤ θ_elbow ≤ 110°. */
   elbow: BandThreshold;
-  /** SRS 3.1.5.4 — 150° ≤ θ_wrist ≤ 180°. */
+  /** SRS 3.1.5.4 as amended by ruling W2: 140° ≤ θ_wrist ≤ 180° (was 150°). */
   wrist: BandThreshold;
   /** Signed wrist flex within ±this is "straight" when choosing droop vs raised wording. */
   wristFlexDeadbandDeg: number;

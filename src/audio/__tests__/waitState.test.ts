@@ -169,6 +169,17 @@ describe('WaitStateMachine (KAN-267, SRS 3.1.6.5)', () => {
     expect(m.consecutiveMisses).toBe(1);
   });
 
+  it('warm-up drills (heartCost 0): a timeout re-arms the timer but never costs a heart or locks', () => {
+    const { m, log } = machine('C', { heartCost: 0, timeoutMs: 30_000 });
+    m.start(0, 1);
+    m.tick(30_000);
+    m.tick(60_000);
+    expect(m.hearts).toBe(1);
+    expect(m.state).toBe('armed');
+    expect(log.filter((l) => l.e === 'heartLost')).toHaveLength(0);
+    expect(m.remainingMs(60_000)).toBe(30_000);
+  });
+
   it('15 s without a valid attempt costs a heart and re-arms (SDD 6.3)', () => {
     const { m, log } = machine();
     m.start(0, 2);
