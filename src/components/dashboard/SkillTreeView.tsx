@@ -189,11 +189,11 @@ export default function SkillTreeView({
                   const lit = done && statuses[i + 1] !== 'locked';
                   return (
                     <g key={i}>
-                      <path d={segmentPath(from, p)} fill="none" stroke="#1e293b" strokeWidth={14} strokeLinecap="round" />
+                      <path d={segmentPath(from, p)} fill="none" style={{ stroke: 'rgb(var(--c-slate-800))' }} strokeWidth={14} strokeLinecap="round" />
                       <path
                         d={segmentPath(from, p)}
                         fill="none"
-                        stroke={lit ? theme.track : '#334155'}
+                        style={{ stroke: lit ? theme.track : 'rgb(var(--c-slate-600))' }}
                         strokeWidth={lit ? 6 : 4}
                         strokeLinecap="round"
                         strokeDasharray={lit ? undefined : '2 12'}

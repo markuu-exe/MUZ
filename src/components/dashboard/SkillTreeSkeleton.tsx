@@ -37,7 +37,7 @@ export default function SkillTreeSkeleton() {
         <div className="relative mx-auto mt-6" style={{ width: PATH_WIDTH, height: pathHeight(NODES) }} aria-hidden="true">
           <svg className="absolute inset-0" width={PATH_WIDTH} height={pathHeight(NODES)} focusable="false">
             {points.slice(1).map((p, i) => (
-              <path key={i} d={segmentPath(points[i], p)} fill="none" stroke="#1e293b" strokeWidth={14} strokeLinecap="round" />
+              <path key={i} d={segmentPath(points[i], p)} fill="none" style={{ stroke: 'rgb(var(--c-slate-800))' }} strokeWidth={14} strokeLinecap="round" />
             ))}
           </svg>
           {points.map((p, i) => (

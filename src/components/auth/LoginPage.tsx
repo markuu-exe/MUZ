@@ -1,3 +1,4 @@
+import { MuzLogo } from '../brand/MuzLogo';
 import React, { useState } from 'react';
 import {
   Mail,
@@ -215,7 +216,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, initialMode = '
     Math.cos((x / 1440) * Math.PI * 4) * 10;
 
   return (
-    <div className="relative flex h-dvh w-full items-center justify-center overflow-hidden bg-muz-bg px-4 text-muz-text selection:bg-muz-accent selection:text-slate-950">
+    <div data-theme="dark" className="relative flex h-dvh w-full items-center justify-center overflow-hidden bg-muz-bg px-4 text-muz-text selection:bg-muz-accent selection:text-slate-950">
       {/* Subtle Musical Background Accents & Edge Glows */}
       <div className="pointer-events-none absolute inset-0 select-none overflow-hidden" aria-hidden="true">
         {/* Core & Edge Soft Glowing Musical Accents */}
@@ -510,13 +511,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, initialMode = '
         )}
         {/* Minimal Brand Header with App Name Cleanly Above Form */}
         <div className="mb-5 text-center">
-          <div className="mb-2.5 inline-flex items-center gap-2.5 rounded-2xl border border-slate-800/90 bg-muz-panel/90 px-3.5 py-1.5 shadow-glow backdrop-blur-md">
-            <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-muz-accent/15 text-muz-accent">
-              <Music className="h-4 w-4" />
-            </div>
-            <span className="text-sm font-extrabold uppercase tracking-[0.28em] text-white">
-              MUZ
-            </span>
+          <div className="mb-3 inline-flex">
+            <MuzLogo size={40} />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">
             {activeMode === 'signin' && 'Welcome back'}

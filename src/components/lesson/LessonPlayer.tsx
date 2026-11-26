@@ -184,7 +184,7 @@ export default function LessonPlayer({
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      className="fixed inset-0 z-50 flex flex-col bg-[#070b14] text-slate-100"
+      className="fixed inset-0 z-50 flex flex-col bg-muz-bg text-slate-100"
       style={{
         backgroundImage:
           'radial-gradient(circle at 15% 0%, rgba(139,92,246,0.14), transparent 40%), radial-gradient(circle at 90% 100%, rgba(34,211,238,0.10), transparent 45%)',

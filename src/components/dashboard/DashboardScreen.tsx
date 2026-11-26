@@ -1,3 +1,6 @@
+import { Moon, Sun } from 'lucide-react';
+import { useTheme } from '../../lib/theme';
+import { MuzLogo } from '../brand/MuzLogo';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
@@ -34,6 +37,7 @@ import DashboardHud from './DashboardHud';
 import SkillTreeView from './SkillTreeView';
 import TapCalibration from '../lesson/rhythm/TapCalibration';
 import SoundToggle from './SoundToggle';
+import AppearanceCard from './AppearanceCard';
 import SkillTreeSkeleton from './SkillTreeSkeleton';
 import LessonNotesView from './LessonNotesView';
 import LessonPlayer, { type LessonSaveFeedback } from '../lesson/LessonPlayer';
@@ -89,6 +93,7 @@ export default function DashboardScreen() {
   const hudProfileStatus = profileStatus === 'loaded' && !profile ? 'failed' : profileStatus;
   // AUX-TEST-ACCESS-01: developer accounts may open locked lessons (access only, never progress).
   const isDev = isDevAccount(profile, isDemo);
+  const [theme, setThemeChoice] = useTheme();
   const data = useDashboardData(profile, isDemo);
   const [view, setView] = useState<DashboardView>('skill-tree');
   const [banner, setBanner] = useState<{ message: string; type: 'warning' | 'error' | 'info' } | null>(null);
@@ -445,25 +450,14 @@ export default function DashboardScreen() {
 
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-[#070b14] text-slate-100 font-sans select-none">
+    <div className="flex h-screen w-full overflow-hidden bg-muz-bg text-slate-100 font-sans select-none">
       {/* =========================================================================
           LEFT-ALIGNED VERTICAL SIDEBAR
           ========================================================================= */}
-      <aside className="flex w-[260px] shrink-0 flex-col border-r border-slate-800/90 bg-[#0c1220] px-4 py-6 shadow-2xl">
+      <aside className="flex w-[260px] shrink-0 flex-col border-r border-slate-800/90 bg-muz-sidebar px-4 py-6 shadow-2xl">
         {/* App Branding & Logo */}
-        <div className="mb-8 flex items-center gap-3 px-2">
-          <div className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-tr from-violet-600 to-fuchsia-600 text-white shadow-[0_0_20px_rgba(139,92,246,0.5)]">
-            <Piano className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xl font-black tracking-widest text-white">MUZ</span>
-              <span className="rounded-md border border-violet-500/40 bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-violet-300">
-                PRO
-              </span>
-            </div>
-            <p className="text-[11px] font-medium text-slate-400">Piano Instruction</p>
-          </div>
+        <div className="mb-8 px-2">
+          <MuzLogo size={40} tagline="Piano lessons" />
         </div>
 
         {/* Sidebar Navigation Links */}
@@ -528,6 +522,16 @@ export default function DashboardScreen() {
               </div>
             </div>
 
+            <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setThemeChoice(theme === 'dark' ? 'light' : 'dark')}
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+              className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-700/60 text-slate-400 transition-colors hover:border-violet-500/50 hover:bg-violet-500/10 hover:text-violet-300"
+            >
+              {theme === 'dark' ? <Sun className="h-4 w-4" aria-hidden="true" /> : <Moon className="h-4 w-4" aria-hidden="true" />}
+            </button>
             <button
               type="button"
               onClick={() => void signOut()}
@@ -536,6 +540,7 @@ export default function DashboardScreen() {
             >
               <LogOut className="h-4 w-4" />
             </button>
+            </div>
           </div>
         </div>
       </aside>
@@ -543,10 +548,10 @@ export default function DashboardScreen() {
       {/* =========================================================================
           MAIN APPLICATION WORKSPACE (TOP HEADER & VIEWPORT)
           ========================================================================= */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#070b14]">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-muz-bg">
         {isDemo && <DemoBanner onExit={() => void signOut()} />}
         {/* TOP GAMIFICATION HEADER */}
-        <header className="flex h-20 shrink-0 items-center justify-between border-b border-slate-800/90 bg-[#0c1220]/90 px-8 backdrop-blur-md">
+        <header className="flex h-20 shrink-0 items-center justify-between border-b border-slate-800/90 bg-muz-sidebar/90 px-8 backdrop-blur-md">
           <div className="flex items-center gap-4">
             <div>
               <div className="flex items-center gap-2">
@@ -746,6 +751,8 @@ export default function DashboardScreen() {
                 <TapCalibration />
               </div>
 
+              <AppearanceCard />
+
               <SoundToggle />
 
               {!isDemo && (
@@ -785,7 +792,7 @@ export default function DashboardScreen() {
               ========================================================================= */}
           {selected && (
             <div className="pointer-events-none fixed bottom-8 left-1/2 z-30 w-full max-w-xl -translate-x-1/2 px-4">
-              <div className="pointer-events-auto rounded-3xl border border-violet-500/50 bg-[#0d1322]/95 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.65)] backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-200">
+              <div className="pointer-events-auto rounded-3xl border border-violet-500/50 bg-muz-panel/95 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.65)] backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-200">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
