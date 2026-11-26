@@ -45,7 +45,7 @@ export const VIRTUOSO_UNITS = [
         title: 'Sixteenth Notes',
         description: 'Four notes in every beat.',
         stages: [
-          learn(card('Sixteenths', 'A sixteenth note lasts a quarter of a beat. Count "1 e & a 2 e & a".')),
+          learn(card('Sixteenths', 'A sixteenth note lasts a quarter of a beat. Count "1 e & a 2 e & a".', { illustration: 'sixteenths' })),
           check(choose('How many sixteenth notes fit in one beat?', '4', ['2', '3', '8'], 'Four sixteenths make one quarter-note beat.')),
           rhythm(tapAlong('sixteenths'), tapRead('sixteenth-mix')),
         ],
@@ -55,7 +55,7 @@ export const VIRTUOSO_UNITS = [
         description: 'Three in the space of two, and the long-short swing feel.',
         stages: [
           learn(
-            card('Triplets', 'A triplet squeezes three equal notes into one beat. Count "1 trip-let 2 trip-let".'),
+            card('Triplets', 'A triplet squeezes three equal notes into one beat. Count "1 trip-let 2 trip-let".', { illustration: 'triplets' }),
             card('Swing', 'Swing plays pairs of eighths long-short, using the first and third notes of a triplet.'),
           ),
           check(choose('How many triplet eighths fit in one beat?', '3', ['2', '4', '6'], 'Three equal notes per beat.')),
@@ -179,8 +179,8 @@ export const VIRTUOSO_UNITS = [
         description: 'How all twelve keys connect.',
         stages: [
           learn(
-            card('Sharps clockwise', 'Each step up a 5th adds one sharp: C (0), G (1), D (2), A (3), E (4), B (5).'),
-            card('Flats anticlockwise', 'Each step down a 5th adds one flat: F (1), Bb (2), Eb (3), Ab (4).'),
+            card('Sharps clockwise', 'Each step up a 5th adds one sharp: C (0), G (1), D (2), A (3), E (4), B (5).', { illustration: 'circle-of-fifths' }),
+            card('Flats anticlockwise', 'Each step down a 5th adds one flat: F (1), Bb (2), Eb (3), Ab (4).', { illustration: 'circle-of-fifths' }),
           ),
           check(
             choose('Which major key has 2 sharps?', 'D', ['G', 'A', 'E'], 'C → G (1) → D (2).'),
@@ -193,7 +193,7 @@ export const VIRTUOSO_UNITS = [
         title: 'All 12 Major Chords',
         description: 'Play every major chord around the circle.',
         stages: [
-          learn(card('Around the circle', 'C G D A E B F# Db Ab Eb Bb F, then back to C.')),
+          learn(card('Around the circle', 'C G D A E B F# Db Ab Eb Bb F, then back to C.', { illustration: 'circle-of-fifths' })),
           play(playChords('C G D A E B F# Db Ab Eb Bb F', { prompt: 'Play all twelve major chords around the circle.' })),
         ],
       }),

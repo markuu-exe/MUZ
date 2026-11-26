@@ -221,7 +221,112 @@ function ChangingChords() {
   );
 }
 
+/** Two beats split into `per` equal notes, beamed, with the count under each. */
+function Subdivision({ per, counts, triplet = false }: { per: number; counts: string[]; triplet?: boolean }) {
+  const beatW = 100;
+  const x0 = 30;
+  return (
+    <g>
+      {[0, 1].map((beat) => {
+        const xs = Array.from({ length: per }, (_, i) => x0 + beat * beatW + 8 + (i * (beatW - 30)) / Math.max(1, per - 1));
+        return (
+          <g key={beat}>
+            {xs.map((x, i) => (
+              <g key={i}>
+                <ellipse cx={x} cy={64} rx={6} ry={4.5} transform={`rotate(-20 ${x} 64)`} fill={INK} />
+                <line x1={x + 5} x2={x + 5} y1={64} y2={36} stroke={INK} strokeWidth={2} />
+                <text x={x} y={92} textAnchor="middle" fontSize="11" fontWeight={i === 0 ? 700 : 400} fill={i === 0 ? ACCENT : MUTED}>
+                  {i === 0 ? String(beat + 1) : counts[i]}
+                </text>
+              </g>
+            ))}
+            <line x1={xs[0] + 5} x2={xs[xs.length - 1] + 5} y1={36} y2={36} stroke={INK} strokeWidth={4} />
+            {per === 4 && <line x1={xs[0] + 5} x2={xs[xs.length - 1] + 5} y1={43} y2={43} stroke={INK} strokeWidth={4} />}
+            {triplet && (
+              <text x={(xs[0] + xs[xs.length - 1]) / 2 + 5} y={26} textAnchor="middle" fontSize="12" fontWeight="800" fill={ACCENT}>
+                3
+              </text>
+            )}
+          </g>
+        );
+      })}
+      <line x1={x0} x2={x0 + 2 * beatW} y1={104} y2={104} stroke={MUTED} strokeWidth={1} />
+      <text x={x0 + beatW / 2} y={116} textAnchor="middle" fontSize="9" fill={MUTED}>beat 1</text>
+      <text x={x0 + 1.5 * beatW} y={116} textAnchor="middle" fontSize="9" fill={MUTED}>beat 2</text>
+    </g>
+  );
+}
+
+function ScaleFormula() {
+  const steps = ['W', 'W', 'H', 'W', 'W', 'W', 'H'];
+  const names = ['C', 'D', 'E', 'F', 'G', 'A', 'B', 'C'];
+  return (
+    <g>
+      {names.map((n, i) => (
+        <g key={i}>
+          <rect x={16 + i * 26} y={30} width={24} height={50} rx={3} fill="#f8fafc" stroke="#334155" />
+          <text x={28 + i * 26} y={74} textAnchor="middle" fontSize="10" fontWeight="700" fill="#334155">{n}</text>
+        </g>
+      ))}
+      {steps.map((s, i) => (
+        <text key={i} x={41 + i * 26} y={100} textAnchor="middle" fontSize="12" fontWeight="800" fill={s === 'H' ? '#fbbf24' : ACCENT}>
+          {s}
+        </text>
+      ))}
+      <text x="120" y="20" textAnchor="middle" fontSize="10" fill={MUTED}>W = whole step, H = half step</text>
+    </g>
+  );
+}
+
+function CircleOfFifths() {
+  const keys = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'Db', 'Ab', 'Eb', 'Bb', 'F'];
+  return (
+    <g>
+      <circle cx="120" cy="62" r="44" fill="none" stroke={MUTED} strokeWidth="1.5" />
+      {keys.map((k, i) => {
+        const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
+        const x = 120 + Math.cos(a) * 44;
+        const y = 62 + Math.sin(a) * 44;
+        const sharp = i >= 1 && i <= 6;
+        const flat = i >= 7;
+        return (
+          <g key={k}>
+            <circle cx={x} cy={y} r="11" fill={i === 0 ? ACCENT : '#0f172a'} stroke={sharp ? GOOD : flat ? '#fbbf24' : ACCENT} strokeWidth="1.5" />
+            <text x={x} y={y + 4} textAnchor="middle" fontSize="9" fontWeight="800" fill={i === 0 ? '#0f172a' : INK}>{k}</text>
+          </g>
+        );
+      })}
+      <text x="214" y="40" fontSize="9" fill={GOOD}>sharps ↻</text>
+      <text x="4" y="40" fontSize="9" fill="#fbbf24">↺ flats</text>
+    </g>
+  );
+}
+
+function RomanNumerals() {
+  const names = ['C', 'Dm', 'Em', 'F', 'G', 'Am', 'B°'];
+  const numerals = ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii°'];
+  const hot = new Set([0, 3, 4, 5]);
+  return (
+    <g>
+      {names.map((n, i) => (
+        <g key={i}>
+          <rect x={14 + i * 31} y={28} width={28} height={30} rx={6} fill={hot.has(i) ? ACCENT : '#1e293b'} opacity={hot.has(i) ? 0.85 : 1} />
+          <text x={28 + i * 31} y={48} textAnchor="middle" fontSize="11" fontWeight="800" fill={hot.has(i) ? '#0f172a' : INK}>{n}</text>
+          <text x={28 + i * 31} y={78} textAnchor="middle" fontSize="12" fontWeight="800" fill={hot.has(i) ? ACCENT : MUTED}>{numerals[i]}</text>
+        </g>
+      ))}
+      <text x="120" y="104" textAnchor="middle" fontSize="10" fill={MUTED}>capitals = major, lower case = minor</text>
+    </g>
+  );
+}
+
 const DRAWINGS: Record<IllustrationId, () => JSX.Element> = {
+  eighths: () => <Subdivision per={2} counts={['1', '&']} />,
+  sixteenths: () => <Subdivision per={4} counts={['1', 'e', '&', 'a']} />,
+  triplets: () => <Subdivision per={3} counts={['1', 'trip', 'let']} triplet />,
+  'scale-formula': ScaleFormula,
+  'circle-of-fifths': CircleOfFifths,
+  'roman-numerals': RomanNumerals,
   'elbow-angle': ElbowAngle,
   'wrist-neutral': WristNeutral,
   'curved-fingers': CurvedFingers,

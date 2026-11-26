@@ -4,10 +4,10 @@
  * src/content is the same source the lesson seed is generated from.
  */
 import type { LessonRow, UnitInfo } from '../../content';
-import type { ConceptCardExercise } from '../../types/lesson.types';
+import type { ConceptCardExercise, Tier } from '../../types/lesson.types';
 
-/** Notes cover the Novice tier (units 1–4): early theory the activities support. */
-export const NOTES_MAX_UNIT = 4;
+/** Notes cover the whole course; the Lessons tab filters them by tier. */
+export const NOTES_MAX_UNIT = 12;
 
 export interface LessonNoteCard {
   title: string;
@@ -27,6 +27,7 @@ export interface LessonNote {
 
 export interface UnitNotes {
   unit: number;
+  tier: Tier;
   title: string;
   blurb: string;
   lessons: LessonNote[];
@@ -62,7 +63,7 @@ export function buildLessonNotes(
       }
     }
     if (unitLessons.length > 0) {
-      out.push({ unit: unit.index, title: unit.title, blurb: unit.blurb, lessons: unitLessons });
+      out.push({ unit: unit.index, tier: unit.tier, title: unit.title, blurb: unit.blurb, lessons: unitLessons });
     }
   }
   return out;

@@ -33,7 +33,7 @@ export const PROFICIENT_UNITS = [
         title: 'Eighth Notes',
         description: 'Two notes in every beat.',
         stages: [
-          learn(card('Eighth notes', 'An eighth note (♪) lasts half a beat. Count "1 & 2 & 3 & 4 &" and tap on every number and every "&".')),
+          learn(card('Eighth notes', 'An eighth note (♪) lasts half a beat. Count "1 & 2 & 3 & 4 &" and tap on every number and every "&".', { illustration: 'eighths' })),
           check(choose('How many eighth notes fit in one beat?', '2', ['1', '3', '4'], 'Two eighths make one quarter-note beat.')),
           rhythm(tapAlong('eighths'), tapRead('eighth-mix')),
         ],
@@ -115,7 +115,7 @@ export const PROFICIENT_UNITS = [
         description: 'W W H W W W H, starting on C.',
         stages: [
           learn(
-            card('The formula', 'Every major scale follows whole, whole, half, whole, whole, whole, half.'),
+            card('The formula', 'Every major scale follows whole, whole, half, whole, whole, whole, half.', { illustration: 'scale-formula' }),
             card('C major scale', 'From C, the formula uses only white keys: C D E F G A B C.', {
               notes: ns('C4 D4 E4 F4 G4 A4 B4 C5'),
               display: 'both',
@@ -277,7 +277,7 @@ export const PROFICIENT_UNITS = [
         title: 'I–IV–V in C',
         description: 'The three most important chords of a key.',
         stages: [
-          learn(card('Roman numerals', 'Number chords by their scale step. In C major: I = C, IV = F, V = G.')),
+          learn(card('Roman numerals', 'Number chords by their scale step. In C major: I = C, IV = F, V = G.', { illustration: 'roman-numerals' })),
           check(
             choose('In C major, the V chord is…', 'G', ['F', 'D', 'A'], 'G is the 5th note of C major.'),
             choose('In C major, the IV chord is…', 'F', ['G', 'E', 'A'], 'F is the 4th note of C major.'),
@@ -289,7 +289,7 @@ export const PROFICIENT_UNITS = [
         title: 'The Pop Progression',
         description: 'I–V–vi–IV: C, G, Am, F.',
         stages: [
-          learn(card('I–V–vi–IV', 'Countless songs use C, G, Am, F. Lower-case vi means a minor chord.')),
+          learn(card('I–V–vi–IV', 'Countless songs use C, G, Am, F. Lower-case vi means a minor chord.', { illustration: 'roman-numerals' })),
           check(
             choose('In C major, vi is…', 'Am', ['A', 'Em', 'F'], 'The 6th note is A, and vi is minor: A minor.'),
             ear('Major or minor?', ['A3 C4 E4'], 'Minor', ['Major'], 'vi is a minor chord.'),
@@ -302,7 +302,7 @@ export const PROFICIENT_UNITS = [
         title: 'Progressions in G & F',
         description: 'Move I–IV–V to new keys.',
         stages: [
-          learn(card('Same numbers, new letters', 'In G major: I = G, IV = C, V = D. In F major: I = F, IV = Bb, V = C.')),
+          learn(card('Same numbers, new letters', 'In G major: I = G, IV = C, V = D. In F major: I = F, IV = Bb, V = C.', { illustration: 'roman-numerals' })),
           check(
             choose('In G major, IV is…', 'C', ['D', 'A', 'F'], 'C is the 4th note of G major.'),
             choose('In F major, V is…', 'C', ['Bb', 'G', 'D'], 'C is the 5th note of F major.'),
