@@ -192,3 +192,19 @@ textarea {
 .animate-achievement-toast-in {
   animation: achievement-toast-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
+/* Landing page: floating notes from the hero keyboard, and scroll reveals. */
+@keyframes muz-float-note {
+  0% { transform: translate(-50%, 0) scale(0.6); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translate(-50%, -140px) rotate(-14deg) scale(1.15); opacity: 0; }
+}
+.muz-float-note { animation: muz-float-note 1.4s ease-out forwards; }
+
+.muz-reveal { opacity: 0; transform: translateY(28px); transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.muz-reveal.is-in { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .muz-float-note { animation: none; opacity: 0; }
+  .muz-reveal, .muz-reveal.is-in { opacity: 1; transform: none; transition: none; }
+}
