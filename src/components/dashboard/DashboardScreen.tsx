@@ -11,7 +11,6 @@ import {
   Play,
   RotateCcw,
   Sparkles,
-  CheckCircle2,
   Sliders,
   Volume2,
   Camera,
@@ -33,6 +32,7 @@ import {
 } from '../../lib/dashboard/curriculum';
 import DashboardHud from './DashboardHud';
 import SkillTreeView from './SkillTreeView';
+import LessonNotesView from './LessonNotesView';
 import LessonPlayer, { type LessonSaveFeedback } from '../lesson/LessonPlayer';
 import { isLessonPayload, type LessonPayload } from '../../types/lesson.types';
 import ProfileAnalyticsView, { type AnalyticsDateRange } from './ProfileAnalyticsView';
@@ -85,7 +85,6 @@ export default function DashboardScreen() {
   const [activeLesson, setActiveLesson] = useState<CurriculumNode | null>(null);
   // D1: where this lesson's results are saved, decided once when it is opened.
   const [activeDestination, setActiveDestination] = useState<ResultDestination>('learner');
-  const [lessonFilter, setLessonFilter] = useState<'all' | 'theory' | 'practice' | 'rhythm'>('all');
   const [placementDone, setPlacementDone] = useState(false);
   const [analyticsRange, setAnalyticsRange] = useState<AnalyticsDateRange>('7d');
   const analytics = useAnalyticsData(isDemo ? null : (profile?.id ?? user?.id ?? null), analyticsRange, isDemo);
@@ -343,11 +342,6 @@ export default function DashboardScreen() {
     setSelectedStatus(status);
   };
 
-  // Filtered lessons for Lessons view
-  const filteredLessons = useMemo(() => {
-    if (lessonFilter === 'all') return data.lessons;
-    return data.lessons.filter((l) => l.kind === lessonFilter);
-  }, [data.lessons, lessonFilter]);
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-[#070b14] text-slate-100 font-sans select-none">
@@ -477,7 +471,7 @@ export default function DashboardScreen() {
                   : view === 'profile'
                     ? 'Profile & Performance Telemetry'
                     : view === 'lessons'
-                      ? 'Piano Curriculum Catalog'
+                      ? 'Lesson Notes'
                       : 'Studio Settings'}
               </h1>
             </div>
@@ -570,97 +564,8 @@ export default function DashboardScreen() {
             />
           )}
 
-          {/* VIEW 3: LESSONS CATALOG */}
-          {view === 'lessons' && (
-            <div className="mx-auto max-w-4xl space-y-6 pb-28">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold text-white">Interactive Lesson Catalog</h2>
-                  <p className="text-sm text-slate-400">
-                    All piano curriculum nodes organized by learning modality and progression gates.
-                  </p>
-                </div>
-
-                {/* Filter buttons */}
-                <div className="flex items-center gap-1.5 rounded-2xl border border-slate-800 bg-slate-900/90 p-1">
-                  {(['all', 'theory', 'practice', 'rhythm'] as const).map((filter) => (
-                    <button
-                      key={filter}
-                      type="button"
-                      onClick={() => setLessonFilter(filter)}
-                      className={cn(
-                        'rounded-xl px-3 py-1.5 text-xs font-bold capitalize transition-all',
-                        lessonFilter === filter
-                          ? 'bg-violet-600 text-white shadow-sm'
-                          : 'text-slate-400 hover:text-slate-200',
-                      )}
-                    >
-                      {filter}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {filteredLessons.map((lesson) => {
-                  const moduleLessons = data.lessons
-                    .filter((item) => item.module_index === lesson.module_index)
-                    .sort((a, b) => a.node_index - b.node_index);
-                  const status = nodeStatus(
-                    lesson,
-                    moduleLessons.findIndex((item) => item.id === lesson.id),
-                    moduleLessons,
-                    data.progress,
-                    exp,
-                    data.lessons,
-                  );
-
-                  return (
-                    <div
-                      key={lesson.id}
-                      onClick={() => handleSelect(lesson, status)}
-                      className={cn(
-                        'flex cursor-pointer items-center justify-between rounded-2xl border p-5 transition-all duration-200',
-                        status === 'mastered' &&
-                          'border-emerald-500/40 bg-slate-900/80 hover:border-emerald-500/70',
-                        status === 'current' &&
-                          'border-violet-400/80 bg-gradient-to-r from-violet-950/40 to-slate-900 shadow-md hover:border-violet-400',
-                        status === 'locked' &&
-                          'border-slate-800/80 bg-slate-950/60 opacity-60 hover:opacity-85',
-                      )}
-                    >
-                      <div className="min-w-0 pr-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                            Module {lesson.module_index} · Node {lesson.node_index}
-                          </span>
-                          <span className="rounded-full border border-slate-700 bg-slate-800 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-300">
-                            {lesson.kind}
-                          </span>
-                        </div>
-                        <h3 className="mt-1 text-base font-bold text-white">{lesson.title}</h3>
-                        <p className="mt-0.5 text-xs text-slate-400">{lesson.description}</p>
-                      </div>
-
-                      <div className="shrink-0 text-right">
-                        <span
-                          className={cn(
-                            'inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider',
-                            status === 'mastered' && 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
-                            status === 'current' && 'bg-violet-500/20 text-violet-300 border border-violet-500/40',
-                            status === 'locked' && 'bg-slate-800 text-slate-400 border border-slate-700',
-                          )}
-                        >
-                          {status === 'mastered' && <CheckCircle2 className="h-3.5 w-3.5" />}
-                          {status}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          {/* VIEW 3: LESSON NOTES (read-only study notes; practice lives on the Skill Tree) */}
+          {view === 'lessons' && <LessonNotesView />}
 
           {/* VIEW 4: SETTINGS */}
           {view === 'settings' && (
@@ -671,36 +576,34 @@ export default function DashboardScreen() {
                     <Sliders className="h-5 w-5" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-white">Audio & Posture Calibration</h2>
-                    <p className="text-xs text-slate-400">Configure your local sensors and acoustic analysis.</p>
+                    <h2 className="text-lg font-bold text-white">Camera & Microphone</h2>
+                    <p className="text-xs text-slate-400">How practice lessons use your devices.</p>
                   </div>
                 </div>
 
                 <div className="mt-6 space-y-4 border-t border-slate-800/80 pt-6">
-                  <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+                  <div className="flex items-center rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
                     <div className="flex items-center gap-3">
                       <Volume2 className="h-5 w-5 text-violet-400" />
                       <div>
-                        <p className="text-sm font-semibold text-white">Chromagram Pitch Tracking</p>
-                        <p className="text-xs text-slate-400">Browser WASM pitch latch window (400ms buffer).</p>
+                        <p className="text-sm font-semibold text-white">Pitch & chord detection (microphone, on-device)</p>
+                        <p className="text-xs text-slate-400">
+                          Runs only in your browser during practice lessons. Nothing is recorded or uploaded.
+                        </p>
                       </div>
                     </div>
-                    <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-400 border border-emerald-500/30">
-                      Active
-                    </span>
                   </div>
 
-                  <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+                  <div className="flex items-center rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
                     <div className="flex items-center gap-3">
                       <Camera className="h-5 w-5 text-emerald-400" />
                       <div>
-                        <p className="text-sm font-semibold text-white">MediaPipe Hand & Wrist Pose Lock</p>
-                        <p className="text-xs text-slate-400">Ergonomic verification for piano practice posture.</p>
+                        <p className="text-sm font-semibold text-white">Posture tracking (camera, on-device)</p>
+                        <p className="text-xs text-slate-400">
+                          Runs only in your browser during practice lessons. Nothing is recorded or uploaded.
+                        </p>
                       </div>
                     </div>
-                    <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-400 border border-emerald-500/30">
-                      Enabled
-                    </span>
                   </div>
 
                   <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
