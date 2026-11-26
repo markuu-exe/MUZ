@@ -128,7 +128,7 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
   else if (ended) status = { text: 'Out of hearts. Practice is paused until a heart comes back.', tone: 'rose' };
   else if (framing === 'searching')
     status = {
-      text: 'Camera is on. Move until it can see your shoulder, elbow and wrist from the side. The timer starts when it can.',
+      text: 'Camera is on. Move until it can see your shoulder, elbow and wrist (a three-quarter view works best). The timer starts when it can.',
       tone: 'amber',
     };
   else if (framing === 'lost') status = { text: `Paused: ${NOT_VISIBLE_MESSAGE} No heart is lost while paused.`, tone: 'amber' };
