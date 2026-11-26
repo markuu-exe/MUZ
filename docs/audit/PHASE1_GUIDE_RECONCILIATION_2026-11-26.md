@@ -146,3 +146,15 @@ So no new auth path is needed. Changes:
   - No schema, RLS or secret changes.
 - **T-13 merged now** would touch `runner.ts`, `applyResult.ts` and the schema, all on the save path, with no review and no staging. **Recommend: do not merge.**
 - **Nothing reaches the live site** until this branch is merged into `main`. A teammate should click through the Vercel preview first.
+
+## 6. Implementation log (2026-11-26, branch `rescue/submission-stabilization`)
+
+| Unit | Result | Evidence |
+|---|---|---|
+| Checkpoint commit | Done | `5eaa2be` |
+| Skill Tree redesign | Done. Winding SVG path, tier sections, unit banners with original SVG art, 3 node states + checkpoint trophy, "Start" bubble, auto-scroll to the next step, `aria-label`/`aria-current`, focus rings. `nodeStatus`/`onSelect` unchanged. | `pathLayout.ts` + 5 tests; browser: 59 nodes, correct current node, tray opens, locked node shakes and names the blocker |
+| Demo mode | Done. Reuses guest mode (no DB access, nothing saved); renamed "Try Demo Mode"; amber DEMO MODE banner with **Exit demo** on every dashboard view | Browser: enter from landing and login, exit returns to landing |
+| Landing page | Done. `/` for signed-out visitors; `/login` and `/signup` open the auth form; Back to home; signed-in users skip it | Browser: all routes plus browser Back |
+| T-14 Onboarding welcome | Done (P1 per U-25/X11: shows until placement is finished; no new DB writes) | Type-check only. **Needs a fresh sign-up to see it.** |
+| T-13 Offline sync (PR #46) | Merged locally (`git merge --no-ff`) plus fixes: restored `achievements`, `run_id` written, pre-migration fallback, duplicate replay = success, per-user queue, broken `scripts/syncLoop.ts` removed, **wired into the lesson save path** | 677/677 tests. **Not verified with a real offline save.** The `run_id` migration is **not applied** to the live DB (optional; the app works without it) |
+| Full checks | `npm test` 60 files / 677 pass; `npm run build` OK; seed up to date; initial bundle 0.90 MB / 5 MB | — |

@@ -55,9 +55,18 @@
 
 1. **D11:** authorize enabling Google in the Supabase project (and the Google Cloud client, U-07), or escalate to the adviser.
 2. **features-integration / PR #22:** **decided — revert** (2026-11-17). Pending: A merges `task/revert-pr-22` (B reviews), then T-03, T-11, T-12 and T-13 continue on the reverted `main`.
-3. **Live `profiles` RLS drift:** P0, owner C, before anything else is deployed from the shared project.
+3. **Live `profiles` RLS drift:** P0, owner C, before anything else is deployed from the shared project. **Closed 2026-11-26 (§4a).**
 4. **Nov 28 is a Saturday:** confirm what is due that day.
 5. **U-06:** production project (new vs promote the existing one) — still open.
+
+## 4a. Decisions 2026-11-26 (submission rescue)
+
+| ID | Decided | Conditions / known limitations | By |
+|---|---|---|---|
+| **U-30** | **Option (c) applies.** The schedule gate (E1 staging by Mon 11-23) passed without E1, so the trusted RPC progression path (T-28, Stage A/B) is **not** delivered for this release. Ruling D14 stays in force. | Progression is computed and written by the browser (W1–W7); this is not protection against self-manipulation. Saves are not atomic (progress, performance and profile are separate requests). | A (Amatong) |
+| **T-13 interim (U-30 option b)** | **Accept the interim offline queue over the current client save path** (PR #46 + review fixes). A lesson save that fails because the network is down is queued in IndexedDB (`muz-sync`, per user) and replayed through `saveLessonResult` when the browser is back online, with backoff. | **Accepted limitations:** (1) replay is not atomic: a replay can half-apply if the connection drops again mid-save; (2) only `performance_records` is protected against duplicates (`run_id`, unique when set); progress upsert and profile update are re-derived from fresh reads on replay, so EXP is not re-awarded for an already-completed lesson, but hearts/streak follow the replayed run; (3) the queue stores client-supplied lesson facts (`passMark`, `expReward`); (4) developer test runs are never queued. Guide C T-13 requirements I-1, I-3 and I-5 are **not met** and are recorded here as accepted. | A (Amatong) |
+| **M7 `run_id`** | Apply `supabase/migrations/20261125120000_performance_run_id.sql` to the hosted project (owner applies in the SQL editor). | The client works with or without the column (falls back to saving without `run_id`). | A (Amatong) |
+| **F2 applied** | `20261119120000_profiles_rls_hardening.sql` applied to the hosted project 2026-11-26 after a SQL-editor snapshot of policies, grants and data. Anonymous `GET /rest/v1/profiles` now returns 401 / 42501. | Outstanding condition 3 below is closed. | A (Amatong) |
 
 ## 5. Sign-off
 
