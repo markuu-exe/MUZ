@@ -1,3 +1,5 @@
+> **Superseded (2026-11-26).** Baseline `e96c34c` and the plan in §4 (staging E1, RPCs, Stage A/B) are stale. Current state: `docs/audit/RESCUE_AUDIT_2026-11-26.md` and `docs/audit/PHASE1_GUIDE_RECONCILIATION_2026-11-26.md`.
+
 # MUZ Consolidated Handoff (Phase 4)
 
 | | |

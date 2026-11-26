@@ -175,3 +175,13 @@ describe('saveLessonResult', () => {
     await expect(save(store, result())).rejects.toThrow(/profile/i);
   });
 });
+
+describe('isMissingRunIdColumn (T-13)', () => {
+  it('recognises the missing-column errors only for run_id', async () => {
+    const { isMissingRunIdColumn } = await import('../supabaseStore');
+    expect(isMissingRunIdColumn({ code: 'PGRST204', message: "Could not find the 'run_id' column of 'performance_records'" })).toBe(true);
+    expect(isMissingRunIdColumn({ code: '42703', message: 'column "run_id" does not exist' })).toBe(true);
+    expect(isMissingRunIdColumn({ code: 'PGRST204', message: "Could not find the 'other' column" })).toBe(false);
+    expect(isMissingRunIdColumn({ code: '23505', message: 'duplicate key value violates unique constraint "performance_records_run_id_key"' })).toBe(false);
+  });
+});

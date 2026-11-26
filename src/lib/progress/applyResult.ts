@@ -39,6 +39,8 @@ export interface PerformanceRow {
   rhythm_consistency: number;
   posture_score: number;
   drill_duration_sec: number;
+  /** T-13: attempt id; a replayed save with the same id is ignored by the database. */
+  run_id?: string | null;
 }
 
 export interface LessonFacts {
@@ -66,6 +68,7 @@ export interface AppliedResult {
   completedNow: boolean;
   /** Short line for the results screen, or null. */
   note: string | null;
+  /** Badge ids unlocked by this run (set by saveLessonResult, T-11). */
   achievements?: string[];
 }
 
@@ -125,6 +128,7 @@ export function applyResult({ profile, progress, lesson, result, today, nowIso }
           rhythm_consistency: pct(result.metrics.rhythmConsistency),
           posture_score: pct(result.metrics.postureScore),
           drill_duration_sec: Math.max(0, Math.round(result.durationSec)),
+          run_id: result.runId ?? null,
         }
       : null,
     expGained,

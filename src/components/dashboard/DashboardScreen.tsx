@@ -11,7 +11,6 @@ import {
   Play,
   RotateCcw,
   Sparkles,
-  CheckCircle2,
   Sliders,
   Volume2,
   Camera,
@@ -33,10 +32,13 @@ import {
 } from '../../lib/dashboard/curriculum';
 import DashboardHud from './DashboardHud';
 import SkillTreeView from './SkillTreeView';
+import SkillTreeSkeleton from './SkillTreeSkeleton';
+import LessonNotesView from './LessonNotesView';
 import LessonPlayer, { type LessonSaveFeedback } from '../lesson/LessonPlayer';
 import { isLessonPayload, type LessonPayload } from '../../types/lesson.types';
 import ProfileAnalyticsView, { type AnalyticsDateRange } from './ProfileAnalyticsView';
 import PlacementModal from './PlacementModal';
+import OnboardingWelcome from './OnboardingWelcome';
 import AchievementToast, { type AchievementToastItem } from '../common/AchievementToast';
 import { lessonExp } from '../../content';
 import type { LessonResult } from '../../lesson/types';
@@ -50,6 +52,9 @@ import {
 } from '../../lib/progress/clientAchievements';
 import { canOpenLesson, isDevAccount, resultDestination, type ResultDestination } from '../../lib/progress/devAccess';
 import { saveRunResult } from '../../lib/progress/devTestResults';
+import { saveLessonResult } from '../../lib/progress/saveLessonResult';
+import { createMemorySyncQueue, isNetworkError, openSyncQueue, type SyncQueue } from '../../lib/sync/queue';
+import { OFFLINE_NOTE, queueForUser, startQueueSync } from '../../lib/sync/syncLoop';
 import { PLACEMENT_METADATA_KEY } from '../../lib/progress/placement';
 import { displayedStreak, toLocalDate } from '../../lib/progress/streak';
 import { persistRegeneratedHearts, savePlacement, supabaseDevTestStore, supabaseProgressStore } from '../../lib/progress/supabaseStore';
@@ -85,8 +90,9 @@ export default function DashboardScreen() {
   const [activeLesson, setActiveLesson] = useState<CurriculumNode | null>(null);
   // D1: where this lesson's results are saved, decided once when it is opened.
   const [activeDestination, setActiveDestination] = useState<ResultDestination>('learner');
-  const [lessonFilter, setLessonFilter] = useState<'all' | 'theory' | 'practice' | 'rhythm'>('all');
   const [placementDone, setPlacementDone] = useState(false);
+  // T-14 (U-25): the welcome step shows until placement is finished; placement itself is stored on the account.
+  const [welcomeSeen, setWelcomeSeen] = useState(false);
   const [analyticsRange, setAnalyticsRange] = useState<AnalyticsDateRange>('7d');
   const analytics = useAnalyticsData(isDemo ? null : (profile?.id ?? user?.id ?? null), analyticsRange, isDemo);
   const [achievementToasts, setAchievementToasts] = useState<AchievementToastItem[]>([]);
@@ -149,6 +155,10 @@ export default function DashboardScreen() {
     };
   }, []);
 
+  // Until this learner's own lessons and progress have loaded once, show a skeleton instead of the
+  // bundled course with no progress, which looks like the learner's data was reset.
+  const treeReady =
+    isDemo || (profileStatus !== 'loading' && (!profile || data.loadedFor === profile.id));
   const hearts = profile?.hearts ?? 0;
   const streak = profile
     ? displayedStreak(profile.current_streak, profile.last_activity_date, toLocalDate(new Date()))
@@ -223,6 +233,45 @@ export default function DashboardScreen() {
     return out;
   };
 
+  // T-13 (SRS 3.3.2, SDD C-08): offline queue for lesson saves. IndexedDB when available, memory otherwise.
+  const syncQueueRef = useRef<SyncQueue | null>(null);
+  const afterSyncRef = useRef<() => void>(() => {});
+  afterSyncRef.current = () => {
+    void refreshProfile();
+    data.reload();
+    analytics.reload();
+  };
+  const syncUserId = !isDemo && profile ? profile.id : null;
+  useEffect(() => {
+    if (!syncUserId) {
+      syncQueueRef.current = null;
+      return;
+    }
+    let stop: (() => void) | null = null;
+    let cancelled = false;
+    void (async () => {
+      let base: SyncQueue;
+      try {
+        base = await openSyncQueue();
+      } catch {
+        base = createMemorySyncQueue();
+      }
+      if (cancelled) return;
+      const queue = queueForUser(base, syncUserId);
+      syncQueueRef.current = queue;
+      stop = startQueueSync({
+        queue,
+        save: (input) => saveLessonResult(supabaseProgressStore(supabase), input),
+        onSynced: () => afterSyncRef.current(),
+      });
+    })();
+    return () => {
+      cancelled = true;
+      stop?.();
+      syncQueueRef.current = null;
+    };
+  }, [syncUserId]);
+
   // COURSE-6: save each finished run; demo mode saves nothing.
   // D1: a lesson a developer opened while it was locked is saved as test data only.
   // Achievements are also evaluated client-side so unlocks & notifications work even before server lesson tables exist.
@@ -270,9 +319,23 @@ export default function DashboardScreen() {
       data.reload();
       analytics.reload();
       return feedback;
-    } catch {
+    } catch (err) {
       if (destination === 'dev-test') {
         return { note: 'Your result could not be saved.' };
+      }
+      // T-13 (SRS 3.3.2): offline, keep the run in the local queue and sync it when the connection returns.
+      if (isNetworkError(err) && syncQueueRef.current) {
+        try {
+          await syncQueueRef.current.enqueue({
+            userId: profile.id,
+            lesson: { passMark: payload.settings.passMark, expReward: lessonExp(payload) },
+            result,
+            now: new Date(),
+          });
+          return { note: OFFLINE_NOTE, expAwarded: 0 };
+        } catch {
+          // Could not even store it locally: fall through to the normal failure message.
+        }
       }
       const clientOut = evaluateClientSide(lesson, payload, result);
       const badgeNote =
@@ -343,11 +406,6 @@ export default function DashboardScreen() {
     setSelectedStatus(status);
   };
 
-  // Filtered lessons for Lessons view
-  const filteredLessons = useMemo(() => {
-    if (lessonFilter === 'all') return data.lessons;
-    return data.lessons.filter((l) => l.kind === lessonFilter);
-  }, [data.lessons, lessonFilter]);
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-[#070b14] text-slate-100 font-sans select-none">
@@ -477,7 +535,7 @@ export default function DashboardScreen() {
                   : view === 'profile'
                     ? 'Profile & Performance Telemetry'
                     : view === 'lessons'
-                      ? 'Piano Curriculum Catalog'
+                      ? 'Lesson Notes'
                       : 'Studio Settings'}
               </h1>
             </div>
@@ -540,7 +598,8 @@ export default function DashboardScreen() {
         {/* Scrollable Main Content Container */}
         <main className="relative flex-1 overflow-y-auto px-8 py-8">
           {/* VIEW 1: SKILL TREE PROGRESSION (Default State) */}
-          {view === 'skill-tree' && (
+          {view === 'skill-tree' && !treeReady && <SkillTreeSkeleton />}
+          {view === 'skill-tree' && treeReady && (
             <SkillTreeView
               lessons={data.lessons}
               progress={data.progress}
@@ -570,97 +629,8 @@ export default function DashboardScreen() {
             />
           )}
 
-          {/* VIEW 3: LESSONS CATALOG */}
-          {view === 'lessons' && (
-            <div className="mx-auto max-w-4xl space-y-6 pb-28">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold text-white">Interactive Lesson Catalog</h2>
-                  <p className="text-sm text-slate-400">
-                    All piano curriculum nodes organized by learning modality and progression gates.
-                  </p>
-                </div>
-
-                {/* Filter buttons */}
-                <div className="flex items-center gap-1.5 rounded-2xl border border-slate-800 bg-slate-900/90 p-1">
-                  {(['all', 'theory', 'practice', 'rhythm'] as const).map((filter) => (
-                    <button
-                      key={filter}
-                      type="button"
-                      onClick={() => setLessonFilter(filter)}
-                      className={cn(
-                        'rounded-xl px-3 py-1.5 text-xs font-bold capitalize transition-all',
-                        lessonFilter === filter
-                          ? 'bg-violet-600 text-white shadow-sm'
-                          : 'text-slate-400 hover:text-slate-200',
-                      )}
-                    >
-                      {filter}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {filteredLessons.map((lesson) => {
-                  const moduleLessons = data.lessons
-                    .filter((item) => item.module_index === lesson.module_index)
-                    .sort((a, b) => a.node_index - b.node_index);
-                  const status = nodeStatus(
-                    lesson,
-                    moduleLessons.findIndex((item) => item.id === lesson.id),
-                    moduleLessons,
-                    data.progress,
-                    exp,
-                    data.lessons,
-                  );
-
-                  return (
-                    <div
-                      key={lesson.id}
-                      onClick={() => handleSelect(lesson, status)}
-                      className={cn(
-                        'flex cursor-pointer items-center justify-between rounded-2xl border p-5 transition-all duration-200',
-                        status === 'mastered' &&
-                          'border-emerald-500/40 bg-slate-900/80 hover:border-emerald-500/70',
-                        status === 'current' &&
-                          'border-violet-400/80 bg-gradient-to-r from-violet-950/40 to-slate-900 shadow-md hover:border-violet-400',
-                        status === 'locked' &&
-                          'border-slate-800/80 bg-slate-950/60 opacity-60 hover:opacity-85',
-                      )}
-                    >
-                      <div className="min-w-0 pr-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                            Module {lesson.module_index} · Node {lesson.node_index}
-                          </span>
-                          <span className="rounded-full border border-slate-700 bg-slate-800 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-300">
-                            {lesson.kind}
-                          </span>
-                        </div>
-                        <h3 className="mt-1 text-base font-bold text-white">{lesson.title}</h3>
-                        <p className="mt-0.5 text-xs text-slate-400">{lesson.description}</p>
-                      </div>
-
-                      <div className="shrink-0 text-right">
-                        <span
-                          className={cn(
-                            'inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider',
-                            status === 'mastered' && 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
-                            status === 'current' && 'bg-violet-500/20 text-violet-300 border border-violet-500/40',
-                            status === 'locked' && 'bg-slate-800 text-slate-400 border border-slate-700',
-                          )}
-                        >
-                          {status === 'mastered' && <CheckCircle2 className="h-3.5 w-3.5" />}
-                          {status}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          {/* VIEW 3: LESSON NOTES (read-only study notes; practice lives on the Skill Tree) */}
+          {view === 'lessons' && <LessonNotesView />}
 
           {/* VIEW 4: SETTINGS */}
           {view === 'settings' && (
@@ -671,36 +641,34 @@ export default function DashboardScreen() {
                     <Sliders className="h-5 w-5" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-white">Audio & Posture Calibration</h2>
-                    <p className="text-xs text-slate-400">Configure your local sensors and acoustic analysis.</p>
+                    <h2 className="text-lg font-bold text-white">Camera & Microphone</h2>
+                    <p className="text-xs text-slate-400">How practice lessons use your devices.</p>
                   </div>
                 </div>
 
                 <div className="mt-6 space-y-4 border-t border-slate-800/80 pt-6">
-                  <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+                  <div className="flex items-center rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
                     <div className="flex items-center gap-3">
                       <Volume2 className="h-5 w-5 text-violet-400" />
                       <div>
-                        <p className="text-sm font-semibold text-white">Chromagram Pitch Tracking</p>
-                        <p className="text-xs text-slate-400">Browser WASM pitch latch window (400ms buffer).</p>
+                        <p className="text-sm font-semibold text-white">Pitch & chord detection (microphone, on-device)</p>
+                        <p className="text-xs text-slate-400">
+                          Runs only in your browser during practice lessons. Nothing is recorded or uploaded.
+                        </p>
                       </div>
                     </div>
-                    <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-400 border border-emerald-500/30">
-                      Active
-                    </span>
                   </div>
 
-                  <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+                  <div className="flex items-center rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
                     <div className="flex items-center gap-3">
                       <Camera className="h-5 w-5 text-emerald-400" />
                       <div>
-                        <p className="text-sm font-semibold text-white">MediaPipe Hand & Wrist Pose Lock</p>
-                        <p className="text-xs text-slate-400">Ergonomic verification for piano practice posture.</p>
+                        <p className="text-sm font-semibold text-white">Posture tracking (camera, on-device)</p>
+                        <p className="text-xs text-slate-400">
+                          Runs only in your browser during practice lessons. Nothing is recorded or uploaded.
+                        </p>
                       </div>
                     </div>
-                    <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-400 border border-emerald-500/30">
-                      Enabled
-                    </span>
                   </div>
 
                   <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
@@ -833,7 +801,8 @@ export default function DashboardScreen() {
         />
       )}
 
-      {needsPlacement && <PlacementModal onChoose={choosePlacement} />}
+      {needsPlacement && !welcomeSeen && <OnboardingWelcome onContinue={() => setWelcomeSeen(true)} />}
+      {needsPlacement && welcomeSeen && <PlacementModal onChoose={choosePlacement} />}
       <AchievementToast toasts={achievementToasts} onDismiss={dismissAchievementToast} />
     </div>
   );
