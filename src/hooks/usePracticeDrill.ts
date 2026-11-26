@@ -45,6 +45,7 @@ export function usePracticeDrill(options: UsePracticeDrillOptions) {
     consecutiveMisses: 0,
     lastAttempt: null,
     lastHeard: null,
+    lastCheck: null,
     postureBlocked: false,
     complete: false,
     running: false,
