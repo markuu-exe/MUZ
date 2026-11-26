@@ -98,7 +98,13 @@ export type IllustrationId =
   | 'hold-then-move'
   | 'rests'
   | 'three-four'
-  | 'changing-chords';
+  | 'changing-chords'
+  | 'eighths'
+  | 'sixteenths'
+  | 'triplets'
+  | 'scale-formula'
+  | 'circle-of-fifths'
+  | 'roman-numerals';
 
 export interface ChooseAnswerExercise extends ExerciseBase {
   type: 'choose-answer';

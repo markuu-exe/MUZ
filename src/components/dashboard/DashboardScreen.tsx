@@ -33,6 +33,7 @@ import {
 import DashboardHud from './DashboardHud';
 import SkillTreeView from './SkillTreeView';
 import TapCalibration from '../lesson/rhythm/TapCalibration';
+import SoundToggle from './SoundToggle';
 import SkillTreeSkeleton from './SkillTreeSkeleton';
 import LessonNotesView from './LessonNotesView';
 import LessonPlayer, { type LessonSaveFeedback } from '../lesson/LessonPlayer';
@@ -744,6 +745,8 @@ export default function DashboardScreen() {
                 </p>
                 <TapCalibration />
               </div>
+
+              <SoundToggle />
 
               {!isDemo && (
                 <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-xl">

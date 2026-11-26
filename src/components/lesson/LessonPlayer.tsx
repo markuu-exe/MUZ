@@ -6,6 +6,7 @@
  * the registry. The player only shows the current exercise, the feedback for
  * answer-type exercises, and the results screen.
  */
+import { playSfx } from '../../lib/sfx';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Heart, X } from 'lucide-react';
 import { exerciseSettings } from '../../content';
@@ -132,7 +133,11 @@ export default function LessonPlayer({
   const handleOutcome = useCallback(
     (outcome: ExerciseOutcome) => {
       if (!item) return;
-      if (registry[item.exercise.type].feedback === 'answer') setPending(outcome);
+      if (registry[item.exercise.type].feedback === 'answer') {
+        // Answer feedback only (theory): never during a microphone drill.
+        playSfx(outcome.passed ? 'correct' : 'wrong');
+        setPending(outcome);
+      }
       else advance(outcome);
     },
     [advance, item, registry],

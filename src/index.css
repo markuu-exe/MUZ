@@ -208,3 +208,13 @@ textarea {
   .muz-float-note { animation: none; opacity: 0; }
   .muz-reveal, .muz-reveal.is-in { opacity: 1; transform: none; transition: none; }
 }
+
+/* Results: star burst on a passed lesson. */
+@keyframes muz-burst {
+  0% { transform: translate(-50%, -50%) scale(0.4); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1); opacity: 0; }
+}
+.muz-burst { animation: muz-burst 0.8s cubic-bezier(0.2, 0.7, 0.3, 1) forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .muz-burst { animation: none; opacity: 0; }
+}

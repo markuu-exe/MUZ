@@ -1,6 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { BookOpen, ChevronDown } from 'lucide-react';
-import { COURSE_LESSONS, COURSE_UNITS } from '../../content';
+import { COURSE_LESSONS, COURSE_UNITS, TIERS } from '../../content';
+import { cn } from '../../lib/cn';
+import type { Tier } from '../../types/lesson.types';
 import { buildLessonNotes } from '../../lib/dashboard/lessonNotes';
 import NoteFigure from '../lesson/theory/NoteFigure';
 import Illustration from '../theory/Illustration';
@@ -10,18 +12,37 @@ import Illustration from '../theory/Illustration';
  * here is graded, saved or gated by hearts.
  */
 export default function LessonNotesView() {
-  const units = useMemo(() => buildLessonNotes(COURSE_LESSONS, COURSE_UNITS), []);
+  const all = useMemo(() => buildLessonNotes(COURSE_LESSONS, COURSE_UNITS), []);
+  const [tier, setTier] = useState<Tier>('novice');
+  const units = all.filter((u) => u.tier === tier);
 
   return (
     <div className="mx-auto max-w-4xl space-y-8 pb-28">
       <div>
         <h2 className="text-2xl font-bold text-white">Lesson Notes</h2>
         <p className="mt-1 text-sm text-slate-400">
-          Read-only notes from the Novice units. To practise a topic, open its lesson on the Skill Tree.
+          Read-only notes from every unit. To practise a topic, open its lesson on the Skill Tree.
         </p>
+        <div className="mt-4 flex gap-1.5 rounded-2xl border border-slate-800 bg-slate-900/90 p-1" role="tablist" aria-label="Level">
+          {(['novice', 'proficient', 'virtuoso'] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={tier === t}
+              onClick={() => setTier(t)}
+              className={cn(
+                'flex-1 rounded-xl px-3 py-2 text-xs font-bold transition-all',
+                tier === t ? 'bg-violet-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200',
+              )}
+            >
+              {TIERS[t].label} <span className="font-medium opacity-70">· {TIERS[t].level}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      {units.map((unit) => (
+      {units.map((unit, unitIndex) => (
         <section key={unit.unit} className="space-y-3">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-violet-400">Unit {unit.unit}</p>
@@ -32,7 +53,7 @@ export default function LessonNotesView() {
           {unit.lessons.map((lesson, index) => (
             <details
               key={lesson.id}
-              open={unit.unit === 1 && index === 0}
+              open={unitIndex === 0 && index === 0}
               className="group rounded-2xl border border-slate-800 bg-slate-900/80 open:border-violet-500/40"
             >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5">
