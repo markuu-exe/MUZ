@@ -22,6 +22,7 @@ import type {
   StageKind,
   TapExercise,
   TapExerciseType,
+  IllustrationId,
 } from '../types/lesson.types';
 
 // ---------------------------------------------------------------------------
@@ -89,7 +90,7 @@ interface WithSettings {
 export function card(
   title: string,
   body: string,
-  opts: { notes?: number[]; display?: NoteDisplay; chord?: boolean } = {},
+  opts: { notes?: number[]; display?: NoteDisplay; chord?: boolean; illustration?: IllustrationId } = {},
 ): Authored<ConceptCardExercise> {
   return { type: 'concept-card', title, body, ...opts };
 }

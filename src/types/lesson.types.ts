@@ -83,7 +83,22 @@ export interface ConceptCardExercise extends ExerciseBase {
   display?: NoteDisplay;
   /** Draw `notes` stacked as one chord on the staff. */
   chord?: boolean;
+  /** A diagram for cards with no notes to show (see components/theory/Illustration.tsx). */
+  illustration?: IllustrationId;
 }
+
+export type IllustrationId =
+  | 'elbow-angle'
+  | 'wrist-neutral'
+  | 'curved-fingers'
+  | 'finger-numbers'
+  | 'pulse'
+  | 'quarter-notes'
+  | 'note-values'
+  | 'hold-then-move'
+  | 'rests'
+  | 'three-four'
+  | 'changing-chords';
 
 export interface ChooseAnswerExercise extends ExerciseBase {
   type: 'choose-answer';
