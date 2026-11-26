@@ -1,11 +1,46 @@
+import { useCallback, useEffect, useState } from 'react';
 import { Loader2, Music2 } from 'lucide-react';
 import ViewportGuard from './components/common/ViewportGuard';
 import { LoginPage } from './components/auth/LoginPage';
 import DashboardScreen from './components/dashboard/DashboardScreen';
+import LandingPage from './components/landing/LandingPage';
 import { useAuth } from './context/AuthContext';
 
+/** Signed-out screens. `/login` and `/signup` open the auth form directly; anything else is the landing page. */
+type PublicScreen = 'landing' | 'signin' | 'signup';
+
+function screenFromPath(pathname: string): PublicScreen {
+  if (pathname.startsWith('/login')) return 'signin';
+  if (pathname.startsWith('/signup')) return 'signup';
+  return 'landing';
+}
+
+const PATH_FOR: Record<PublicScreen, string> = { landing: '/', signin: '/login', signup: '/signup' };
+
 export default function App() {
-  const { user, loading, isPasswordRecovery } = useAuth();
+  const { user, loading, isPasswordRecovery, enterDemoMode } = useAuth();
+  const [screen, setScreen] = useState<PublicScreen>(() => screenFromPath(window.location.pathname));
+
+  const go = useCallback((next: PublicScreen) => {
+    setScreen(next);
+    if (window.location.pathname !== PATH_FOR[next]) {
+      window.history.pushState(null, '', PATH_FOR[next] + window.location.hash);
+    }
+  }, []);
+
+  useEffect(() => {
+    const onPop = () => setScreen(screenFromPath(window.location.pathname));
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  // Once signed in (or in demo mode) the app lives at "/", so a later sign-out lands on the landing page.
+  useEffect(() => {
+    if (user && window.location.pathname !== '/') {
+      window.history.replaceState(null, '', '/' + window.location.hash);
+      setScreen('landing');
+    }
+  }, [user]);
 
   // Loading state while checking session
   if (loading) {
@@ -26,12 +61,25 @@ export default function App() {
     );
   }
 
-  // If not authenticated or in password recovery flow, show the Login Page
-  if (!user || isPasswordRecovery) {
+  // Password recovery always goes straight to the auth form.
+  if (isPasswordRecovery) {
     return (
       <>
         <ViewportGuard />
         <LoginPage />
+      </>
+    );
+  }
+
+  if (!user) {
+    return (
+      <>
+        <ViewportGuard />
+        {screen === 'landing' ? (
+          <LandingPage onSignIn={() => go('signin')} onSignUp={() => go('signup')} onDemo={() => enterDemoMode('virtuoso')} />
+        ) : (
+          <LoginPage key={screen} initialMode={screen === 'signup' ? 'signup' : 'signin'} onBack={() => go('landing')} />
+        )}
       </>
     );
   }
