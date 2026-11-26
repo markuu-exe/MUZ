@@ -1,3 +1,4 @@
+import { OFFLINE_NOTE } from '../../lib/sync/syncLoop';
 import { Heart, RotateCcw, Sparkles, Target, Timer } from 'lucide-react';
 import type { LessonResult } from '../../lesson/types';
 import { cn } from '../../lib/cn';
@@ -71,7 +72,14 @@ export default function LessonResults({ title, result, note, onRetry, onClose, t
         <p className="text-xs font-bold uppercase tracking-widest text-violet-300">{title}</p>
         <h2 className="mt-1 text-3xl font-black text-white">{head.title}</h2>
         <p className="mt-2 text-sm text-slate-400">{head.body}</p>
-        {note && <p className="mt-2 text-xs text-slate-500">{note}</p>}
+        {note &&
+          (note.startsWith(OFFLINE_NOTE) ? (
+            <p className="mt-3 rounded-lg border border-amber-500/40 bg-amber-950/40 px-3 py-2 text-sm font-semibold text-amber-100">
+              {note}
+            </p>
+          ) : (
+            <p className="mt-2 text-xs text-slate-500">{note}</p>
+          ))}
       </div>
 
       <div className="grid grid-cols-2 gap-3">

@@ -1,4 +1,5 @@
 /** COURSE-5: small display pieces shared by the practice views. */
+import { useEffect, useRef, useState } from 'react';
 import { Heart } from 'lucide-react';
 import { MAX_HEARTS } from '../../../lesson/runner';
 import { cn } from '../../../lib/cn';
@@ -58,7 +59,16 @@ export function MicMeter({ rmsDb }: { rmsDb: number }) {
 const WHITE_W = 48; // PianoKeyboard key width
 
 /** A silent, non-interactive keyboard scaled to fit `maxWidth`, with `notes` lit. */
-export function TargetKeyboard({ notes, maxWidth = 440 }: { notes: number[]; maxWidth?: number }) {
+export function TargetKeyboard({
+  notes,
+  maxWidth = 440,
+  heard,
+}: {
+  notes: number[];
+  maxWidth?: number;
+  /** Maps the keyboard's range to the keys being heard (see practice/heard.ts). */
+  heard?: (start: number, end: number) => number[];
+}) {
   const lo = Math.min(...notes);
   const hi = Math.max(...notes);
   const start = Math.floor(lo / 12) * 12;
@@ -66,12 +76,24 @@ export function TargetKeyboard({ notes, maxWidth = 440 }: { notes: number[]; max
   let whites = 0;
   for (let m = start; m <= end; m++) if (!isBlackKey(m)) whites++;
   const width = whites * WHITE_W;
-  const scale = Math.min(1, maxWidth / width);
+  // Fit the space the card actually has, not only the requested maximum.
+  const fitRef = useRef<HTMLDivElement | null>(null);
+  const [available, setAvailable] = useState<number>(maxWidth);
+  useEffect(() => {
+    const el = fitRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(([entry]) => setAvailable(entry.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const scale = Math.min(1, maxWidth / width, available > 0 ? available / width : 1);
   return (
+    <div ref={fitRef} className="w-full">
     <div className="pointer-events-none mx-auto" style={{ width: width * scale, height: 160 * scale }} aria-hidden="true">
       <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width }}>
-        <PianoKeyboard startMidi={start} endMidi={end} highlighted={notes} playSound={false} />
+        <PianoKeyboard startMidi={start} endMidi={end} highlighted={notes} heard={heard?.(start, end)} playSound={false} />
       </div>
+    </div>
     </div>
   );
 }

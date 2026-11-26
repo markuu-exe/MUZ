@@ -25,8 +25,8 @@ export const EXERCISE_REGISTRY: ExerciseRegistry = {
   'tap-echo': { View: TapExerciseView, feedback: 'activity', label: 'Echo the rhythm', wide: true },
   'tap-read': { View: TapExerciseView, feedback: 'activity', label: 'Read and tap', wide: true },
   // COURSE-5: one drill view for notes, chords and sequences; posture-hold is camera only.
-  'play-note': { View: PracticeDrillView, feedback: 'activity', label: 'Play the note', wide: true },
-  'play-chord': { View: PracticeDrillView, feedback: 'activity', label: 'Play the chord', wide: true },
-  'play-sequence': { View: PracticeDrillView, feedback: 'activity', label: 'Play in order', wide: true },
-  'posture-hold': { View: PostureHoldView, feedback: 'activity', label: 'Posture check', wide: true },
+  'play-note': { View: PracticeDrillView, feedback: 'activity', label: 'Play the note', wide: true, camera: true },
+  'play-chord': { View: PracticeDrillView, feedback: 'activity', label: 'Play the chord', wide: true, camera: true },
+  'play-sequence': { View: PracticeDrillView, feedback: 'activity', label: 'Play in order', wide: true, camera: true },
+  'posture-hold': { View: PostureHoldView, feedback: 'activity', label: 'Posture check', wide: true, camera: true },
 };

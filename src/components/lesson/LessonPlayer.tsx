@@ -241,7 +241,7 @@ export default function LessonPlayer({
           item &&
           entry &&
           View && (
-            <div className={cn('mx-auto w-full', entry.wide ? 'max-w-5xl' : 'max-w-2xl')}>
+            <div className={cn('mx-auto w-full', entry.camera ? 'max-w-screen-2xl' : entry.wide ? 'max-w-5xl' : 'max-w-2xl')}>
               <div className="mb-4 flex items-center justify-between text-xs uppercase tracking-widest text-slate-500">
                 <span className="font-bold text-cyan-300">{entry.label}</span>
                 <span>
@@ -278,7 +278,7 @@ export default function LessonPlayer({
             pending.passed ? 'border-emerald-500/40 bg-emerald-950/60' : 'border-rose-500/40 bg-rose-950/60',
           )}
         >
-          <div className={cn('mx-auto flex w-full items-center gap-6', entry?.wide ? 'max-w-5xl' : 'max-w-2xl')}>
+          <div className={cn('mx-auto flex w-full items-center gap-6', entry?.camera ? 'max-w-screen-2xl' : entry?.wide ? 'max-w-5xl' : 'max-w-2xl')}>
             <div className="min-w-0 flex-1">
               <p className={cn('text-lg font-black', pending.passed ? 'text-emerald-300' : 'text-rose-300')}>
                 {pending.passed ? 'Correct!' : item.stage === 'review' ? 'Not quite' : 'Not quite. You will see this one again.'}
