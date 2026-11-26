@@ -97,6 +97,11 @@ export function resolveSlotTones(snapshot: PostureSnapshot | null, out: Tone[] =
   for (const side of ['left', 'right'] as const) {
     const arm = snapshot.arms[side];
     const s = ARM_SLOTS[side];
+    if (arm?.judged === false) {
+      // Far arm in a side view: drawn neutral, never green/red (it does not count).
+      out[s.upper] = out[s.foreA] = out[s.foreB] = out[s.hand] = Tone.Unknown;
+      continue;
+    }
     const elbow = metricTone(arm?.elbow.state, true);
     const wrist = metricTone(arm?.wrist.state, true);
     const slope = arm?.forearmPitch.state === 'low' || arm?.forearmPitch.state === 'high';

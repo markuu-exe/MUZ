@@ -126,6 +126,8 @@ export interface RuleEvaluation {
 
 export class PostureRules {
   private readonly arms: Record<Side, ArmTrackers> = { left: armTrackers(), right: armTrackers() };
+  /** Arm ignored this frame because it is behind the body in a side view (see nearArmOnlyDepthM). */
+  private farSide: Side | null = null;
   private readonly trunk = new BandTracker();
   private readonly head = new BandTracker();
 
@@ -153,6 +155,7 @@ export class PostureRules {
     const grace = th.unknownGraceMs;
     const cues: PostureCue[] = [];
 
+    this.farSide = farArm(m, this.gating.nearArmOnlyDepthM);
     const arms = {} as Record<Side, ArmReading>;
     for (const side of ['left', 'right'] as const) {
       const raw = m.arms[side];
@@ -172,7 +175,13 @@ export class PostureRules {
         status: this.armStatus(tr),
         confidence: raw.confidence,
       };
-      this.collectArmCues(side, tr, t, cues);
+
+    }
+    // Prefer the near arm, but only when it can be judged; otherwise fall back to whichever arm is visible.
+    if (this.farSide !== null && arms[this.farSide === 'left' ? 'right' : 'left'].status === 'unknown') this.farSide = null;
+    if (this.farSide !== null) arms[this.farSide].judged = false;
+    for (const side of ['left', 'right'] as const) {
+      if (side !== this.farSide) this.collectArmCues(side, this.arms[side], t, cues);
     }
 
     // Trunk & head: compare change-from-neutral when calibrated, absolute otherwise.
@@ -217,7 +226,7 @@ export class PostureRules {
   }
 
   private compliance(arms: Record<Side, ArmReading>): boolean | null {
-    const statuses = [arms.left.status, arms.right.status];
+    const statuses = (['left', 'right'] as const).filter((s) => s !== this.farSide).map((s) => arms[s].status);
     if (statuses.includes('violation')) return false;
     for (const [enabled, tracker] of [
       [this.gating.trunk, this.trunk],
@@ -241,6 +250,7 @@ export class PostureRules {
   private strictBand(m: RawPostureMetrics): boolean | null {
     let known = 0;
     for (const side of ['left', 'right'] as const) {
+      if (side === this.farSide) continue;
       const r = m.arms[side];
       const verdict = this.strictArm(r);
       if (verdict === false) return false;
@@ -281,4 +291,13 @@ export class PostureRules {
     const text = CUE_TEXT[code];
     cues.push({ code, side, label: text.label, message: text.message, gating, sinceMs });
   }
+}
+
+/** The arm to ignore in a side view: the one whose shoulder is farther from the camera, or null. */
+export function farArm(m: RawPostureMetrics, minDepthM: number): Side | null {
+  const zl = m.arms.left.shoulderZ;
+  const zr = m.arms.right.shoulderZ;
+  if (!Number.isFinite(zl) || !Number.isFinite(zr) || !Number.isFinite(minDepthM)) return null;
+  if (Math.abs(zl - zr) < minDepthM) return null;
+  return zl > zr ? 'left' : 'right';
 }

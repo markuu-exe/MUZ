@@ -32,6 +32,7 @@ export const DEFAULT_POSTURE_CONFIG: PostureConfig = {
     trunk: false,
     head: false,
     minKnownArms: 1,
+    nearArmOnlyDepthM: 0.15,
   },
   handPoint: 'index',
   up: { x: 0, y: -1, z: 0 },
