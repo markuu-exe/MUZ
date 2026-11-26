@@ -21,6 +21,16 @@ interface DashboardData {
   reload: () => void;
   /** Profile id whose lessons and progress have finished loading at least once; null before that. */
   loadedFor: string | null;
+  /** Where the course came from and why: shown in Settings so a silent fallback is visible. */
+  source: CourseSource;
+}
+
+export interface CourseSource {
+  kind: 'database' | 'bundled';
+  /** Piano rows returned by the database, and how many are current-format (v2). */
+  rows: number;
+  valid: number;
+  error: string | null;
 }
 
 function asProgressMap(rows: UserProgress[]): ProgressMap {
@@ -41,6 +51,7 @@ export function useDashboardData(profile: UserProfile | null, isDemo: boolean): 
   const [usingFallback, setUsingFallback] = useState(true);
   const [version, setVersion] = useState(0);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const [source, setSource] = useState<CourseSource>({ kind: 'bundled', rows: 0, valid: 0, error: null });
 
   useEffect(() => {
     if (isDemo || !profile?.id) {
@@ -70,6 +81,12 @@ export function useDashboardData(profile: UserProfile | null, isDemo: boolean): 
         // which used to hide placement and the welcome step for every new learner.
         const remoteLessons = (lessonRows ?? []).filter((l) => isLessonPayload(l.payload));
         const usable = !lessonError && remoteLessons.length > 0;
+        setSource({
+          kind: usable ? 'database' : 'bundled',
+          rows: lessonRows?.length ?? 0,
+          valid: remoteLessons.length,
+          error: lessonError ? lessonError.message : null,
+        });
         if (!usable) {
           setLessons(DEMO_CURRICULUM);
           setUsingFallback(true);
@@ -77,8 +94,9 @@ export function useDashboardData(profile: UserProfile | null, isDemo: boolean): 
         }
         setLessons(remoteLessons.map((lesson) => toCurriculumNode(lesson, asProgressMap(remoteProgress)[lesson.id])));
         setUsingFallback(false);
-      } catch {
+      } catch (err) {
         if (cancelled) return;
+        setSource({ kind: 'bundled', rows: 0, valid: 0, error: err instanceof Error ? err.message : 'request failed' });
         setLessons(DEMO_CURRICULUM);
         setUsingFallback(true);
       } finally {
@@ -96,7 +114,7 @@ export function useDashboardData(profile: UserProfile | null, isDemo: boolean): 
   }, [isDemo, profile?.id, profile?.exp, version]);
 
   return useMemo(
-    () => ({ lessons, progress, loading, usingFallback, loadedFor, reload: () => setVersion((v) => v + 1) }),
-    [lessons, progress, loading, usingFallback, loadedFor],
+    () => ({ lessons, progress, loading, usingFallback, loadedFor, source, reload: () => setVersion((v) => v + 1) }),
+    [lessons, progress, loading, usingFallback, loadedFor, source],
   );
 }

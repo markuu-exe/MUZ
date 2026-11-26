@@ -1,6 +1,7 @@
 import type { ConceptCardExercise } from '../../../types/lesson.types';
 import type { ExerciseViewProps } from '../../../lesson/registry';
 import NoteFigure from './NoteFigure';
+import Illustration from '../../theory/Illustration';
 
 /** A teaching card. Nothing to grade: "Got it" always passes. */
 export default function ConceptCardView({ exercise, onOutcome }: ExerciseViewProps<ConceptCardExercise>) {
@@ -13,6 +14,7 @@ export default function ConceptCardView({ exercise, onOutcome }: ExerciseViewPro
       {exercise.notes && exercise.notes.length > 0 && (
         <NoteFigure notes={exercise.notes} display={exercise.display} chord={exercise.chord} />
       )}
+      {exercise.illustration && <Illustration id={exercise.illustration} />}
       <button
         type="button"
         onClick={() => onOutcome({ passed: true, score: 1 })}

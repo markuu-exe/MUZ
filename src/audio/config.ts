@@ -155,10 +155,13 @@ export interface WaitStateConfig {
   timeoutMs: number;
   /** Consecutive wrong attempts that cost a heart. SPEC: SRS 3.1.2.4 (3). */
   maxConsecutiveMisses: number;
+  /** Hearts a timeout or the miss limit costs: 1 per SRS 3.1.2.4; 0 for warm-up units (ruling W1, 2026-11-27). */
+  heartCost: 0 | 1;
 }
 
 export const DEFAULT_WAIT_STATE_CONFIG: Readonly<WaitStateConfig> = Object.freeze({
   latchWindowMs: 400, // SPEC
   timeoutMs: 15_000, // SPEC
   maxConsecutiveMisses: 3, // SPEC
+  heartCost: 1, // SPEC (W1: 0 in warm-up units)
 });

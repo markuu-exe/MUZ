@@ -4,6 +4,8 @@
  * within the 400 ms latch (SRS 3.1.6.5). Hearts, the 15 s timeout and the
  * three-wrong-notes rule are enforced by PracticeDrill / WaitStateMachine.
  */
+import { parseChord } from '../../../audio/chords/vocabulary';
+import { chordCheckReasons } from '../../../practice/chordReport';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePracticeDrill } from '../../../hooks/usePracticeDrill';
 import type { ExerciseViewProps } from '../../../lesson/registry';
@@ -16,6 +18,7 @@ import type { PlayChordExercise, PlayNoteExercise, PlaySequenceExercise } from '
 import GrandStaff from '../../theory/GrandStaff';
 import { exampleVoicing } from '../theory/BuildTheChordView';
 import CameraPanel from './CameraPanel';
+import { isPerfDebug } from './PerfOverlay';
 import CameraSetupGuide from './CameraSetupGuide';
 import MediaDiagnostics, { mediaProblems } from './MediaDiagnostics';
 import { usePracticeRig } from './PracticeRigContext';
@@ -81,6 +84,7 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
     targets,
     hearts,
     timeoutSec: settings.timeoutSec,
+    heartCost: settings.drillHeartCost ?? 1,
     suspended: !canRun,
     onComplete: (stats) => setEnded({ passed: true, stats }),
     onLocked: (stats) => setEnded({ passed: false, stats }),
@@ -136,7 +140,7 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
   else if (drill.state === 'verifying') status = { text: 'Listening…', tone: 'cyan' };
   else if (drill.lastAttempt === 'miss')
     status = {
-      text: `${drill.lastHeard ? `That sounded like ${drill.lastHeard}. ` : 'Not quite. '}Try again (${drill.consecutiveMisses} of 3 wrong tries before a heart is lost).`,
+      text: `${drill.lastHeard ? `That sounded like ${drill.lastHeard}. ` : 'Not quite. '}Try again${settings.drillHeartCost === 0 ? '. Warm-up lesson: no hearts are lost.' : ` (${drill.consecutiveMisses} of 3 wrong tries before a heart is lost).`}`,
       tone: 'rose',
     };
   else status = { text: 'Play it on your piano now.', tone: 'slate' };
@@ -150,6 +154,11 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
   } as const;
 
   const chordTarget = target.kind === 'chord';
+  // After a missed chord (or every attempt with ?debug), say which check failed, in plain words.
+  const chordReasons =
+    chordTarget && drill.lastCheck && (drill.lastAttempt === 'miss' || isPerfDebug())
+      ? chordCheckReasons(drill.lastCheck, parseChord(target.chord).pcs)
+      : [];
   const heardText = heardLabel(heard, chordTarget);
   const targetPcs = new Set(targetNotes(target).map((n) => ((n % 12) + 12) % 12));
   const heardMatches = chordTarget
@@ -223,6 +232,16 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
           >
             {heardText ? `Hearing: ${heardText}` : 'Hearing: nothing yet'}
           </div>
+          {chordReasons.length > 0 && (
+            <div className="rounded-xl border border-rose-500/30 bg-rose-950/30 px-4 py-2 text-left text-sm text-rose-100">
+              <p className="font-bold">Why that chord did not count:</p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                {chordReasons.map((r) => (
+                  <li key={r}>{r}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <p className="text-center text-xs text-slate-500">
             {target.kind === 'chord' ? 'Any octave and any inversion counts.' : 'Play this exact key: the octave counts.'} Amber keys
             are what the microphone hears; green means it matches.

@@ -230,17 +230,20 @@ describe('builders', () => {
 // Ruling D5 (T-02, 2026-11-16): every practice drill times out after 15 s
 // (SRS 3.1.2.4, SDD C-06). Checks the effective value after tier defaults and
 // per-exercise overrides are merged, i.e. what PracticeDrillView receives.
-describe('drill timeout (ruling D5)', () => {
+describe('drill timeout (ruling D5, amended by W1)', () => {
   const DRILLS = new Set(['play-note', 'play-chord', 'play-sequence']);
-  it('is 15 s for every practice drill in every tier', () => {
+  it('is 15 s and costs hearts from unit 3 on; warm-up units 1-2 give 30 s and cost no hearts', () => {
     const wrong: string[] = [];
     for (const lesson of COURSE_LESSONS) {
       const payload = lesson.payload as LessonPayload;
       for (const stage of payload.stages)
         for (const exercise of stage.exercises as Exercise[]) {
           if (!DRILLS.has(exercise.type)) continue;
-          const { timeoutSec } = exerciseSettings(payload, exercise);
-          if (timeoutSec !== 15) wrong.push(`${lesson.id}/${exercise.id}: ${timeoutSec} s`);
+          const { timeoutSec, drillHeartCost } = exerciseSettings(payload, exercise);
+          const warm = payload.unit <= 2;
+          const want = warm ? { t: 30, h: 0 } : { t: 15, h: 1 };
+          if (timeoutSec !== want.t || (drillHeartCost ?? 1) !== want.h)
+            wrong.push(`${lesson.id}/${exercise.id}: ${timeoutSec} s, heart cost ${drillHeartCost ?? 1}`);
         }
     }
     expect(wrong).toEqual([]);

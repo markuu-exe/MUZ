@@ -711,6 +711,17 @@ export default function DashboardScreen() {
                 </div>
               </div>
 
+              {!isDemo && (
+                <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-xl">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Course data</h3>
+                  <p className="mt-1 text-xs text-slate-300">
+                    {data.source.kind === 'database'
+                      ? `Loaded from the database: ${data.source.valid} lessons.`
+                      : `Using the course built into the app. Database returned ${data.source.rows} piano lessons, ${data.source.valid} in the current format${data.source.error ? ` (error: ${data.source.error})` : ''}. Placement only runs with database lessons.`}
+                  </p>
+                </div>
+              )}
+
               {/* Account Management & Sign Out */}
               <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-xl">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">

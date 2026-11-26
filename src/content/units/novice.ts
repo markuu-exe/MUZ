@@ -90,10 +90,10 @@ export const NOVICE_UNITS = [
         description: 'Curved fingers, level forearms and a neutral wrist, checked by your camera.',
         stages: [
           learn(
-            card('Curved fingers', 'Rest your hand as if holding a small ball. Fingertips touch the keys, not the flat pads.'),
-            card('Level forearm', 'Sit so your elbow bends between 80° and 110°. Your forearm should be roughly level with the keys.'),
-            card('Neutral wrist', 'Keep your wrist in line with your forearm (150° or straighter). No dipping, no bumps.'),
-            card('Finger numbers', 'Thumbs are finger 1, index 2, middle 3, ring 4, pinky 5, on both hands.'),
+            card('Curved fingers', 'Rest your hand as if holding a small ball. Fingertips touch the keys, not the flat pads.', { illustration: 'curved-fingers' }),
+            card('Level forearm', 'Sit so your elbow bends between 80° and 110°. Your forearm should be roughly level with the keys.', { illustration: 'elbow-angle' }),
+            card('Neutral wrist', 'Keep your wrist close to in line with your forearm (140° or straighter). No big dip, no big bump.', { illustration: 'wrist-neutral' }),
+            card('Finger numbers', 'Thumbs are finger 1, index 2, middle 3, ring 4, pinky 5, on both hands.', { illustration: 'finger-numbers' }),
           ),
           check(
             choose('Which finger is number 1?', 'Thumb', ['Index finger', 'Pinky', 'Middle finger'], 'Piano fingering counts from the thumb (1) to the pinky (5).'),
@@ -107,8 +107,8 @@ export const NOVICE_UNITS = [
         description: 'Tap quarter notes on the spacebar with the beat highway.',
         stages: [
           learn(
-            card('The beat', 'Music has a steady pulse, like a heartbeat. The metronome clicks it for you.'),
-            card('Quarter notes', 'A quarter note (♩) lasts one beat. Tap once on every click.'),
+            card('The beat', 'Music has a steady pulse, like a heartbeat. The metronome clicks it for you.', { illustration: 'pulse' }),
+            card('Quarter notes', 'A quarter note (♩) lasts one beat. Tap once on every click.', { illustration: 'quarter-notes' }),
           ),
           rhythm(tapAlong('quarters'), tapEcho('quarters')),
         ],
@@ -172,8 +172,8 @@ export const NOVICE_UNITS = [
         description: 'Learn how long each note lasts, then tap them.',
         stages: [
           learn(
-            card('Note values', 'A whole note (𝅝) lasts 4 beats, a half note (𝅗𝅥) 2 beats and a quarter note (♩) 1 beat.'),
-            card('Hold, then move', 'Tap when a note starts, then wait for its length before the next tap.'),
+            card('Note values', 'A whole note (𝅝) lasts 4 beats, a half note (𝅗𝅥) 2 beats and a quarter note (♩) 1 beat.', { illustration: 'note-values' }),
+            card('Hold, then move', 'Tap when a note starts, then wait for its length before the next tap.', { illustration: 'hold-then-move' }),
           ),
           check(
             choose('How many beats does a half note last?', '2', ['1', '3', '4'], 'A half note is half of a whole note: 2 beats.'),
@@ -266,8 +266,8 @@ export const NOVICE_UNITS = [
         description: 'Count silent beats and feel three beats in a measure.',
         stages: [
           learn(
-            card('Rests', 'A rest is a silent beat. Keep counting, but do not tap.'),
-            card('3/4 time', 'In 3/4 each measure has three beats. It is the waltz pulse: ONE two three.'),
+            card('Rests', 'A rest is a silent beat. Keep counting, but do not tap.', { illustration: 'rests' }),
+            card('3/4 time', 'In 3/4 each measure has three beats. It is the waltz pulse: ONE two three.', { illustration: 'three-four' }),
           ),
           rhythm(tapAlong('waltz'), tapRead('waltz-rest'), tapRead('quarters-rest')),
         ],
@@ -311,7 +311,7 @@ export const NOVICE_UNITS = [
         description: 'Stack a root, a third and a fifth.',
         stages: [
           learn(
-            card('Root, third, fifth', 'A triad is three notes stacked in skips: a root, the note a third above, and the note a fifth above.'),
+            card('Root, third, fifth', 'A triad is three notes stacked in skips: a root, the note a third above, and the note a fifth above.', { notes: ns('C4 E4 G4'), display: 'both', chord: true }),
             card('C major', 'Start on C, skip to E, skip to G. Play them together.', {
               notes: ns('C4 E4 G4'),
               display: 'both',
@@ -362,7 +362,7 @@ export const NOVICE_UNITS = [
         title: 'Chord Changes: C, F, G',
         description: 'Move between chords in time.',
         stages: [
-          learn(card('Changing chords', 'Keep your hand shape and slide it: C to F to G and back to C. Change on the beat.')),
+          learn(card('Changing chords', 'Keep your hand shape and slide it: C to F to G and back to C. Change on the beat.', { illustration: 'changing-chords' })),
           rhythm(tapAlong('chord-changes', { prompt: 'Tap where each chord changes.' })),
           play(playChords('C F G C', { prompt: 'Play C, F, G, then C.' })),
         ],

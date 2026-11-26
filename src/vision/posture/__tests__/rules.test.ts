@@ -21,8 +21,9 @@ describe('band classification (SRS 3.1.5.4 / 3.1.5.5)', () => {
     expect(classifyBand(110, elbow)).toBe('ok');
     expect(classifyBand(79.99, elbow)).toBe('low');
     expect(classifyBand(110.01, elbow)).toBe('high');
-    expect(classifyBand(150, wrist)).toBe('ok');
-    expect(classifyBand(149.99, wrist)).toBe('low');
+    // Ruling W2: wrist band 140–180° (SRS said 150°).
+    expect(classifyBand(140, wrist)).toBe('ok');
+    expect(classifyBand(139.99, wrist)).toBe('low');
     expect(classifyBand(NaN, wrist)).toBe('unknown');
   });
 
@@ -57,10 +58,10 @@ describe('PostureAnalyzer rules (KAN-253)', () => {
   });
 
   it('distinguishes wrist droop from a raised wrist', () => {
-    const droop = run(new PostureAnalyzer(noSmoothing), { wristFlexDeg: -40 }, 0, 800);
+    const droop = run(new PostureAnalyzer(noSmoothing), { wristFlexDeg: -50 }, 0, 800);
     expect(droop.cues.map((c) => c.code)).toEqual(['WRIST_DROOP', 'WRIST_DROOP']);
     expect(droop.arms.left.wrist.state).toBe('low');
-    const raised = run(new PostureAnalyzer(noSmoothing), { wristFlexDeg: 40 }, 0, 800);
+    const raised = run(new PostureAnalyzer(noSmoothing), { wristFlexDeg: 50 }, 0, 800);
     expect(raised.cues.every((c) => c.code === 'WRIST_RAISED')).toBe(true);
   });
 
@@ -122,5 +123,39 @@ describe('PostureSession (SDD posture_score)', () => {
     expect(sum.framesEvaluated).toBe(40);
     expect(sum.postureScore).toBe(75);
     expect(sum.elbow.left?.meanDeviationDeg).toBeCloseTo(2.5, 6); // 10 frames × 10° / 40
+  });
+});
+
+describe('side view: only the arm nearest the camera is judged', () => {
+  // A side-on camera (the setup the app asks for) sees the far arm behind the body.
+  // MediaPipe still guesses its joints, often merged into the near arm, so its angles
+  // must not veto a correct near arm. Seen in the hardware rehearsal, 2026-11-27.
+  function withBrokenFarArm(spec: SkeletonSpec, broken: 'far' | 'left') {
+    const frame = makeSkeleton(spec);
+    const zL = frame.world[LM.LEFT_SHOULDER * 3 + 2];
+    const zR = frame.world[LM.RIGHT_SHOULDER * 3 + 2];
+    const farLeft = broken === 'left' || zL > zR;
+    const shoulder = farLeft ? LM.LEFT_SHOULDER : LM.RIGHT_SHOULDER;
+    const wrist = farLeft ? LM.LEFT_WRIST : LM.RIGHT_WRIST;
+    // Fold the far forearm back onto the shoulder: elbow angle ≈ 0°, a hard violation.
+    for (let k = 0; k < 3; k++) frame.world[wrist * 3 + k] = frame.world[shoulder * 3 + k];
+    return frame;
+  }
+
+  function runFrames(analyzer: PostureAnalyzer, spec: SkeletonSpec, broken: 'far' | 'left') {
+    let snap = analyzer.process(withBrokenFarArm({ ...spec, timestampMs: 0 }, broken));
+    for (let t = 33; t <= 1000; t += 33) snap = analyzer.process(withBrokenFarArm({ ...spec, timestampMs: t }, broken));
+    return snap;
+  }
+
+  it('passes when the near arm is correct and the hidden far arm reads out of band', () => {
+    const snap = runFrames(new PostureAnalyzer(noSmoothing), { elbowDeg: 95, yawDeg: 90 }, 'far');
+    expect(snap.compliant).toBe(true);
+    expect(snap.inBandStrict).toBe(true);
+  });
+
+  it('still judges both arms when facing the camera', () => {
+    const snap = runFrames(new PostureAnalyzer(noSmoothing), { elbowDeg: 95, yawDeg: 0 }, 'left');
+    expect(snap.compliant).toBe(false);
   });
 });

@@ -90,7 +90,7 @@ export default function PostureHoldView({ exercise, settings, onOutcome }: Exerc
           <p className="text-sm font-semibold text-slate-200">{message}</p>
           <ul className="space-y-1 text-left text-xs text-slate-500">
             <li>Elbow angle between 80° and 110°</li>
-            <li>Wrist straight (150° to 180°)</li>
+            <li>Wrist close to straight (140° to 180°)</li>
             <li>Green lines mean good, red lines need fixing</li>
           </ul>
         </div>

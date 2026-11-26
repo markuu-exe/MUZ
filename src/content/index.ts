@@ -16,7 +16,7 @@ import {
   type Tier,
 } from '../types/lesson.types';
 import type { AuthoredUnit } from './builders';
-import { resolveSettings, tierOfUnit, TIERS } from './tiers';
+import { isWarmUpUnit, resolveSettings, tierOfUnit, TIERS, WARM_UP } from './tiers';
 import { getPattern } from './patterns';
 import { NOVICE_UNITS } from './units/novice';
 import { PROFICIENT_UNITS } from './units/proficient';
@@ -140,7 +140,10 @@ export { PATTERNS, getPattern } from './patterns';
 
 /** Lesson settings with the exercise's own overrides applied. */
 export function exerciseSettings(payload: LessonPayload, exercise: Exercise): LessonSettings {
-  return resolveSettings(payload.tier, payload.settings, exercise.settings);
+  const settings = resolveSettings(payload.tier, payload.settings, exercise.settings);
+  if (!isWarmUpUnit(payload.unit)) return settings;
+  // Ruling W1: applied here, in code, so it also holds for lessons already stored in the database.
+  return { ...settings, timeoutSec: Math.max(settings.timeoutSec, WARM_UP.timeoutSec), drillHeartCost: WARM_UP.drillHeartCost };
 }
 
 /** Tempo for a tap exercise: exercise override → pattern suggestion → lesson/tier bpm. */
