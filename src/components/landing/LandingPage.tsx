@@ -56,7 +56,7 @@ function Reveal({ children, className }: { children: React.ReactNode; className?
 
 export default function LandingPage({ onSignIn, onSignUp, onDemo }: LandingPageProps) {
   return (
-    <div className="relative min-h-dvh w-full overflow-x-clip bg-muz-bg text-muz-text">
+    <div data-theme="dark" className="relative min-h-dvh w-full overflow-x-clip bg-muz-bg text-muz-text">
       {/* ambient glow */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[900px] bg-[radial-gradient(ellipse_at_top,rgba(139,92,246,0.22),transparent_60%)]" aria-hidden="true" />
 

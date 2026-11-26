@@ -7,7 +7,7 @@ const BLACK_W = 30;
 type Tone = "neutral" | "correct" | "wrong";
 
 const WHITE_HIGHLIGHT: Record<Tone, string> = {
-  neutral: "bg-violet-400 text-white",
+  neutral: "bg-violet-400 text-[#ffffff]",
   correct: "bg-emerald-400 text-black",
   wrong: "bg-red-400 text-black",
 };
@@ -61,14 +61,14 @@ export default function PianoKeyboard({
             aria-label={midiToName(midi)}
             onClick={() => press(midi)}
             style={{ width: WHITE_W, height: 160 }}
-            className={`flex items-end justify-center pb-2 rounded-b-md border border-slate-600 text-xs font-semibold ${
+            className={`flex items-end justify-center pb-2 rounded-b-md border border-[#475569] text-xs font-semibold ${
               heard.includes(midi)
                 ? highlighted.includes(midi)
                   ? WHITE_HIGHLIGHT.correct
                   : "bg-amber-300 text-black"
                 : highlighted.includes(midi)
                   ? WHITE_HIGHLIGHT[tone]
-                  : "bg-white text-slate-700 hover:bg-slate-200"
+                  : "bg-[#ffffff] text-[#334155] hover:bg-[#e2e8f0]"
             }`}
           >
             {showLabels ? midiToName(midi) : ""}
@@ -83,14 +83,14 @@ export default function PianoKeyboard({
           aria-label={midiToName(midi)}
           onClick={() => press(midi)}
           style={{ left, width: BLACK_W, height: 96 }}
-          className={`absolute top-0 z-10 rounded-b-md border border-slate-700 ${
+          className={`absolute top-0 z-10 rounded-b-md border border-[#334155] ${
             heard.includes(midi)
               ? highlighted.includes(midi)
                 ? BLACK_HIGHLIGHT.correct
                 : "bg-amber-400"
               : highlighted.includes(midi)
                 ? BLACK_HIGHLIGHT[tone]
-                : "bg-slate-900 hover:bg-slate-700"
+                : "bg-[#0f172a] hover:bg-[#334155]"
           }`}
         />
       ))}

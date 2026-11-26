@@ -48,7 +48,7 @@ export default function App() {
     return (
       <>
         <ViewportGuard />
-        <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#070b14] text-white">
+        <div className="flex min-h-screen w-full flex-col items-center justify-center bg-muz-bg text-white">
           <div className="relative mb-6">
             <MuzMark size={64} title="MUZ" className="motion-safe:animate-pulse" />
           </div>

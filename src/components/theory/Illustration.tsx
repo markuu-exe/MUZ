@@ -343,7 +343,7 @@ const DRAWINGS: Record<IllustrationId, () => JSX.Element> = {
 export default function Illustration({ id }: { id: IllustrationId }) {
   const Drawing = DRAWINGS[id];
   return (
-    <div className="rounded-xl border border-violet-500/20 bg-slate-950/80 p-4">
+    <div className="rounded-xl border border-[#7c3aed]/25 bg-[#0b1120] p-4">
       <svg viewBox="0 0 240 120" className="mx-auto h-auto w-full max-w-md" aria-hidden="true" focusable="false">
         <Drawing />
       </svg>

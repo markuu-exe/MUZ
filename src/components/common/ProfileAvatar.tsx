@@ -40,7 +40,7 @@ export default function ProfileAvatar({ name, avatar, frame, size = 40, classNam
   const Icon = spec ? ICONS[spec.id] : null;
   return (
     <div
-      className={cn('relative flex shrink-0 items-center justify-center rounded-full text-white', FRAME_STYLE[frame], className)}
+      className={cn('relative flex shrink-0 items-center justify-center rounded-full text-[#ffffff]', FRAME_STYLE[frame], className)}
       style={{
         width: size,
         height: size,

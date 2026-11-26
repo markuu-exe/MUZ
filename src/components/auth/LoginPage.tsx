@@ -216,7 +216,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, initialMode = '
     Math.cos((x / 1440) * Math.PI * 4) * 10;
 
   return (
-    <div className="relative flex h-dvh w-full items-center justify-center overflow-hidden bg-muz-bg px-4 text-muz-text selection:bg-muz-accent selection:text-slate-950">
+    <div data-theme="dark" className="relative flex h-dvh w-full items-center justify-center overflow-hidden bg-muz-bg px-4 text-muz-text selection:bg-muz-accent selection:text-slate-950">
       {/* Subtle Musical Background Accents & Edge Glows */}
       <div className="pointer-events-none absolute inset-0 select-none overflow-hidden" aria-hidden="true">
         {/* Core & Edge Soft Glowing Musical Accents */}
