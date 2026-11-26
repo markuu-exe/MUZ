@@ -5,6 +5,7 @@
  * note per press. Before the visitor interacts it silently "plays" a phrase as a
  * hint. Reduced motion: no tilt, no idle phrase, no floating notes.
  */
+import { MuzMark } from '../brand/MuzLogo';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isBlackKey, midiToName } from '../../lib/theory/notes';
 import { playNote } from '../../lib/theory/playNote';
@@ -121,7 +122,7 @@ export default function HeroKeyboard() {
         style={{ transform: reduced ? 'rotateX(14deg)' : `rotateX(${16 - tilt.y * 10}deg) rotateY(${tilt.x * 14}deg)`, transformStyle: 'preserve-3d' }}
       >
         <div className="absolute left-5 top-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.3em] text-slate-500">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" /> MUZ
+          <MuzMark size={14} variant="flat" className="text-slate-300" /> MUZ
         </div>
 
         {/* floating notes */}

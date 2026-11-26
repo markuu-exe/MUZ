@@ -1,3 +1,4 @@
+import { MuzLogo } from '../brand/MuzLogo';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
@@ -451,19 +452,8 @@ export default function DashboardScreen() {
           ========================================================================= */}
       <aside className="flex w-[260px] shrink-0 flex-col border-r border-slate-800/90 bg-[#0c1220] px-4 py-6 shadow-2xl">
         {/* App Branding & Logo */}
-        <div className="mb-8 flex items-center gap-3 px-2">
-          <div className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-tr from-violet-600 to-fuchsia-600 text-white shadow-[0_0_20px_rgba(139,92,246,0.5)]">
-            <Piano className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xl font-black tracking-widest text-white">MUZ</span>
-              <span className="rounded-md border border-violet-500/40 bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-violet-300">
-                PRO
-              </span>
-            </div>
-            <p className="text-[11px] font-medium text-slate-400">Piano Instruction</p>
-          </div>
+        <div className="mb-8 px-2">
+          <MuzLogo size={40} tagline="Piano lessons" />
         </div>
 
         {/* Sidebar Navigation Links */}

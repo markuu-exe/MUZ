@@ -1,5 +1,6 @@
+import { MuzLogo, MuzMark } from '../brand/MuzLogo';
 import { useEffect, useState } from 'react';
-import { ArrowRight, ChevronDown, Music, Presentation } from 'lucide-react';
+import { ArrowRight, ChevronDown, Presentation } from 'lucide-react';
 import { COURSE_LESSONS, COURSE_UNITS } from '../../content';
 import { cn } from '../../lib/cn';
 import HeroKeyboard from './HeroKeyboard';
@@ -60,12 +61,7 @@ export default function LandingPage({ onSignIn, onSignUp, onDemo }: LandingPageP
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[900px] bg-[radial-gradient(ellipse_at_top,rgba(139,92,246,0.22),transparent_60%)]" aria-hidden="true" />
 
       <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-8 py-6">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-muz-accent/15 text-muz-accent">
-            <Music className="h-5 w-5" aria-hidden="true" />
-          </div>
-          <span className="text-sm font-extrabold uppercase tracking-[0.28em] text-white">MUZ</span>
-        </div>
+        <MuzLogo size={36} />
         <nav className="flex items-center gap-3">
           <button type="button" onClick={onSignIn} className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-800/80 hover:text-white">
             Sign in
@@ -152,7 +148,9 @@ export default function LandingPage({ onSignIn, onSignUp, onDemo }: LandingPageP
         </Reveal>
       </section>
 
-      <footer className="relative z-10 border-t border-slate-800/80 py-6 text-center text-xs text-slate-500">MUZ · DAWGZ · CIT-U Capstone 2026</footer>
+      <footer className="relative z-10 flex items-center justify-center gap-2 border-t border-slate-800/80 py-6 text-xs text-slate-500">
+        <MuzMark size={18} /> MUZ · DAWGZ · CIT-U Capstone 2026
+      </footer>
     </div>
   );
 }
