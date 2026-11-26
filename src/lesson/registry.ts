@@ -37,6 +37,8 @@ export interface ExerciseRegistryEntry {
   label: string;
   /** Use the wide layout (keyboards, the rhythm highway, the camera view). */
   wide?: boolean;
+  /** Camera exercises: use (nearly) the full screen width so the video is large enough to see from the piano. */
+  camera?: boolean;
 }
 
 export type ExerciseRegistry = Record<ExerciseType, ExerciseRegistryEntry>;
