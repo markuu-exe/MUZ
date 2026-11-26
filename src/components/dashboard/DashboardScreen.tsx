@@ -40,6 +40,7 @@ import ProfileAnalyticsView, { type AnalyticsDateRange } from './ProfileAnalytic
 import PlacementModal from './PlacementModal';
 import OnboardingWelcome from './OnboardingWelcome';
 import DemoBanner from '../common/DemoBanner';
+import ConnectionStatus from '../common/ConnectionStatus';
 import AchievementToast, { type AchievementToastItem } from '../common/AchievementToast';
 import { lessonExp } from '../../content';
 import type { LessonResult } from '../../lesson/types';
@@ -236,8 +237,32 @@ export default function DashboardScreen() {
 
   // T-13 (SRS 3.3.2, SDD C-08): offline queue for lesson saves. IndexedDB when available, memory otherwise.
   const syncQueueRef = useRef<SyncQueue | null>(null);
-  const afterSyncRef = useRef<() => void>(() => {});
-  afterSyncRef.current = () => {
+  const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
+  const [pendingSync, setPendingSync] = useState(0);
+  const [justSynced, setJustSynced] = useState(0);
+  useEffect(() => {
+    const up = () => setOnline(true);
+    const down = () => setOnline(false);
+    window.addEventListener('online', up);
+    window.addEventListener('offline', down);
+    return () => {
+      window.removeEventListener('online', up);
+      window.removeEventListener('offline', down);
+    };
+  }, []);
+  useEffect(() => {
+    if (justSynced === 0) return;
+    const timer = window.setTimeout(() => setJustSynced(0), 5000);
+    return () => window.clearTimeout(timer);
+  }, [justSynced]);
+  const refreshPending = useCallback(async () => {
+    const queue = syncQueueRef.current;
+    setPendingSync(queue ? (await queue.list()).length : 0);
+  }, []);
+  const afterSyncRef = useRef<(saved: number) => void>(() => {});
+  afterSyncRef.current = (saved) => {
+    setJustSynced(saved);
+    void refreshPending();
     void refreshProfile();
     data.reload();
     analytics.reload();
@@ -260,10 +285,11 @@ export default function DashboardScreen() {
       if (cancelled) return;
       const queue = queueForUser(base, syncUserId);
       syncQueueRef.current = queue;
+      void refreshPending();
       stop = startQueueSync({
         queue,
         save: (input) => saveLessonResult(supabaseProgressStore(supabase), input),
-        onSynced: () => afterSyncRef.current(),
+        onSynced: (saved) => afterSyncRef.current(saved),
       });
     })();
     return () => {
@@ -271,7 +297,7 @@ export default function DashboardScreen() {
       stop?.();
       syncQueueRef.current = null;
     };
-  }, [syncUserId]);
+  }, [syncUserId, refreshPending]);
 
   // COURSE-6: save each finished run; demo mode saves nothing.
   // D1: a lesson a developer opened while it was locked is saved as test data only.
@@ -333,6 +359,7 @@ export default function DashboardScreen() {
             result,
             now: new Date(),
           });
+          void refreshPending();
           return { note: OFFLINE_NOTE, expAwarded: 0 };
         } catch {
           // Could not even store it locally: fall through to the normal failure message.
@@ -801,6 +828,7 @@ export default function DashboardScreen() {
       {needsPlacement && !welcomeSeen && <OnboardingWelcome onContinue={() => setWelcomeSeen(true)} />}
       {needsPlacement && welcomeSeen && <PlacementModal onChoose={choosePlacement} />}
       <AchievementToast toasts={achievementToasts} onDismiss={dismissAchievementToast} />
+      {!isDemo && <ConnectionStatus online={online} pending={pendingSync} justSynced={justSynced} />}
     </div>
   );
 }

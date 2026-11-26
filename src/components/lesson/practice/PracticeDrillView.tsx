@@ -10,6 +10,7 @@ import type { ExerciseViewProps } from '../../../lesson/registry';
 import { cn } from '../../../lib/cn';
 import { drillTargets, targetLabel, type DrillStats, type DrillTarget } from '../../../practice/PracticeDrill';
 import { FramingTracker, type FramingState } from '../../../practice/framing';
+import { NOTHING_HEARD, heardFromFrame, heardKeys, heardLabel, type Heard } from '../../../practice/heard';
 import { NOT_VISIBLE_MESSAGE } from '../../../practice/visibilityCue';
 import type { PlayChordExercise, PlayNoteExercise, PlaySequenceExercise } from '../../../types/lesson.types';
 import GrandStaff from '../../theory/GrandStaff';
@@ -23,6 +24,8 @@ import { HeartRow, MicMeter, Ring, TargetKeyboard } from './PracticeWidgets';
 type DrillExercise = PlayNoteExercise | PlayChordExercise | PlaySequenceExercise;
 
 const SUCCESS_PAUSE_MS = 900;
+/** Keep showing the last heard key this long after the sound stops, so it can be read. */
+const HEARD_HOLD_MS = 700;
 const LOCKED_PAUSE_MS = 1800;
 
 function targetNotes(target: DrillTarget): number[] {
@@ -55,6 +58,23 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
     return rig.on('posture', ({ tMs, snapshot }) => setFraming(tracker.push(tMs, snapshot.compliant)));
   }, [rig]);
   const canRun = ready && framing === 'framed';
+
+  // Live feedback: which key or chord the microphone is hearing right now (display only).
+  const [heard, setHeard] = useState<Heard>(NOTHING_HEARD);
+  useEffect(() => {
+    let lastUi = 0;
+    let lastHeardAt = 0;
+    return rig.on('audio', (frame) => {
+      const now = performance.now();
+      const next = heardFromFrame(frame);
+      const something = next.midi !== null || next.pitchClasses.length > 0;
+      if (something) lastHeardAt = now;
+      if (now - lastUi < 100) return;
+      lastUi = now;
+      if (something) setHeard(next);
+      else if (now - lastHeardAt > HEARD_HOLD_MS) setHeard(NOTHING_HEARD);
+    });
+  }, [rig]);
 
   const drill = usePracticeDrill({
     rig,
@@ -129,6 +149,13 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
     rose: 'border-rose-500/40 bg-rose-950/40 text-rose-100',
   } as const;
 
+  const chordTarget = target.kind === 'chord';
+  const heardText = heardLabel(heard, chordTarget);
+  const targetPcs = new Set(targetNotes(target).map((n) => ((n % 12) + 12) % 12));
+  const heardMatches = chordTarget
+    ? heard.pitchClasses.length > 0 && [...targetPcs].every((p) => heard.pitchClasses.includes(p))
+    : heard.midi !== null && target.kind === 'note' && heard.midi === target.note;
+
   return (
     <div className="space-y-5">
       {'prompt' in exercise && exercise.prompt && <h2 className="text-2xl font-bold text-white">{exercise.prompt}</h2>}
@@ -136,17 +163,17 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
       {problems.length > 0 ? (
         <MediaDiagnostics problems={problems} onRetry={() => void rig.start()} />
       ) : ready || ended ? (
-        <p role="status" className={cn('rounded-xl border px-5 py-3 text-sm font-semibold', TONE[status.tone])}>
+        <p role="status" className={cn('rounded-xl border px-5 py-3 text-base font-semibold', TONE[status.tone])}>
           {status.text}
         </p>
       ) : (
         <CameraSetupGuide needsMic starting={starting} onStart={() => void rig.start()} />
       )}
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.8fr)_minmax(300px,1fr)]">
         <CameraPanel rig={rig} state={state} />
 
-        <div className="flex flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-5">
+        <div className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-5">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-widest text-violet-300">
@@ -180,13 +207,25 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
           )}
 
           {target.kind === 'note' && (
-            <div className="flex justify-center text-slate-200">
+            <div className="flex h-24 justify-center text-slate-200 [&>svg]:h-full [&>svg]:w-auto">
               <GrandStaff notes={[target.note]} color="#c4b5fd" />
             </div>
           )}
-          <TargetKeyboard notes={targetNotes(target)} />
+          <TargetKeyboard notes={targetNotes(target)} maxWidth={420} heard={(start, end) => heardKeys(heard, chordTarget, start, end)} />
+          <div
+            aria-live="polite"
+            className={cn(
+              'rounded-xl border px-4 py-2 text-center text-lg font-black',
+              !heardText && 'border-slate-800 text-slate-500',
+              heardText && heardMatches && 'border-emerald-500/50 bg-emerald-950/40 text-emerald-200',
+              heardText && !heardMatches && 'border-amber-500/50 bg-amber-950/40 text-amber-200',
+            )}
+          >
+            {heardText ? `Hearing: ${heardText}` : 'Hearing: nothing yet'}
+          </div>
           <p className="text-center text-xs text-slate-500">
-            {target.kind === 'chord' ? 'Any octave and any inversion counts.' : 'Play this exact key: the octave counts.'}
+            {target.kind === 'chord' ? 'Any octave and any inversion counts.' : 'Play this exact key: the octave counts.'} Amber keys
+            are what the microphone hears; green means it matches.
           </p>
 
           <div className="mt-auto flex items-center justify-between">

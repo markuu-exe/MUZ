@@ -22,6 +22,8 @@ interface PianoKeyboardProps {
   endMidi?: number;        
   highlighted?: number[];  
   tone?: Tone;            
+  /** Keys the microphone currently hears (practice drills). Amber; green when also a target key. */
+  heard?: number[];
   showLabels?: boolean;
   playSound?: boolean;
   onKeyPress?: (midi: number) => void;
@@ -32,6 +34,7 @@ export default function PianoKeyboard({
   endMidi = 71,
   highlighted = [],
   tone = "neutral",
+  heard = [],
   showLabels = true,
   playSound = true,
   onKeyPress,
@@ -59,9 +62,13 @@ export default function PianoKeyboard({
             onClick={() => press(midi)}
             style={{ width: WHITE_W, height: 160 }}
             className={`flex items-end justify-center pb-2 rounded-b-md border border-slate-600 text-xs font-semibold ${
-              highlighted.includes(midi)
-                ? WHITE_HIGHLIGHT[tone]
-                : "bg-white text-slate-700 hover:bg-slate-200"
+              heard.includes(midi)
+                ? highlighted.includes(midi)
+                  ? WHITE_HIGHLIGHT.correct
+                  : "bg-amber-300 text-black"
+                : highlighted.includes(midi)
+                  ? WHITE_HIGHLIGHT[tone]
+                  : "bg-white text-slate-700 hover:bg-slate-200"
             }`}
           >
             {showLabels ? midiToName(midi) : ""}
@@ -77,7 +84,13 @@ export default function PianoKeyboard({
           onClick={() => press(midi)}
           style={{ left, width: BLACK_W, height: 96 }}
           className={`absolute top-0 z-10 rounded-b-md border border-slate-700 ${
-            highlighted.includes(midi) ? BLACK_HIGHLIGHT[tone] : "bg-slate-900 hover:bg-slate-700"
+            heard.includes(midi)
+              ? highlighted.includes(midi)
+                ? BLACK_HIGHLIGHT.correct
+                : "bg-amber-400"
+              : highlighted.includes(midi)
+                ? BLACK_HIGHLIGHT[tone]
+                : "bg-slate-900 hover:bg-slate-700"
           }`}
         />
       ))}
