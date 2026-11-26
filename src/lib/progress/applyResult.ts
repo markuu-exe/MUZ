@@ -39,6 +39,8 @@ export interface PerformanceRow {
   rhythm_consistency: number;
   posture_score: number;
   drill_duration_sec: number;
+  /** T-13: attempt id; a replayed save with the same id is ignored by the database. */
+  run_id?: string | null;
 }
 
 export interface LessonFacts {
@@ -66,7 +68,6 @@ export interface AppliedResult {
   completedNow: boolean;
   /** Short line for the results screen, or null. */
   note: string | null;
-  achievements?: string[];
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
