@@ -6,7 +6,7 @@
  */
 export const NOT_VISIBLE_AFTER_MS = 1500;
 
-export const NOT_VISIBLE_MESSAGE = 'Move so the camera can see your arm and hand from the side.';
+export const NOT_VISIBLE_MESSAGE = 'Move so the camera can see your arm and hand, from a three-quarter angle.';
 
 export class NotVisibleTimer {
   private since: number | null = null;

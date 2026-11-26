@@ -185,6 +185,14 @@ export class WaitStateMachine extends Emitter<WaitStateEvents> {
   }
 
   private loseHeart(reason: HeartLossReason, atMs: number): void {
+    if (this.config.heartCost === 0) {
+      // Warm-up (ruling W1): start a fresh attempt and a fresh timer, nothing is lost.
+      this.misses = 0;
+      this.verifier.reset();
+      this.deadlineMs = atMs + this.config.timeoutMs;
+      this.setState('armed', atMs);
+      return;
+    }
     this._hearts = Math.max(0, this._hearts - 1);
     this.misses = 0;
     this.verifier.reset();

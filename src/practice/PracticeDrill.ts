@@ -7,6 +7,7 @@
  * PitchVerifier (notes; the chroma NoteVerifier only behind useChromaNoteVerifier)
  * or a ChordVerifier; hearts carry over from step to step.
  */
+import type { ChordCheck } from './chordReport';
 import { ChordMatcher } from '../audio/chords/ChordMatcher';
 import { DEFAULT_PRACTICE_CONFIG } from '../audio/config';
 import { parseChord } from '../audio/chords/vocabulary';
@@ -62,6 +63,8 @@ export interface DrillSnapshot {
   lastAttempt: AttemptKind | null;
   /** What the last wrong attempt sounded like ("D", "C minor"), when known. */
   lastHeard: string | null;
+  /** The last attempt's chord-check numbers (chord targets only), for "why it did not count". */
+  lastCheck: ChordCheck | null;
   /** The right sound was heard but posture was not compliant inside the latch window. */
   postureBlocked: boolean;
   complete: boolean;
@@ -91,6 +94,8 @@ export interface PracticeDrillOptions {
   hearts: number;
   /** settings.timeoutSec × 1000. */
   timeoutMs: number;
+  /** Hearts a timeout or 3 misses cost (WaitStateConfig.heartCost). Default 1. */
+  heartCost?: 0 | 1;
   /** Single-note verifier override (tests). Default: see `useChromaNoteVerifier`. */
   createNoteVerifier?: NoteVerifierFactory;
   /**
@@ -114,6 +119,7 @@ export class PracticeDrill extends Emitter<PracticeDrillEvents> {
   readonly targets: readonly DrillTarget[];
   private readonly timeoutMs: number;
   private readonly heartsStart: number;
+  private readonly heartCost: 0 | 1;
 
   private machine: WaitStateMachine | null = null;
   private readonly createNoteVerifier: NoteVerifierFactory;
@@ -127,6 +133,7 @@ export class PracticeDrill extends Emitter<PracticeDrillEvents> {
   private postureInBand = 0;
   private lastAttempt: AttemptKind | null = null;
   private lastHeard: string | null = null;
+  private lastCheck: ChordCheck | null = null;
   private postureBlocked = false;
   private complete = false;
 
@@ -138,6 +145,7 @@ export class PracticeDrill extends Emitter<PracticeDrillEvents> {
     const useChroma = options.useChromaNoteVerifier ?? DEFAULT_PRACTICE_CONFIG.useChromaNoteVerifier;
     this.createNoteVerifier = options.createNoteVerifier ?? (useChroma ? chromaNoteVerifier : pitchNoteVerifier);
     this.heartsStart = Math.max(0, Math.floor(options.hearts));
+    this.heartCost = options.heartCost ?? 1;
     this.hearts = this.heartsStart;
   }
 
@@ -169,6 +177,7 @@ export class PracticeDrill extends Emitter<PracticeDrillEvents> {
       consecutiveMisses: m?.consecutiveMisses ?? 0,
       lastAttempt: this.lastAttempt,
       lastHeard: this.lastHeard,
+      lastCheck: this.lastCheck,
       postureBlocked: this.postureBlocked,
       complete: this.complete,
     };
@@ -223,7 +232,7 @@ export class PracticeDrill extends Emitter<PracticeDrillEvents> {
     const target = this.targets[this.stepIndex];
     this.noteVerifier = target.kind === 'note' ? this.createNoteVerifier(target.note) : null;
     const verifier = this.noteVerifier ?? new ChordVerifier(chordMatcher, (target as { chord: string }).chord);
-    const machine = new WaitStateMachine(verifier, { timeoutMs: this.timeoutMs });
+    const machine = new WaitStateMachine(verifier, { timeoutMs: this.timeoutMs, heartCost: this.heartCost });
     this.machine = machine;
     this.offs = [
       machine.on('state', (e) => {
@@ -241,6 +250,7 @@ export class PracticeDrill extends Emitter<PracticeDrillEvents> {
       }),
       machine.on('attempt', (a) => {
         this.lastAttempt = a.kind;
+        this.lastCheck = a.kind === 'unvoiced' ? this.lastCheck : { detail: a.detail, passRatio: a.passRatio };
         if (a.kind === 'match') {
           this.matches++;
           this.lastHeard = null;
@@ -287,6 +297,7 @@ export class PracticeDrill extends Emitter<PracticeDrillEvents> {
     this.stepIndex = index + 1;
     this.lastAttempt = null;
     this.lastHeard = null;
+    this.lastCheck = null;
     this.arm(atMs);
     this.emit('change', { atMs });
   }

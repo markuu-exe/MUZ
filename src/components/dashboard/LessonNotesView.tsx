@@ -3,6 +3,7 @@ import { BookOpen, ChevronDown } from 'lucide-react';
 import { COURSE_LESSONS, COURSE_UNITS } from '../../content';
 import { buildLessonNotes } from '../../lib/dashboard/lessonNotes';
 import NoteFigure from '../lesson/theory/NoteFigure';
+import Illustration from '../theory/Illustration';
 
 /**
  * Lessons tab: study notes only. Practice happens on the Skill Tree; nothing
@@ -53,6 +54,7 @@ export default function LessonNotesView() {
                     {card.notes && card.notes.length > 0 && (
                       <NoteFigure notes={card.notes} display={card.display} chord={card.chord} />
                     )}
+                    {card.illustration && <Illustration id={card.illustration} />}
                   </article>
                 ))}
               </div>

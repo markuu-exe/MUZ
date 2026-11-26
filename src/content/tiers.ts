@@ -7,6 +7,8 @@ export interface TierInfo {
   blurb: string;
   /** Units (module_index) that belong to this tier, inclusive. */
   units: [number, number];
+  /** Rhythm timing windows in ms (ruling R1, 2026-11-27). Virtuoso keeps SRS 3.1.4.3 (25 / 50). */
+  rhythm: { perfectMs: number; goodMs: number };
   defaults: LessonSettings;
 }
 
@@ -21,6 +23,7 @@ export const TIERS: Readonly<Record<Tier, TierInfo>> = Object.freeze({
     level: 'Beginner',
     blurb: 'Find your way around the keyboard, read the staff and play your first chords.',
     units: [1, 4],
+    rhythm: { perfectMs: 40, goodMs: 90 },
     defaults: {
       passMark: 0.7,
       timeoutSec: 15,
@@ -39,6 +42,7 @@ export const TIERS: Readonly<Record<Tier, TierInfo>> = Object.freeze({
     level: 'Intermediate',
     blurb: 'Richer rhythms, scales and keys, minor harmony and real progressions.',
     units: [5, 8],
+    rhythm: { perfectMs: 35, goodMs: 70 },
     defaults: {
       passMark: 0.8,
       timeoutSec: 15,
@@ -57,6 +61,7 @@ export const TIERS: Readonly<Record<Tier, TierInfo>> = Object.freeze({
     level: 'Advanced',
     blurb: 'Syncopation and speed, seventh chords, colour chords and performance runs.',
     units: [9, 12],
+    rhythm: { perfectMs: 25, goodMs: 50 },
     defaults: {
       passMark: 0.85,
       timeoutSec: 15, // SRS 3.1.2.4; ruling D5: 15 s in every tier
@@ -71,6 +76,17 @@ export const TIERS: Readonly<Record<Tier, TierInfo>> = Object.freeze({
   },
 });
 
+/**
+ * Ruling W1 (2026-11-27): the first two units are a warm-up. Their practice drills
+ * give 30 s per attempt and never cost hearts, so a beginner can learn the camera
+ * and microphone setup without being locked out. From unit 3 on, SRS 3.1.2.4 applies.
+ */
+export const WARM_UP = Object.freeze({ lastUnit: 2, timeoutSec: 30, drillHeartCost: 0 as const });
+
+export function isWarmUpUnit(unit: number): boolean {
+  return unit >= 1 && unit <= WARM_UP.lastUnit;
+}
+
 export function tierOfUnit(unit: number): Tier {
   for (const t of Object.values(TIERS)) {
     if (unit >= t.units[0] && unit <= t.units[1]) return t.id;
@@ -84,7 +100,7 @@ export function resolveSettings(tier: Tier, ...overrides: Array<SettingsOverride
   for (const o of overrides) {
     if (!o) continue;
     for (const [k, v] of Object.entries(o) as Array<[keyof LessonSettings, number | undefined]>) {
-      if (v !== undefined) out[k] = v;
+      if (v !== undefined) (out as unknown as Record<string, number>)[k] = v;
     }
   }
   return out;

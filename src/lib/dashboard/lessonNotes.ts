@@ -15,6 +15,7 @@ export interface LessonNoteCard {
   notes?: number[];
   display?: ConceptCardExercise['display'];
   chord?: boolean;
+  illustration?: ConceptCardExercise['illustration'];
 }
 
 export interface LessonNote {
@@ -52,6 +53,7 @@ export function buildLessonNotes(
             notes: exercise.notes,
             display: exercise.display,
             chord: exercise.chord,
+            illustration: exercise.illustration,
           });
         }
       }

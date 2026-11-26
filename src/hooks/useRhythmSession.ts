@@ -4,6 +4,8 @@
  * spacebar, and judges taps with the existing useRhythmJudge against the plan's
  * targets (SRS 3.1.4.2–3.1.4.4). All timing uses AudioContext time, never setTimeout.
  */
+import { readTapLatencyMs } from '../lib/rhythm/calibration';
+import { SRS_WINDOWS, captureWindowMs, type RhythmWindows } from '../lib/rhythm/timing';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { acceptsTap, type RhythmPlan } from '../lib/rhythm/plan';
 import type { JudgedTap, RhythmSummary } from '../lib/rhythm/timing';
@@ -16,17 +18,8 @@ export type RhythmPhase = 'idle' | 'running' | 'done';
 const START_DELAY_SEC = 0.3;
 /** Keep listening this long after the last note so a late final tap is still judged. */
 const TAIL_SEC = 0.35;
-const LATENCY_KEY = 'muz-tap-latency-ms';
-
-/** Per-device tap latency compensation in ms (0 unless set in localStorage). */
-export function readTapLatencyMs(): number {
-  try {
-    const raw = Number(window.localStorage.getItem(LATENCY_KEY));
-    return Number.isFinite(raw) ? Math.max(0, Math.min(200, raw)) : 0;
-  } catch {
-    return 0;
-  }
-}
+/** Per-device tap latency (ms) from the tap test; see src/lib/rhythm/calibration.ts. */
+export { readTapLatencyMs } from '../lib/rhythm/calibration';
 
 function scheduleClick(ctx: AudioContext, time: number, accent: boolean): void {
   const osc = ctx.createOscillator();
@@ -57,7 +50,11 @@ export interface RhythmSessionResult {
   taps: JudgedTap[];
 }
 
-export function useRhythmSession(plan: RhythmPlan, onDone: (result: RhythmSessionResult) => void) {
+export function useRhythmSession(
+  plan: RhythmPlan,
+  onDone: (result: RhythmSessionResult) => void,
+  windows: RhythmWindows = SRS_WINDOWS,
+) {
   const ctxRef = useRef<AudioContext | null>(null);
   const targetTimesRef = useRef<number[]>([]);
   /** AudioContext time of plan t = 0. */
@@ -69,8 +66,9 @@ export function useRhythmSession(plan: RhythmPlan, onDone: (result: RhythmSessio
   planRef.current = plan;
 
   const [phase, setPhase] = useState<RhythmPhase>('idle');
-  const [latencyMs] = useState(readTapLatencyMs);
-  const { judgeTap, getSummary, reset, taps } = useRhythmJudge(ctxRef, targetTimesRef, latencyMs);
+  // Re-read at every start so a tap test done just before the exercise applies at once.
+  const [latencyMs, setLatencyMs] = useState(readTapLatencyMs);
+  const { judgeTap, getSummary, reset, taps } = useRhythmJudge(ctxRef, targetTimesRef, latencyMs, windows);
   const tapsRef = useRef<JudgedTap[]>(taps);
   tapsRef.current = taps;
 
@@ -78,10 +76,11 @@ export function useRhythmSession(plan: RhythmPlan, onDone: (result: RhythmSessio
     (tap: TapEvent) => {
       const t0 = startTimeRef.current;
       if (t0 === null) return;
-      if (!acceptsTap(planRef.current, tap.audioTime - latencyMs / 1000 - t0)) return;
+      const lateMs = captureWindowMs(targetTimesRef.current, windows);
+      if (!acceptsTap(planRef.current, tap.audioTime - latencyMs / 1000 - t0, lateMs)) return;
       judgeTap(tap);
     },
-    [judgeTap, latencyMs],
+    [judgeTap, latencyMs, windows],
   );
   useSpacebarTap(ctxRef, handleTap, phase === 'running');
 
@@ -99,6 +98,7 @@ export function useRhythmSession(plan: RhythmPlan, onDone: (result: RhythmSessio
   /** Call from a click or key press (AudioContext autoplay policy). */
   const start = useCallback(async () => {
     if (ctxRef.current) return;
+    setLatencyMs(readTapLatencyMs());
     const ctx = new AudioContext({ latencyHint: 'interactive' });
     ctxRef.current = ctx;
     await ctx.resume();

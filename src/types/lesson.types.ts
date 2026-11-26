@@ -39,6 +39,8 @@ export interface LessonSettings {
   /** EXP for completing a normal lesson / a checkpoint. */
   exp: number;
   checkpointExp: number;
+  /** Hearts a drill timeout or 3 misses cost. Unset = 1 (SRS 3.1.2.4); 0 in warm-up units (ruling W1). */
+  drillHeartCost?: 0 | 1;
 }
 
 /** Overrides an author may put on a unit, lesson or exercise. */
@@ -81,7 +83,22 @@ export interface ConceptCardExercise extends ExerciseBase {
   display?: NoteDisplay;
   /** Draw `notes` stacked as one chord on the staff. */
   chord?: boolean;
+  /** A diagram for cards with no notes to show (see components/theory/Illustration.tsx). */
+  illustration?: IllustrationId;
 }
+
+export type IllustrationId =
+  | 'elbow-angle'
+  | 'wrist-neutral'
+  | 'curved-fingers'
+  | 'finger-numbers'
+  | 'pulse'
+  | 'quarter-notes'
+  | 'note-values'
+  | 'hold-then-move'
+  | 'rests'
+  | 'three-four'
+  | 'changing-chords';
 
 export interface ChooseAnswerExercise extends ExerciseBase {
   type: 'choose-answer';

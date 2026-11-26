@@ -27,6 +27,8 @@ export interface RawArmMetrics {
   wristFlexDeg: number;
   forearmPitchDeg: number;
   confidence: number;
+  /** World z of the shoulder (metres; smaller = nearer the camera), NaN if unseen. */
+  shoulderZ: number;
 }
 
 export interface RawTrunkMetrics {
@@ -44,7 +46,7 @@ export interface RawPostureMetrics {
 }
 
 function emptyArm(): RawArmMetrics {
-  return { elbowDeg: NaN, wristDeg: NaN, wristFlexDeg: NaN, forearmPitchDeg: NaN, confidence: 0 };
+  return { elbowDeg: NaN, wristDeg: NaN, wristFlexDeg: NaN, forearmPitchDeg: NaN, confidence: 0, shoulderZ: NaN };
 }
 
 export function createRawMetrics(): RawPostureMetrics {
@@ -154,6 +156,7 @@ export class PostureMetricsComputer {
       else hasHand = false;
     }
 
+    out.shoulderZ = hasShoulder ? this.shoulder.z : NaN;
     const v = frame.visibility;
     out.confidence = frame.hasPose ? Math.min(v[idx.shoulder], v[idx.elbow], v[idx.wrist], v[idx.index]) : 0;
 

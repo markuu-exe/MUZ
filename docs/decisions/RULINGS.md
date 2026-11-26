@@ -68,6 +68,21 @@
 | **M7 `run_id`** | Apply `supabase/migrations/20261125120000_performance_run_id.sql` to the hosted project (owner applies in the SQL editor). | The client works with or without the column (falls back to saving without `run_id`). | A (Amatong) |
 | **F2 applied** | `20261119120000_profiles_rls_hardening.sql` applied to the hosted project 2026-11-26 after a SQL-editor snapshot of policies, grants and data. Anonymous `GET /rest/v1/profiles` now returns 401 / 42501. | Outstanding condition 3 below is closed. | A (Amatong) |
 
+## 4b. Decisions 2026-11-27 (hardware rehearsal)
+
+| ID | Decided | Reason / scope | By |
+|---|---|---|---|
+| **W1** | **Warm-up units.** In units 1–2, practice drills give **30 s** per attempt and a timeout or 3 wrong notes **costs no heart** (the attempt just restarts). Units 3–12 keep SRS 3.1.2.4 (15 s, 1 heart). Amends ruling D5 for units 1–2. | Beginners could not learn the camera/mic setup without being locked out by the second lesson. Applied in code (`exerciseSettings`, `WARM_UP` in `src/content/tiers.ts`), so it also holds for lessons already in the database. | A (Amatong) |
+| **W2** | **Wrist band 140–180°** (SRS 3.1.5.4 said 150–180°). The measured angle is the total bend between forearm and hand, so the wider floor allows more bend in **both** directions (dropped and raised). Elbow band unchanged (80–110°). | Fixed-height chairs; the owner confirmed the suggested posture is correct but 150° was too strict in practice. Applies to the HUD and to grading/posture_score. | A (Amatong) |
+| **W3** | **Side view: judge the near arm only.** When the shoulders differ in camera depth by ≥ 0.15 m, the far arm is not judged and is drawn grey; if the near arm cannot be seen, whichever arm is visible is judged. | Defect fix: a hidden far arm (guessed by MediaPipe) vetoed a correct near arm. No spec value changed. | A (Amatong) |
+
+## 4c. Decisions 2026-11-27 (rhythm)
+
+| ID | Decided | Reason / scope | By |
+|---|---|---|---|
+| **R1** | **Rhythm windows by tier** (SRS 3.1.4.3 said Perfect ≤ 25 ms, Good ≤ 50 ms everywhere): Novice ≤ 40 / ≤ 90 ms, Proficient ≤ 35 / ≤ 70 ms, Virtuoso ≤ 25 / ≤ 50 ms (unchanged SRS). The D13 consistency formula uses the tier's Good window. **Plus a one-time per-device tap test** (Settings, and offered before the first rhythm exercise) that measures the device's audio delay and corrects for it. | Untrained tapping varies 30–60 ms; difficulty now grows with the course. The tap test corrects only the device (speakers/Bluetooth), not a learner who plays late. | A (Amatong) |
+| **R2** (fairness fix, no spec value changed) | A tap just outside Good (up to 150 ms, never more than 45 % of the gap between beats) counts as **a Miss on that beat**, not as an extra tap that also costs the −35 extra-tap penalty. Live feedback shows how many ms early/late; results show the learner's average drift. | A slightly-late tap was punished twice. | A (Amatong) |
+
 ## 5. Sign-off
 
 | | Name | Date |

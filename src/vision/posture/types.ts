@@ -17,7 +17,7 @@ export interface BandThreshold {
 export interface PostureThresholds {
   /** SRS 3.1.5.4 — 80° ≤ θ_elbow ≤ 110°. */
   elbow: BandThreshold;
-  /** SRS 3.1.5.4 — 150° ≤ θ_wrist ≤ 180°. */
+  /** SRS 3.1.5.4 as amended by ruling W2: 140° ≤ θ_wrist ≤ 180° (was 150°). */
   wrist: BandThreshold;
   /** Signed wrist flex within ±this is "straight" when choosing droop vs raised wording. */
   wristFlexDeadbandDeg: number;
@@ -50,6 +50,12 @@ export interface GatingConfig {
   head: boolean;
   /** Minimum number of arms that must be visible and OK. */
   minKnownArms: 1 | 2;
+  /**
+   * Side view: when the shoulders differ in camera depth by at least this many metres, only the
+   * arm nearest the camera is judged. The far arm is behind the body and its guessed joints are
+   * unreliable (hardware rehearsal 2026-11-27). Infinity disables it.
+   */
+  nearArmOnlyDepthM: number;
 }
 
 export interface PostureConfig {
@@ -87,6 +93,8 @@ export interface ArmReading {
   forearmPitch: MetricReading;
   /** Status over the gated metrics only. */
   status: ArmStatus;
+  /** False when this arm is ignored in a side view (behind the body); see GatingConfig.nearArmOnlyDepthM. */
+  judged?: boolean;
   /** Lowest visibility among this arm's landmarks (0 when absent). */
   confidence: number;
 }

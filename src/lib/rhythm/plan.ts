@@ -104,9 +104,9 @@ export function segmentAt(plan: RhythmPlan, t: number): RhythmSegment | null {
 }
 
 /** Whether a tap at time `t` should be judged (taps during count-in and listen passes are ignored). */
-export function acceptsTap(plan: RhythmPlan, t: number): boolean {
+export function acceptsTap(plan: RhythmPlan, t: number, lateMs: number = GOOD_MS): boolean {
   for (const s of plan.segments) {
-    if (s.kind === 'play' && t >= s.start - INPUT_LEAD_SEC && t < s.end + GOOD_MS / 1000) return true;
+    if (s.kind === 'play' && t >= s.start - INPUT_LEAD_SEC && t < s.end + lateMs / 1000) return true;
   }
   return false;
 }
