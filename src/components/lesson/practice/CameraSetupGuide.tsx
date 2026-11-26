@@ -26,11 +26,11 @@ function SetupDiagram() {
       <path d="M66 92 L50 58 M94 92 L110 58" stroke="#c4b5fd" strokeWidth="5" strokeLinecap="round" />
       <text x="80" y="124" textAnchor="middle" fontSize="9" fill="#94a3b8">you</text>
       {/* camera to the side, pointing at the learner */}
-      <rect x="176" y="82" width="26" height="18" rx="3" fill="#0f172a" stroke="#34d399" strokeWidth="1.5" />
-      <circle cx="176" cy="91" r="5" fill="#34d399" />
-      <path d="M170 91 L118 70 M170 91 L118 112" stroke="#34d399" strokeDasharray="3 4" />
-      <text x="189" y="116" textAnchor="middle" fontSize="9" fill="#6ee7b7">camera</text>
-      <text x="146" y="140" textAnchor="middle" fontSize="8" fill="#94a3b8">about 1 m, level with your elbow</text>
+      <rect x="168" y="112" width="26" height="18" rx="3" fill="#0f172a" stroke="#34d399" strokeWidth="1.5" transform="rotate(-40 181 121)" />
+      <circle cx="172" cy="114" r="5" fill="#34d399" />
+      <path d="M166 110 L112 66 M166 110 L96 104" stroke="#34d399" strokeDasharray="3 4" />
+      <text x="196" y="108" textAnchor="middle" fontSize="9" fill="#6ee7b7">camera</text>
+      <text x="150" y="146" textAnchor="middle" fontSize="8" fill="#94a3b8">3/4 view, about 1 m, at elbow height</text>
     </svg>
   );
 }
@@ -43,8 +43,9 @@ export default function CameraSetupGuide({ needsMic, starting, onStart }: Camera
         <SetupDiagram />
         <ol className="list-decimal space-y-2 pl-5 text-sm text-slate-200">
           <li>
-            Put the camera <strong>to your left or right side</strong>, not in front of you, about 1 m away and level with
-            your elbow. A phone or laptop propped on a chair works.
+            Put the camera <strong>off to one side and a little in front of you</strong>, about halfway between straight
+            ahead and fully side-on (a three-quarter view), about 1 m away and level with your elbow. A phone or laptop
+            propped on a chair works.
           </li>
           <li>
             Sit as you play. The camera must see the <strong>shoulder, elbow and wrist</strong> of the arm nearest to it.
