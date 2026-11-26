@@ -1,3 +1,5 @@
+import ProfileAvatar from '../common/ProfileAvatar';
+import type { ProfileLook } from '../../lib/profile/look';
 import { useMemo, useState } from 'react';
 import {
   Activity,
@@ -88,6 +90,8 @@ interface ProfileAnalyticsViewProps {
   onRangeChange?: (range: AnalyticsDateRange) => void;
   loading?: boolean;
   error?: string | null;
+  /** Chosen avatar and frame (Settings → Profile). */
+  look?: ProfileLook;
 }
 
 interface Achievement {
@@ -126,6 +130,7 @@ export default function ProfileAnalyticsView({
   onRangeChange,
   loading = false,
   error = null,
+  look,
 }: ProfileAnalyticsViewProps) {
   const [internalRange, setInternalRange] = useState<AnalyticsDateRange>('7d');
   const activeRange = controlledRange ?? internalRange;
@@ -337,8 +342,8 @@ export default function ProfileAnalyticsView({
       <div className="relative overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900/80 to-slate-950 p-6 shadow-2xl md:p-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-5">
-            <div className="relative flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 text-3xl font-black text-white shadow-[0_0_25px_rgba(147,51,234,0.4)]">
-              {username.charAt(0).toUpperCase()}
+            <div className="relative">
+              <ProfileAvatar name={username} avatar={look?.avatar ?? null} frame={look?.frame ?? 'none'} size={80} />
               <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-slate-900 bg-emerald-500 text-slate-950">
                 <CheckCircle2 className="h-3.5 w-3.5" />
               </div>

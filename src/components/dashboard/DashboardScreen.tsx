@@ -41,6 +41,10 @@ import ProfileAnalyticsView, { type AnalyticsDateRange } from './ProfileAnalytic
 import PlacementModal from './PlacementModal';
 import OnboardingWelcome from './OnboardingWelcome';
 import DemoBanner from '../common/DemoBanner';
+import ProfileAvatar from '../common/ProfileAvatar';
+import ProfileEditor from './ProfileEditor';
+import { saveDisplayName, saveLook } from '../../lib/profile/saveProfile';
+import { readLook, type ProfileLook } from '../../lib/profile/look';
 import ConnectionStatus from '../common/ConnectionStatus';
 import AchievementToast, { type AchievementToastItem } from '../common/AchievementToast';
 import { lessonExp } from '../../content';
@@ -168,6 +172,9 @@ export default function DashboardScreen() {
     : 0;
   const exp = profile?.exp ?? 0;
   const username = displayNameFromProfile(profile, user?.email);
+  // Avatar and frame live in auth user_metadata; demo mode keeps them in memory only.
+  const [demoLook, setDemoLook] = useState<ProfileLook>({ avatar: null, frame: 'none' });
+  const look: ProfileLook = isDemo ? demoLook : readLook(user?.user_metadata);
   const progressMeta = expProgress(exp);
   const regen = useHeartRegen(profile?.id ?? user?.id, hearts, {
     onRegenerate:
@@ -508,8 +515,8 @@ export default function DashboardScreen() {
         <div className="mt-auto border-t border-slate-800/80 pt-4">
           <div className="flex items-center justify-between rounded-2xl border border-slate-800/80 bg-slate-900/80 p-3 shadow-md">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-violet-600 to-fuchsia-600 text-sm font-extrabold text-white shadow-md">
-                {username.charAt(0).toUpperCase()}
+              <div className="relative">
+                <ProfileAvatar name={username} avatar={look.avatar} frame={look.frame} size={40} />
                 <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-slate-900 bg-emerald-500" />
               </div>
               <div className="min-w-0">
@@ -651,6 +658,7 @@ export default function DashboardScreen() {
               onRangeChange={setAnalyticsRange}
               loading={analytics.loading}
               error={analytics.error}
+              look={look}
             />
           )}
 
@@ -660,6 +668,26 @@ export default function DashboardScreen() {
           {/* VIEW 4: SETTINGS */}
           {view === 'settings' && (
             <div className="mx-auto max-w-2xl space-y-6 pb-28">
+              <ProfileEditor
+                name={username}
+                look={look}
+                exp={exp}
+                isDemo={isDemo}
+                onSaveName={async (name) => {
+                  if (!profile) return 'Your profile is not loaded yet.';
+                  const error = await saveDisplayName(supabase, profile.id, name);
+                  if (!error) await refreshProfile();
+                  return error;
+                }}
+                onSaveLook={async (next) => {
+                  if (isDemo) {
+                    setDemoLook(next);
+                    return null;
+                  }
+                  return saveLook(supabase, next);
+                }}
+              />
+
               <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-xl">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-600/20 text-violet-400">
