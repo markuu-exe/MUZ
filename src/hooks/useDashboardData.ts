@@ -65,8 +65,11 @@ export function useDashboardData(profile: UserProfile | null, isDemo: boolean): 
         const remoteProgress = (progressResult.data ?? []) as UserProgress[];
         setProgress(asProgressMap(remoteProgress));
 
-        const remoteLessons = lessonRows ?? [];
-        const usable = !lessonError && remoteLessons.length > 0 && remoteLessons.every((l) => isLessonPayload(l.payload));
+        // Use every current-format (v2) row. Leftover old-format rows (kept by the seed because a
+        // learner has history on them) are skipped instead of discarding the whole database course,
+        // which used to hide placement and the welcome step for every new learner.
+        const remoteLessons = (lessonRows ?? []).filter((l) => isLessonPayload(l.payload));
+        const usable = !lessonError && remoteLessons.length > 0;
         if (!usable) {
           setLessons(DEMO_CURRICULUM);
           setUsingFallback(true);
