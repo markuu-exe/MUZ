@@ -9,6 +9,20 @@ export const OFFLINE_NOTE = 'Saved offline. It will sync when you are back onlin
 
 export type SaveOutcome<T> = { queued: false; value: T } | { queued: true };
 
+/**
+ * The part of a shared browser queue that belongs to one learner. Another
+ * account's saves are never listed, so they are never replayed under the wrong
+ * session (RLS would reject them and they would retry forever).
+ */
+export function queueForUser(queue: SyncQueue, userId: string): SyncQueue {
+  return {
+    enqueue: (input) => queue.enqueue(input),
+    list: async () => (await queue.list()).filter((item) => item.payload.userId === userId),
+    remove: (id) => queue.remove(id),
+    bump: (id) => queue.bump(id),
+  };
+}
+
 /** Try the save. If the network is down, queue it. Any other failure is rethrown. */
 export async function saveOrQueue<T>(
   save: (input: SaveLessonInput) => Promise<T>,

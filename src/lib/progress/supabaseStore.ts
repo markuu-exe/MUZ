@@ -15,6 +15,11 @@ function check(error: { message: string } | null, what: string): void {
   if (error) throw new Error(`${what}: ${error.message}`);
 }
 
+/** PostgREST / Postgres errors meaning "performance_records has no run_id column". */
+export function isMissingRunIdColumn(error: { code?: string; message?: string }): boolean {
+  return (error.code === 'PGRST204' || error.code === '42703') && /run_id/.test(error.message ?? '');
+}
+
 export function supabaseProgressStore(client: Client): ProgressStore {
   return {
     async getProfile(userId) {
@@ -43,7 +48,14 @@ export function supabaseProgressStore(client: Client): ProgressStore {
       check(error, 'Could not save lesson progress');
     },
     async insertPerformance(userId, lessonId, row: PerformanceRow) {
-      const { error } = await client.from('performance_records').insert({ user_id: userId, lesson_id: lessonId, ...row });
+      let { error } = await client.from('performance_records').insert({ user_id: userId, lesson_id: lessonId, ...row });
+      // T-13: a database without migration 20261125120000 has no run_id column. Save without it.
+      if (error && isMissingRunIdColumn(error)) {
+        const { run_id: _omit, ...withoutRunId } = row;
+        ({ error } = await client.from('performance_records').insert({ user_id: userId, lesson_id: lessonId, ...withoutRunId }));
+      }
+      // T-13: the same run replayed from the offline queue is already stored; nothing to do.
+      if (error?.code === '23505' && row.run_id) return;
       check(error, 'Could not save the performance record');
     },
     async getUnlockedAchievements(userId) {

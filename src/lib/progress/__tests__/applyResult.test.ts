@@ -175,7 +175,7 @@ describe('applyResult: performance records and posture', () => {
         durationSec: 240,
       }),
     );
-    expect(out.performance).toEqual({ pitch_accuracy: 88.5, rhythm_consistency: 72, posture_score: 93, drill_duration_sec: 240 });
+    expect(out.performance).toEqual({ pitch_accuracy: 88.5, rhythm_consistency: 72, posture_score: 93, drill_duration_sec: 240, run_id: null });
     expect(out.progress?.posture_stability_score).toBe(93);
   });
 
@@ -187,5 +187,17 @@ describe('applyResult: performance records and posture', () => {
   it('keeps the previous posture score when no practice exercise ran this time', () => {
     const prev: ProgressSnapshot = { completed: true, accuracy_percentage: 90, posture_stability_score: 81, completed_at: NOW };
     expect(run(result(), profile(), prev).progress?.posture_stability_score).toBe(81);
+  });
+});
+
+describe('applyResult: run id (T-13)', () => {
+  it('stores the run id on the performance record so a replayed save is ignored', () => {
+    const out = run(result({ runId: 'run-123', records: [record('rhythm')] }));
+    expect(out.performance?.run_id).toBe('run-123');
+  });
+
+  it('stores null when the run has no id', () => {
+    const out = run(result({ records: [record('rhythm')] }));
+    expect(out.performance?.run_id).toBeNull();
   });
 });

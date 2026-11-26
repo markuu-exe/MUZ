@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SaveLessonInput } from '../../progress/saveLessonResult';
 import { createMemorySyncQueue } from '../queue';
-import { saveOrQueue, startQueueSync } from '../syncLoop';
+import { queueForUser, saveOrQueue, startQueueSync } from '../syncLoop';
 
-function input(lessonId = 'a'): SaveLessonInput {
+function input(lessonId = 'a', userId = 'user-1'): SaveLessonInput {
   return {
-    userId: 'user-1',
+    userId,
     lesson: { passMark: 0.8, expReward: 120 },
     result: { lessonId } as unknown as SaveLessonInput['result'],
     now: new Date('2026-11-25T10:00:00Z'),
@@ -117,5 +117,21 @@ describe('startQueueSync', () => {
     target.dispatchEvent(new Event('online'));
     await vi.advanceTimersByTimeAsync(5000);
     expect(save).not.toHaveBeenCalled();
+  });
+});
+
+describe('queueForUser', () => {
+  it("lists and replays only the signed-in learner's saves", async () => {
+    const shared = createMemorySyncQueue();
+    await shared.enqueue(input('a', 'user-1'));
+    await shared.enqueue(input('b', 'user-2'));
+    const mine = queueForUser(shared, 'user-1');
+    expect((await mine.list()).map((i) => i.payload.result.lessonId)).toEqual(['a']);
+
+    const save = vi.fn(async () => undefined);
+    const stop = startQueueSync({ queue: mine, save, target: new EventTarget() });
+    await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    stop();
+    expect((await shared.list()).map((i) => i.payload.userId)).toEqual(['user-2']);
   });
 });

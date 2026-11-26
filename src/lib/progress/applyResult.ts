@@ -68,6 +68,8 @@ export interface AppliedResult {
   completedNow: boolean;
   /** Short line for the results screen, or null. */
   note: string | null;
+  /** Badge ids unlocked by this run (set by saveLessonResult, T-11). */
+  achievements?: string[];
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -126,6 +128,7 @@ export function applyResult({ profile, progress, lesson, result, today, nowIso }
           rhythm_consistency: pct(result.metrics.rhythmConsistency),
           posture_score: pct(result.metrics.postureScore),
           drill_duration_sec: Math.max(0, Math.round(result.durationSec)),
+          run_id: result.runId ?? null,
         }
       : null,
     expGained,

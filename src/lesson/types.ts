@@ -35,7 +35,7 @@ export type LessonStatus = 'running' | 'passed' | 'failed' | 'out-of-hearts' | '
 
 export interface LessonResult {
   /** T-13: unique id of this attempt; lets the database ignore a save that is replayed twice. */
-  runId: string;
+  runId?: string;
   lessonId: string;
   status: Exclude<LessonStatus, 'running'>;
   passed: boolean;
