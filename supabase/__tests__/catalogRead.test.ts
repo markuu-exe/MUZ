@@ -28,23 +28,23 @@ describe('catalog read policies (lessons, achievements)', () => {
   it('reproduces the live drift: RLS on, no read policy, so a learner sees 0 lessons and no error', async () => {
     const db = await driftedDb();
     const me = { role: 'authenticated', uid: U1 } as const;
-    expect(countLessons(await as(db, me, `select count(*) as n from public.lessons where instrument = 'piano'`))).toBe(0);
-    expect(countLessons(await as(db, me, `select count(*) as n from public.achievements`))).toBe(0);
+    expect(countLessons(await as<{ n: number }>(db, me, `select count(*) as n from public.lessons where instrument = 'piano'`))).toBe(0);
+    expect(countLessons(await as<{ n: number }>(db, me, `select count(*) as n from public.achievements`))).toBe(0);
   });
 
   it('the repair migration lets a signed-in learner read both catalogs', async () => {
     const db = await driftedDb();
     await applyMigration(db, REPAIR);
     const me = { role: 'authenticated', uid: U1 } as const;
-    expect(countLessons(await as(db, me, `select count(*) as n from public.lessons where instrument = 'piano'`))).toBe(1);
-    expect(countLessons(await as(db, me, `select count(*) as n from public.achievements`))).toBe(1);
+    expect(countLessons(await as<{ n: number }>(db, me, `select count(*) as n from public.lessons where instrument = 'piano'`))).toBe(1);
+    expect(countLessons(await as<{ n: number }>(db, me, `select count(*) as n from public.achievements`))).toBe(1);
   });
 
   it('gives anonymous callers nothing and stays idempotent', async () => {
     const db = await driftedDb();
     await applyMigration(db, REPAIR);
     await applyMigration(db, REPAIR);
-    const rows = await as(db, { role: 'anon' }, `select count(*) as n from public.lessons`).catch(() => [{ n: 0 }]);
+    const rows = await as<{ n: number }>(db, { role: 'anon' }, `select count(*) as n from public.lessons`).catch((): Array<{ n: number }> => [{ n: 0 }]);
     expect(countLessons(rows)).toBe(0);
   });
 });
