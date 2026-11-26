@@ -37,6 +37,7 @@ import LessonPlayer, { type LessonSaveFeedback } from '../lesson/LessonPlayer';
 import { isLessonPayload, type LessonPayload } from '../../types/lesson.types';
 import ProfileAnalyticsView, { type AnalyticsDateRange } from './ProfileAnalyticsView';
 import PlacementModal from './PlacementModal';
+import OnboardingWelcome from './OnboardingWelcome';
 import AchievementToast, { type AchievementToastItem } from '../common/AchievementToast';
 import { lessonExp } from '../../content';
 import type { LessonResult } from '../../lesson/types';
@@ -86,6 +87,8 @@ export default function DashboardScreen() {
   // D1: where this lesson's results are saved, decided once when it is opened.
   const [activeDestination, setActiveDestination] = useState<ResultDestination>('learner');
   const [placementDone, setPlacementDone] = useState(false);
+  // T-14 (U-25): the welcome step shows until placement is finished; placement itself is stored on the account.
+  const [welcomeSeen, setWelcomeSeen] = useState(false);
   const [analyticsRange, setAnalyticsRange] = useState<AnalyticsDateRange>('7d');
   const analytics = useAnalyticsData(isDemo ? null : (profile?.id ?? user?.id ?? null), analyticsRange, isDemo);
   const [achievementToasts, setAchievementToasts] = useState<AchievementToastItem[]>([]);
@@ -736,7 +739,8 @@ export default function DashboardScreen() {
         />
       )}
 
-      {needsPlacement && <PlacementModal onChoose={choosePlacement} />}
+      {needsPlacement && !welcomeSeen && <OnboardingWelcome onContinue={() => setWelcomeSeen(true)} />}
+      {needsPlacement && welcomeSeen && <PlacementModal onChoose={choosePlacement} />}
       <AchievementToast toasts={achievementToasts} onDismiss={dismissAchievementToast} />
     </div>
   );
