@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyDelta, summarize, type JudgedTap } from '../timing';
+import { SRS_WINDOWS, captureWindowMs, classifyDelta, meanSignedOffsetMs, summarize, type JudgedTap } from '../timing';
 
 describe('rhythm timing', () => {
   it('classifies the perfect and good boundaries exactly', () => {
@@ -51,5 +51,50 @@ describe('rhythm timing', () => {
       { rating: 'Perfect', deltaMs: 0, beatIndex: 1 },
     ];
     expect(summarize(taps, 1).consistency).toBe(100);
+  });
+});
+
+describe('tier windows and near misses (ruling R1)', () => {
+  const NOVICE = { perfectMs: 40, goodMs: 90 };
+
+  it('classifies with the tier windows when given', () => {
+    expect(classifyDelta(40, NOVICE)).toBe('Perfect');
+    expect(classifyDelta(40.01, NOVICE)).toBe('Good');
+    expect(classifyDelta(90, NOVICE)).toBe('Good');
+    expect(classifyDelta(90.01, NOVICE)).toBe('Miss');
+  });
+
+  it('scores consistency against the tier Good window', () => {
+    const taps: JudgedTap[] = [{ rating: 'Good', deltaMs: 45, beatIndex: 0 }];
+    expect(summarize(taps, 1, NOVICE).consistency).toBe(50);
+  });
+
+  it('counts a near-miss tap on a beat as one miss, not as an extra tap plus an omitted beat', () => {
+    const taps: JudgedTap[] = [
+      { rating: 'Perfect', deltaMs: 0, beatIndex: 0 },
+      { rating: 'Miss', deltaMs: 120, beatIndex: 1 },
+    ];
+    const s = summarize(taps, 2);
+    expect(s.miss).toBe(1);
+    expect(s.perfect).toBe(1);
+  });
+
+  it('captures near misses up to 150 ms, never beyond ~half the gap between beats', () => {
+    expect(captureWindowMs([0, 0.5, 1.0], SRS_WINDOWS)).toBe(150);
+    expect(captureWindowMs([0, 0.2, 0.4], SRS_WINDOWS)).toBe(90);
+    expect(captureWindowMs([0, 0.1], SRS_WINDOWS)).toBe(50); // never below the Good window
+  });
+});
+
+describe('meanSignedOffsetMs', () => {
+  it('averages signed error over taps on a beat and ignores extra taps', () => {
+    expect(
+      meanSignedOffsetMs([
+        { rating: 'Good', deltaMs: 40, beatIndex: 0 },
+        { rating: 'Perfect', deltaMs: 20, beatIndex: 1 },
+        { rating: 'Miss', deltaMs: -300, beatIndex: null },
+      ]),
+    ).toBe(30);
+    expect(meanSignedOffsetMs([])).toBeNull();
   });
 });
