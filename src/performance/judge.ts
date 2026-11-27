@@ -47,6 +47,8 @@ export interface EventResult {
   offsetMs: number | null;
   /** For a miss: a wrong note/chord was played, or nothing was. */
   missReason: 'wrong' | 'missed' | null;
+  /** For a wrong miss: what the last strike sounded like ("E4", "D minor"), when known. */
+  heard: string | null;
 }
 
 export interface PerformanceSummary {
@@ -75,25 +77,32 @@ export function eventWindows(times: readonly number[]): Window[] {
   });
 }
 
-interface Pending {
+/** Frames of one strike kept for naming a wrong attempt (~0.3 s of analysis hops). */
+const MAX_STRIKE_FRAMES = 32;
+
+interface Pending<F> {
   onsetT: number | null;
   recent: boolean[];
+  /** Judged frames of the latest strike, for "you played X". */
+  frames: F[];
   played: boolean;
   hitT: number | null;
 }
 
 export class PerformanceJudge<F extends PerfFrame> {
   private readonly windows: Window[];
-  private readonly state: Pending[];
+  private readonly state: Pending<F>[];
 
   constructor(
     private readonly times: readonly number[],
     private readonly targets: readonly SongTarget[],
     private readonly matches: (frame: F, target: SongTarget) => boolean,
+    /** Names what a wrong strike sounded like (performance/heardLabel.ts in the app). */
+    private readonly describe: (frames: readonly F[], target: SongTarget) => string | null = () => null,
   ) {
     if (times.length !== targets.length) throw new Error('times and targets must match');
     this.windows = eventWindows(times);
-    this.state = times.map(() => ({ onsetT: null, recent: [], played: false, hitT: null }));
+    this.state = times.map(() => ({ onsetT: null, recent: [], frames: [], played: false, hitT: null }));
   }
 
   /** Feed one analysis frame. Frames must arrive in time order. */
@@ -105,6 +114,7 @@ export class PerformanceJudge<F extends PerfFrame> {
     if (frame.onset) {
       s.onsetT = frame.onsetT ?? frame.t;
       s.recent = [];
+      s.frames = [];
       s.played = true;
     }
     if (s.onsetT === null || !frame.voiced) return;
@@ -119,6 +129,7 @@ export class PerformanceJudge<F extends PerfFrame> {
       s.onsetT = null;
       return;
     }
+    if (s.frames.length < MAX_STRIKE_FRAMES) s.frames.push(frame);
     s.recent.push(this.matches(frame, this.targets[i]));
     if (s.recent.length > PASS_FRAMES) s.recent.shift();
     if (s.recent.filter(Boolean).length >= MIN_PASS) s.hitT = s.onsetT;
@@ -130,19 +141,30 @@ export class PerformanceJudge<F extends PerfFrame> {
     this.state.forEach((s, index) => {
       if (s.hitT !== null) {
         const offset = s.hitT - this.times[index];
-        out.push({ index, rating: Math.abs(offset) <= PERFECT_SEC ? 'Perfect' : 'Good', offsetMs: Math.round(offset * 1000), missReason: null });
+        out.push({ index, rating: Math.abs(offset) <= PERFECT_SEC ? 'Perfect' : 'Good', offsetMs: Math.round(offset * 1000), missReason: null, heard: null });
       } else if (nowT >= this.windows[index].end) {
-        out.push({ index, rating: 'Miss', offsetMs: null, missReason: s.played ? 'wrong' : 'missed' });
+        out.push(this.miss(index));
       }
     });
     return out;
   }
 
+  private miss(index: number): EventResult {
+    const s = this.state[index];
+    return {
+      index,
+      rating: 'Miss',
+      offsetMs: null,
+      missReason: s.played ? 'wrong' : 'missed',
+      heard: s.played ? this.describe(s.frames, this.targets[index]) : null,
+    };
+  }
+
   summary(): PerformanceSummary {
     const results: EventResult[] = this.state.map((s, index) => {
-      if (s.hitT === null) return { index, rating: 'Miss', offsetMs: null, missReason: s.played ? 'wrong' : 'missed' };
+      if (s.hitT === null) return this.miss(index);
       const offset = s.hitT - this.times[index];
-      return { index, rating: Math.abs(offset) <= PERFECT_SEC ? 'Perfect' : 'Good', offsetMs: Math.round(offset * 1000), missReason: null };
+      return { index, rating: Math.abs(offset) <= PERFECT_SEC ? 'Perfect' : 'Good', offsetMs: Math.round(offset * 1000), missReason: null, heard: null };
     });
     const perfect = results.filter((r) => r.rating === 'Perfect').length;
     const good = results.filter((r) => r.rating === 'Good').length;

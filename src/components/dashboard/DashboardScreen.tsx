@@ -463,9 +463,16 @@ export default function DashboardScreen() {
       return;
     }
     let raf = 0;
+    // The glow travels with scroll *progress*, so it keeps drifting to the very bottom of any
+    // page (a fixed rate with a cap stopped it after ~10 % of the Skill Tree). Travel is at most
+    // 35 % of the viewport and never more than half the scroll distance, so it always moves
+    // slower than the content.
     const update = () => {
       raf = 0;
-      layer.style.setProperty('--muz-parallax', `${-Math.min(main.scrollTop * 0.06, 90).toFixed(1)}px`);
+      const range = main.scrollHeight - main.clientHeight;
+      const progress = range > 0 ? Math.min(1, Math.max(0, main.scrollTop / range)) : 0;
+      const travel = Math.min(main.clientHeight * 0.35, range * 0.5);
+      layer.style.setProperty('--muz-parallax', `${(-progress * travel).toFixed(1)}px`);
     };
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(update);

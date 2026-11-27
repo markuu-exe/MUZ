@@ -1,12 +1,20 @@
 /**
  * Scroll-driven story: a sticky stage whose picture changes as the visitor scrolls
  * through three beats (watch, listen, climb). One short line of text per beat; the
- * drawings carry the rest. Each beat is an invisible full-height marker observed
- * with IntersectionObserver, so there is no scroll listener and no layout thrash.
+ * drawings carry the rest.
+ *
+ * Smoothness (owner feedback 2026-11-28): the beat and a progress bar both come from one
+ * scroll progress value (passive listener, rAF-throttled; the bar and the drift are written as
+ * CSS variables, so React re-renders only when the beat changes). Nothing animates layout:
+ * text keeps one size and the highlight is opacity + transform, and the drawings start
+ * reacting within ~0.3 s instead of waiting up to 1.2 s.
  */
 import { Camera, Mic, Trophy } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '../../lib/cn';
+import { useReducedMotion } from './hooks';
+
+const EASE = 'cubic-bezier(0.22, 0.8, 0.25, 1)';
 
 const BEATS = [
   { icon: Camera, kicker: 'It watches', line: 'Your elbow and wrist, live, from your webcam.', tint: 'text-emerald-300' },
@@ -23,11 +31,11 @@ function WatchVisual({ on }: { on: boolean }) {
       <rect x="196" y="150" width="110" height="14" rx="3" fill="#1e293b" stroke="#475569" />
       <circle cx="90" cy="40" r="9" fill="#e2e8f0" />
       <line x1="90" y1="40" x2="104" y2="140" stroke="#e2e8f0" strokeWidth="10" strokeLinecap="round" />
-      <g style={{ transformOrigin: '104px 140px', transform: on ? 'rotate(0deg)' : 'rotate(22deg)', transition: 'transform 1.1s cubic-bezier(0.3, 0.8, 0.2, 1) 0.2s' }}>
-        <line x1="104" y1="140" x2="214" y2="142" stroke={on ? '#34d399' : '#fb7185'} strokeWidth="10" strokeLinecap="round" style={{ transition: 'stroke 0.4s 0.9s' }} />
-        <circle cx="214" cy="142" r="7" fill={on ? '#34d399' : '#fb7185'} style={{ transition: 'fill 0.4s 0.9s' }} />
+      <g style={{ transformOrigin: '104px 140px', transform: on ? 'rotate(0deg)' : 'rotate(22deg)', transition: `transform 0.8s ${EASE} 0.1s` }}>
+        <line x1="104" y1="140" x2="214" y2="142" stroke={on ? '#34d399' : '#fb7185'} strokeWidth="10" strokeLinecap="round" style={{ transition: 'stroke 0.3s 0.5s' }} />
+        <circle cx="214" cy="142" r="7" fill={on ? '#34d399' : '#fb7185'} style={{ transition: 'fill 0.3s 0.5s' }} />
       </g>
-      <circle cx="104" cy="140" r="8" fill={on ? '#34d399' : '#fb7185'} style={{ transition: 'fill 0.4s 0.9s' }} />
+      <circle cx="104" cy="140" r="8" fill={on ? '#34d399' : '#fb7185'} style={{ transition: 'fill 0.3s 0.5s' }} />
       <path d="M 100 112 A 28 28 0 0 0 130 140" fill="none" stroke="#a78bfa" strokeWidth="3" />
       <text x="134" y="114" fill="#c4b5fd" fontSize="18" fontWeight="800">{on ? '94° ✓' : '68°'}</text>
       <g opacity="0.8">
@@ -47,7 +55,7 @@ function ListenVisual({ on }: { on: boolean }) {
           <div key={i} className="flex flex-col items-center gap-1.5">
             <div
               className={cn('w-5 rounded-t-md', lvl > 0.5 ? 'bg-gradient-to-t from-violet-600 to-fuchsia-400' : 'bg-slate-700')}
-              style={{ height: `${(on ? lvl : 0.08) * 150}px`, transition: `height 0.9s cubic-bezier(0.3, 0.8, 0.2, 1) ${0.05 * i}s` }}
+              style={{ height: `${(on ? lvl : 0.08) * 150}px`, transition: `height 0.6s ${EASE} ${0.03 * i}s` }}
             />
             <span className={cn('text-[10px] font-bold', lvl > 0.5 && on ? 'text-white' : 'text-slate-400')}>{PCS[i]}</span>
           </div>
@@ -55,7 +63,7 @@ function ListenVisual({ on }: { on: boolean }) {
       </div>
       <p
         className="rounded-full border border-emerald-500/40 bg-emerald-950/50 px-4 py-1.5 text-sm font-black text-emerald-200"
-        style={{ opacity: on ? 1 : 0, transition: 'opacity 0.5s 0.9s' }}
+        style={{ opacity: on ? 1 : 0, transition: 'opacity 0.4s 0.45s' }}
       >
         Hearing: C · E · G — C major ✓
       </p>
@@ -84,7 +92,7 @@ function ClimbVisual({ on }: { on: boolean }) {
             stroke={on && i < 3 ? '#10b981' : '#334155'}
             strokeWidth="7"
             strokeLinecap="round"
-            style={{ transition: `stroke 0.4s ${0.35 * (i + 1)}s` }}
+            style={{ transition: `stroke 0.3s ${0.15 * (i + 1)}s` }}
           />
         );
       })}
@@ -92,7 +100,7 @@ function ClimbVisual({ on }: { on: boolean }) {
         const done = on && i < 3;
         const current = on && i === 3;
         return (
-          <g key={i} style={{ transition: `opacity 0.4s ${0.35 * i}s` }}>
+          <g key={i}>
             <circle
               cx={n.x}
               cy={n.y}
@@ -100,7 +108,7 @@ function ClimbVisual({ on }: { on: boolean }) {
               fill={done ? '#10b981' : current ? '#8b5cf6' : '#1e293b'}
               stroke={current ? '#fff' : done ? '#6ee7b7' : '#475569'}
               strokeWidth="4"
-              style={{ transition: `fill 0.4s ${0.35 * i}s` }}
+              style={{ transition: `fill 0.3s ${0.15 * i}s` }}
             />
             <text x={n.x} y={n.y + 6} textAnchor="middle" fontSize="16" fontWeight="900" fill={done ? '#022c22' : '#e2e8f0'}>
               {done ? '✓' : current ? '♪' : '•'}
@@ -108,7 +116,7 @@ function ClimbVisual({ on }: { on: boolean }) {
           </g>
         );
       })}
-      <text x="250" y="250" textAnchor="middle" fontSize="16" fontWeight="900" fill="#fbbf24" style={{ opacity: on ? 1 : 0, transition: 'opacity 0.4s 1.2s' }}>
+      <text x="250" y="250" textAnchor="middle" fontSize="16" fontWeight="900" fill="#fbbf24" style={{ opacity: on ? 1 : 0, transition: 'opacity 0.3s 0.6s' }}>
         +60 XP
       </text>
     </svg>
@@ -119,63 +127,82 @@ const VISUALS = [WatchVisual, ListenVisual, ClimbVisual];
 
 export default function ScrollStory() {
   const [active, setActive] = useState(0);
-  const markers = useRef<Array<HTMLDivElement | null>>([]);
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const reduced = useReducedMotion();
 
   useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (e.isIntersecting) setActive(Number((e.target as HTMLElement).dataset.beat));
-        }
-      },
-      { rootMargin: '-45% 0px -45% 0px' },
-    );
-    markers.current.forEach((m) => m && io.observe(m));
-    return () => io.disconnect();
+    const section = sectionRef.current;
+    if (!section) return;
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      const rect = section.getBoundingClientRect();
+      const range = rect.height - window.innerHeight;
+      const progress = range > 0 ? Math.min(1, Math.max(0, -rect.top / range)) : 0;
+      section.style.setProperty('--story-progress', progress.toFixed(4));
+      const beat = Math.min(BEATS.length - 1, Math.floor(progress * BEATS.length));
+      setActive((a) => (a === beat ? a : beat));
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, []);
+
+  const fade = reduced ? 'none' : `opacity 0.5s ${EASE}, transform 0.5s ${EASE}`;
 
   return (
     // One extra screen of height so the last beat stays pinned as long as the others.
-    <section className="relative" style={{ height: `${(BEATS.length + 1) * 100}vh` }} aria-label="How MUZ works">
-      {BEATS.map((_, i) => (
-        <div
-          key={i}
-          ref={(el) => (markers.current[i] = el)}
-          data-beat={i}
-          className="pointer-events-none absolute inset-x-0"
-          style={{ top: `${i * 100}vh`, height: '100vh' }}
-          aria-hidden="true"
-        />
-      ))}
-
+    <section ref={sectionRef} className="relative" style={{ height: `${(BEATS.length + 1) * 100}vh` }} aria-label="How MUZ works">
       <div className="sticky top-0 mx-auto grid h-dvh max-w-6xl items-center gap-10 px-8 md:grid-cols-[1fr_1.1fr]">
         <ol className="space-y-8">
           {BEATS.map((b, i) => {
             const Icon = b.icon;
             const on = i === active;
             return (
-              <li key={b.kicker} className={cn('transition-all duration-500', on ? 'opacity-100' : 'opacity-30')} aria-current={on ? 'step' : undefined}>
+              <li
+                key={b.kicker}
+                aria-current={on ? 'step' : undefined}
+                style={{ opacity: on ? 1 : 0.3, transform: on || reduced ? 'none' : 'translateX(-6px)', transition: fade }}
+              >
                 <p className={cn('flex items-center gap-2 text-xs font-black uppercase tracking-[0.3em]', b.tint)}>
                   <Icon className="h-4 w-4" aria-hidden="true" /> {b.kicker}
                 </p>
-                <p className={cn('mt-2 font-black leading-tight text-white transition-all duration-500', on ? 'text-4xl' : 'text-2xl')}>{b.line}</p>
+                <p className="mt-2 text-3xl font-black leading-tight text-white">{b.line}</p>
               </li>
             );
           })}
-          <li aria-hidden="true" className="flex gap-2 pt-2">
-            {BEATS.map((_, i) => (
-              <span key={i} className={cn('h-1.5 rounded-full transition-all duration-500', i === active ? 'w-10 bg-white' : 'w-4 bg-slate-700')} />
-            ))}
+          <li aria-hidden="true" className="pt-2">
+            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-800">
+              <div
+                className="h-full w-full origin-left rounded-full bg-gradient-to-r from-emerald-400 via-violet-400 to-amber-300"
+                style={{ transform: 'scaleX(var(--story-progress, 0))' }}
+              />
+            </div>
           </li>
         </ol>
 
-        <div className="relative h-[360px] rounded-[2rem] border border-white/10 bg-gradient-to-br from-slate-900 via-slate-950 to-black p-6 shadow-2xl">
+        <div
+          className="relative h-[360px] rounded-[2rem] border border-white/10 bg-gradient-to-br from-slate-900 via-slate-950 to-black p-6 shadow-2xl"
+          // A slow, continuous drift across the whole story (no jump at a beat change).
+          style={reduced ? undefined : { transform: 'translate3d(0, calc((var(--story-progress, 0) - 0.5) * -32px), 0)' }}
+        >
           {VISUALS.map((Visual, i) => (
             <div
               key={i}
-              className="absolute inset-6 transition-all duration-700"
-              style={{ opacity: i === active ? 1 : 0, transform: i === active ? 'none' : `translateY(${i < active ? -24 : 24}px) scale(0.97)` }}
+              className="absolute inset-6"
+              style={{
+                opacity: i === active ? 1 : 0,
+                transform: i === active || reduced ? 'none' : `translateY(${i < active ? -16 : 16}px) scale(0.98)`,
+                transition: fade,
+              }}
               aria-hidden={i !== active}
             >
               <Visual on={i === active} />

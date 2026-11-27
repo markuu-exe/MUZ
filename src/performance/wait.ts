@@ -13,13 +13,17 @@
  *   ringing from it) can never satisfy the next one: that needs a strike of its own.
  * Practice only, like the rest of Performance mode: nothing is saved.
  */
-import type { AcousticFrame, AcousticVerifier } from '../audio/practice/ChordVerifier';
+import { midiToNoteName } from '../audio/dsp/pitch';
+import type { AcousticFrame, AcousticVerifier, AttemptResult } from '../audio/practice/ChordVerifier';
 import { ChordVerifier } from '../audio/practice/ChordVerifier';
 import { PitchVerifier } from '../audio/notes/PitchVerifier';
 import { chordMatcher } from '../practice/PracticeDrill';
 import type { SongTarget } from './songs';
 
-export type WaitEvent = { kind: 'advance'; index: number; firstTry: boolean } | { kind: 'wrong'; index: number };
+export type WaitEvent =
+  | { kind: 'advance'; index: number; firstTry: boolean }
+  /** `heard`: what the wrong attempt sounded like ("E4", "D minor"), as the lessons say it; null when unclear. */
+  | { kind: 'wrong'; index: number; heard: string | null };
 
 export interface WaitSummary {
   total: number;
@@ -29,6 +33,16 @@ export interface WaitSummary {
   wrong: number;
   /** Wrong attempts per step. */
   perEvent: number[];
+}
+
+/** Same wording as the lesson drills (PracticeDrill.describeHeard): a note with its octave, or the closest chord. */
+function describeAttempt(verifier: AcousticVerifier, attempt: AttemptResult): string | null {
+  if ('lastHeardMidi' in verifier) {
+    const midi = (verifier as PitchVerifier).lastHeardMidi;
+    return midi >= 0 ? midiToNoteName(midi) : null;
+  }
+  const label = attempt.detail?.closest.label;
+  return label ? label : null;
 }
 
 export function verifierForTarget(target: SongTarget): AcousticVerifier {
@@ -65,7 +79,7 @@ export class WaitStepper {
     const index = this._index;
     if (attempt.kind === 'miss') {
       this.wrongs[index]++;
-      return { kind: 'wrong', index };
+      return { kind: 'wrong', index, heard: describeAttempt(this.verifier, attempt) };
     }
     this._index++;
     this.verifier = this.done ? null : this.createVerifier(this.targets[this._index]);

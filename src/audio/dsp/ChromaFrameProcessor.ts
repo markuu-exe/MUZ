@@ -39,6 +39,16 @@ const ONSET_FFT = 1024;
 /** Frames of magnitude history kept for residue capture (covers ~64 ms of onset-detection lag at hop 512). */
 const RESIDUE_RING = 6;
 const WARMUP_FRAMES = 8;
+/**
+ * A note struck while a neighbour still rings adds little energy at first: flux spikes as the
+ * new partials appear, but the short-window level may rise only ~1-2 dB, or a hop later than
+ * the flux peak (owner report 2026-11-28: F4 after the held G4 in Twinkle was rarely heard).
+ * A strong spectral attack (flux at least STRONG_FLUX x threshold) therefore needs half the
+ * usual rise, and the rise may arrive up to RISE_GRACE_HOPS after the flux peak. The onset is
+ * stamped at the flux peak. Weak flux (beating in a sustained chord) keeps the full rule.
+ */
+const STRONG_FLUX = 2;
+const RISE_GRACE_HOPS = 2;
 
 /**
  * Pure, allocation-free (after construction) STFT → chroma + onset pipeline.
@@ -84,6 +94,10 @@ export class ChromaFrameProcessor {
   private fluxPos = 0;
   private prevAbove = false;
   private lastOnsetTime = -Infinity;
+  /** Flux peak still waiting for its energy rise: hops left, onset time, rise needed (dB). */
+  private pendingHops = 0;
+  private pendingOnsetTime = 0;
+  private pendingRiseDb = 0;
   private hasPrevSpec = false;
   /** Short-window energy (dB) of the last 3 hops, for the energy-rise test. */
   private readonly shortDb = new Float64Array(3).fill(-Infinity);
@@ -194,6 +208,7 @@ export class ChromaFrameProcessor {
     this.fluxCount = 0;
     this.fluxPos = 0;
     this.prevAbove = false;
+    this.pendingHops = 0;
     this.hasPrevSpec = false;
     this.lastOnsetTime = -Infinity;
     this.shortDb.fill(-Infinity);
@@ -353,7 +368,7 @@ export class ChromaFrameProcessor {
     for (let i = 0; i < 3; i++) quietest = Math.min(quietest, this.shortDb[i]);
     this.shortDb[this.shortDbPos] = shortDb;
     this.shortDbPos = (this.shortDbPos + 1) % 3;
-    const rose = shortDb - quietest >= cfg.onsetMinRiseDb;
+    const riseDb = shortDb - quietest;
     this.onsetFft.transform(this.oRe, this.oIm);
     const scale = 2 / this.onsetWinSum;
     let flux = 0;
@@ -385,13 +400,24 @@ export class ChromaFrameProcessor {
     this.fluxPos = (this.fluxPos + 1) % this.fluxHistory.length;
     if (this.fluxCount < this.fluxHistory.length) this.fluxCount++;
 
-    const above = warm && rose && flux > threshold && rmsDb >= cfg.minRmsDb;
     // Onset time ≈ centre of the short window.
     const onsetTime = time - ONSET_FFT / 2 / this.sampleRate;
-    if (above && !this.prevAbove && (onsetTime - this.lastOnsetTime) * 1000 >= cfg.onsetRefractoryMs) {
+    const fluxHit = warm && flux > threshold && rmsDb >= cfg.minRmsDb;
+    if (fluxHit) {
+      const need = flux >= threshold * STRONG_FLUX ? cfg.onsetMinRiseDb / 2 : cfg.onsetMinRiseDb;
+      // A new peak inside the grace keeps the earlier onset time and the easier rise requirement.
+      if (this.pendingHops === 0) this.pendingOnsetTime = onsetTime;
+      this.pendingRiseDb = this.pendingHops > 0 ? Math.min(this.pendingRiseDb, need) : need;
+      this.pendingHops = RISE_GRACE_HOPS + 1;
+    }
+    const above = this.pendingHops > 0 && riseDb >= this.pendingRiseDb;
+    if (above && !this.prevAbove && (this.pendingOnsetTime - this.lastOnsetTime) * 1000 >= cfg.onsetRefractoryMs) {
       this.frame.onset = true;
-      this.frame.onsetTime = onsetTime;
-      this.lastOnsetTime = onsetTime;
+      this.frame.onsetTime = this.pendingOnsetTime;
+      this.lastOnsetTime = this.pendingOnsetTime;
+      this.pendingHops = 0;
+    } else if (this.pendingHops > 0) {
+      this.pendingHops--;
     }
     this.prevAbove = above;
   }
