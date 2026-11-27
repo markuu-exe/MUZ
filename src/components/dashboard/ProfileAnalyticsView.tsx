@@ -1,4 +1,6 @@
 import ProfileAvatar from '../common/ProfileAvatar';
+import WeeklyGoalCard from './WeeklyGoalCard';
+import ContinueCard from './ContinueCard';
 import type { ProfileLook } from '../../lib/profile/look';
 import { useMemo, useState } from 'react';
 import {
@@ -31,7 +33,8 @@ import {
 } from 'chart.js';
 import { Bar, Line } from 'react-chartjs-2';
 import type { UserProfile } from '../../types/auth.types';
-import { displayNameFromProfile, expProgress } from '../../lib/dashboard/curriculum';
+import { displayNameFromProfile, expProgress, type CurriculumNode, type NodeStatus, type ProgressMap } from '../../lib/dashboard/curriculum';
+import PracticeSuggestionCard from './PracticeSuggestionCard';
 import {
   ACHIEVEMENT_DESCRIPTIONS,
   ACHIEVEMENT_TITLES,
@@ -92,6 +95,19 @@ interface ProfileAnalyticsViewProps {
   error?: string | null;
   /** Chosen avatar and frame (Settings → Profile). */
   look?: ProfileLook;
+  /** P8: whose week to load for the daily goal / weekly summary card. */
+  userId?: string | null;
+  isDemo?: boolean;
+  /** UX 2026-11-27: the next action comes first on Profile. */
+  continueLesson?: Pick<CurriculumNode, 'title' | 'description' | 'kind'> | null;
+  onContinue?: () => void;
+  /** Smart practice suggestion inputs (the course, progress and how to open a lesson). */
+  suggestion?: {
+    lessons: CurriculumNode[];
+    progress: ProgressMap;
+    exp: number;
+    onOpen: (lesson: CurriculumNode, status: NodeStatus) => void;
+  };
 }
 
 interface Achievement {
@@ -131,6 +147,11 @@ export default function ProfileAnalyticsView({
   loading = false,
   error = null,
   look,
+  userId = null,
+  isDemo = false,
+  continueLesson = null,
+  onContinue,
+  suggestion,
 }: ProfileAnalyticsViewProps) {
   const [internalRange, setInternalRange] = useState<AnalyticsDateRange>('7d');
   const activeRange = controlledRange ?? internalRange;
@@ -395,6 +416,21 @@ export default function ProfileAnalyticsView({
       </div>
 
       {/* 2. Row of 4 Summary Statistic Cards */}
+      {continueLesson && onContinue && <ContinueCard lesson={continueLesson} onContinue={onContinue} compact />}
+
+      {suggestion && (
+        <PracticeSuggestionCard
+          userId={userId}
+          isDemo={isDemo}
+          lessons={suggestion.lessons}
+          progress={suggestion.progress}
+          exp={suggestion.exp}
+          onOpen={suggestion.onOpen}
+        />
+      )}
+
+      <WeeklyGoalCard userId={userId} isDemo={isDemo} lastActivityDate={profile?.last_activity_date} />
+
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-lg transition-all hover:border-cyan-500/40">
           <div className="flex items-center justify-between">
@@ -497,7 +533,7 @@ export default function ProfileAnalyticsView({
 
             <div className="relative mt-4 h-48 w-full">
               {loading ? (
-                <div className="flex h-full items-center justify-center text-xs text-slate-500">
+                <div className="flex h-full items-center justify-center text-xs text-slate-400">
                   Loading pitch telemetry…
                 </div>
               ) : hasPitchData ? (
@@ -506,7 +542,7 @@ export default function ProfileAnalyticsView({
                 <div className="flex h-full flex-col items-center justify-center rounded-2xl border border-dashed border-slate-800 bg-slate-950/50 px-4 text-center">
                   <Activity className="mb-2 h-5 w-5 text-slate-600" />
                   <p className="text-xs font-medium text-slate-400">No pitch sessions recorded yet</p>
-                  <p className="mt-0.5 text-[11px] text-slate-500">Complete a practice drill to plot accuracy</p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">Complete a practice drill to plot accuracy</p>
                 </div>
               )}
             </div>
@@ -531,7 +567,7 @@ export default function ProfileAnalyticsView({
 
             <div className="relative mt-4 h-48 w-full">
               {loading ? (
-                <div className="flex h-full items-center justify-center text-xs text-slate-500">
+                <div className="flex h-full items-center justify-center text-xs text-slate-400">
                   Loading rhythm histogram…
                 </div>
               ) : histogramTotal > 0 ? (
@@ -540,7 +576,7 @@ export default function ProfileAnalyticsView({
                 <div className="flex h-full flex-col items-center justify-center rounded-2xl border border-dashed border-slate-800 bg-slate-950/50 px-4 text-center">
                   <BarChart3 className="mb-2 h-5 w-5 text-slate-600" />
                   <p className="text-xs font-medium text-slate-400">No rhythm runs recorded yet</p>
-                  <p className="mt-0.5 text-[11px] text-slate-500">Buckets: 0–59, 60–69, 70–79, 80–89, 90–100</p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">Buckets: 0–59, 60–69, 70–79, 80–89, 90–100</p>
                 </div>
               )}
             </div>
@@ -565,7 +601,7 @@ export default function ProfileAnalyticsView({
 
             <div className="relative mt-4 h-48 w-full">
               {loading ? (
-                <div className="flex h-full items-center justify-center text-xs text-slate-500">
+                <div className="flex h-full items-center justify-center text-xs text-slate-400">
                   Loading posture telemetry…
                 </div>
               ) : hasPostureData ? (
@@ -574,7 +610,7 @@ export default function ProfileAnalyticsView({
                 <div className="flex h-full flex-col items-center justify-center rounded-2xl border border-dashed border-slate-800 bg-slate-950/50 px-4 text-center">
                   <ShieldCheck className="mb-2 h-5 w-5 text-slate-600" />
                   <p className="text-xs font-medium text-slate-400">No posture sessions recorded yet</p>
-                  <p className="mt-0.5 text-[11px] text-slate-500">Complete a camera-tracked drill to plot posture</p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">Complete a camera-tracked drill to plot posture</p>
                 </div>
               )}
             </div>
@@ -614,7 +650,7 @@ export default function ProfileAnalyticsView({
                       className={`flex h-11 w-11 items-center justify-center rounded-xl border ${
                         badge.unlocked
                           ? badge.color
-                          : 'border-slate-800 bg-slate-900 text-slate-600'
+                          : 'border-slate-800 bg-slate-900 text-slate-400'
                       }`}
                     >
                       <Icon className="h-5 w-5" />

@@ -4,7 +4,7 @@
  * Drawn on a canvas from refs inside requestAnimationFrame; React never re-renders per frame.
  */
 import { useEffect, useRef } from 'react';
-import { segmentAt, type RhythmPlan } from '../../../lib/rhythm/plan';
+import { rhythmCue, segmentAt, type RhythmPlan } from '../../../lib/rhythm/plan';
 import { GOOD_MS, type JudgedTap } from '../../../lib/rhythm/timing';
 
 interface BeatHighwayProps {
@@ -12,6 +12,8 @@ interface BeatHighwayProps {
   /** Seconds since the plan started, or null when idle. */
   now: () => number | null;
   taps: JudgedTap[];
+  /** Text drawn above each target (performance mode: note or chord name). */
+  labels?: readonly string[];
 }
 
 const COLORS = {
@@ -32,10 +34,10 @@ const HIT_X = 0.2;
 /** Clicks of travel visible ahead of the hit line. */
 const LOOKAHEAD_BEATS = 4;
 
-export default function BeatHighway({ plan, now, taps }: BeatHighwayProps) {
+export default function BeatHighway({ plan, now, taps, labels }: BeatHighwayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const live = useRef({ plan, now, taps });
-  live.current = { plan, now, taps };
+  const live = useRef({ plan, now, taps, labels });
+  live.current = { plan, now, taps, labels };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -61,7 +63,7 @@ export default function BeatHighway({ plan, now, taps }: BeatHighwayProps) {
 
     const draw = () => {
       raf = requestAnimationFrame(draw);
-      const { plan: p, now: getNow, taps: judged } = live.current;
+      const { plan: p, now: getNow, taps: judged, labels: names } = live.current;
       const t = getNow() ?? -0.0001;
       const hitX = width * HIT_X;
       const pxPerSec = (width * (1 - HIT_X)) / (LOOKAHEAD_BEATS * p.beatSec);
@@ -119,6 +121,14 @@ export default function BeatHighway({ plan, now, taps }: BeatHighwayProps) {
         g.arc(x, midY, 14, 0, Math.PI * 2);
         g.fill();
         g.shadowBlur = 0;
+        const name = names?.[i];
+        if (name) {
+          g.font = '800 13px Inter, "Segoe UI", sans-serif';
+          g.textAlign = 'center';
+          g.textBaseline = 'bottom';
+          g.fillStyle = COLORS.text;
+          g.fillText(name, x, midY - 18);
+        }
         g.globalAlpha = 1;
       });
 
@@ -142,14 +152,16 @@ export default function BeatHighway({ plan, now, taps }: BeatHighwayProps) {
       g.font = '700 12px Inter, "Segoe UI", sans-serif';
       g.textAlign = 'right';
       if (seg?.kind === 'count-in') {
-        const left = Math.max(1, Math.ceil((seg.end - Math.max(0, t)) / p.beatSec - 1e-6));
+        // Count the bar the way a musician counts in: "1 2 3 4" in 4/4, "1 2 3 | 1 2 3" in 3/4.
+        const cue = rhythmCue(p, Math.max(0, t));
+        const beat = cue.kind === 'count' ? cue.measureBeat : 1;
         g.fillStyle = COLORS.textDim;
-        g.fillText('GET READY', width - 16, 12);
+        g.fillText(cue.kind === 'count' && cue.of > cue.beatsPerMeasure ? `COUNT-IN · BAR ${Math.ceil(cue.beat / cue.beatsPerMeasure)}` : 'COUNT-IN', width - 16, 12);
         g.fillStyle = COLORS.text;
         g.font = '900 44px Inter, "Segoe UI", sans-serif';
         g.textAlign = 'center';
         g.textBaseline = 'middle';
-        g.fillText(String(left), width * 0.6, midY);
+        g.fillText(String(beat), width * 0.6, midY);
       } else if (seg?.kind === 'listen') {
         g.fillStyle = COLORS.listen;
         g.fillText('LISTEN', width - 16, 12);

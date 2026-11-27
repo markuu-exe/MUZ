@@ -28,6 +28,8 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npx tsc -p tsconfig.json
+      - run: npx tsc -p api/tsconfig.json
+      - run: node scripts/check-api-load.mjs
       - run: npx vite build
       - run: npm run seed:lessons:check
       - run: node scripts/check-bundle-size.mjs

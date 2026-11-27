@@ -4,6 +4,7 @@
  * spacebar, and judges taps with the existing useRhythmJudge against the plan's
  * targets (SRS 3.1.4.2–3.1.4.4). All timing uses AudioContext time, never setTimeout.
  */
+import { audioTimeAt } from '../lib/rhythm/audioClock';
 import { clickVoice } from '../lib/rhythm/clickVoice';
 import { readTapLatencyMs } from '../lib/rhythm/calibration';
 import { SRS_WINDOWS, captureWindowMs, type RhythmWindows } from '../lib/rhythm/timing';
@@ -143,11 +144,8 @@ export function useRhythmSession(
     const ctx = ctxRef.current;
     const t0 = startTimeRef.current;
     if (!ctx || t0 === null) return null;
-    const ts = ctx.getOutputTimestamp();
-    if (ts.contextTime !== undefined && ts.performanceTime !== undefined && ts.performanceTime > 0) {
-      return ts.contextTime + (performance.now() - ts.performanceTime) / 1000 - t0;
-    }
-    return ctx.currentTime - t0;
+    const now = performance.now();
+    return audioTimeAt(ctx, now, now) - t0;
   }, []);
 
   return { phase, start, stop, now, taps };

@@ -46,7 +46,7 @@ export default function EarPickView({ exercise, submitted, onOutcome }: Exercise
         onSelect={setPicked}
       />
       <CheckButton disabled={picked === null || !heard} hidden={submitted} onClick={check} />
-      {!heard && <p className="text-center text-xs text-slate-500">Listen first, then choose.</p>}
+      {!heard && <p className="text-center text-xs text-slate-400">Listen first, then choose.</p>}
     </div>
   );
 }

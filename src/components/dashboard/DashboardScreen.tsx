@@ -1,11 +1,13 @@
 import { Moon, Sun } from 'lucide-react';
 import { useTheme } from '../../lib/theme';
 import { MuzLogo } from '../brand/MuzLogo';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
 import {
   AlertTriangle,
   BookOpen,
   GitBranch,
+  Music2,
   Heart,
   LogOut,
   Piano,
@@ -29,6 +31,7 @@ import {
   expProgress,
   groupByModule,
   nodeStatus,
+  nextLessonAfter,
   type CurriculumNode,
   type DashboardView,
   type NodeStatus,
@@ -41,9 +44,12 @@ import AppearanceCard from './AppearanceCard';
 import SkillTreeSkeleton from './SkillTreeSkeleton';
 import LessonNotesView from './LessonNotesView';
 import PianoSandboxView from './PianoSandboxView';
-import LessonPlayer, { type LessonSaveFeedback } from '../lesson/LessonPlayer';
+import type { LessonSaveFeedback } from '../lesson/LessonPlayer';
+import LazyBoundary from '../common/LazyBoundary';
+import { readCameraCheck } from '../../practice/cameraCheck';
+import { findLessonStatus, readPlace, savePlace } from '../../lib/dashboard/sessionPlace';
 import { isLessonPayload, type LessonPayload } from '../../types/lesson.types';
-import ProfileAnalyticsView, { type AnalyticsDateRange } from './ProfileAnalyticsView';
+import type { AnalyticsDateRange } from './ProfileAnalyticsView';
 import PlacementModal from './PlacementModal';
 import OnboardingWelcome from './OnboardingWelcome';
 import DemoBanner from '../common/DemoBanner';
@@ -73,6 +79,7 @@ import { displayedStreak, toLocalDate } from '../../lib/progress/streak';
 import { persistHeartAnchor, persistRegeneratedHearts, savePlacement, supabaseDevTestStore, supabaseProgressStore } from '../../lib/progress/supabaseStore';
 import { lessonNeedsHearts } from '../../lesson/runner';
 import { blockingLesson } from '../../lib/dashboard/curriculum';
+import ContinueCard from './ContinueCard';
 
 interface NavItem {
   id: DashboardView;
@@ -83,11 +90,19 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'skill-tree', label: 'Skill Tree', icon: GitBranch },
+  { id: 'perform', label: 'Perform', icon: Music2 },
   { id: 'lessons', label: 'Lessons', icon: BookOpen },
   { id: 'sandbox', label: 'Piano Sandbox', icon: Piano },
   { id: 'profile', label: 'Profile & Analytics', icon: UserRound },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
+
+// E9: downloaded only when opened, so the first page load does not carry the lesson
+// player (and its exercise views) or chart.js for the Profile charts.
+const LessonPlayer = lazy(() => import('../lesson/LessonPlayer'));
+const ProfileAnalyticsView = lazy(() => import('./ProfileAnalyticsView'));
+const CameraCheckModal = lazy(() => import('./CameraCheckModal'));
+const PerformView = lazy(() => import('../perform/PerformView'));
 
 export default function DashboardScreen() {
   const { user, profile, profileStatus, isDemo, signOut, refreshProfile } = useAuth();
@@ -97,7 +112,10 @@ export default function DashboardScreen() {
   const isDev = isDevAccount(profile, isDemo);
   const [theme, setThemeChoice] = useTheme();
   const data = useDashboardData(profile, isDemo);
-  const [view, setView] = useState<DashboardView>('skill-tree');
+  // Owner request 2026-11-27: a refresh returns to the same tab and reopens the open lesson.
+  const placeAccount = isDemo ? 'demo' : (user?.id ?? 'signed-out');
+  const [restoredPlace] = useState(() => readPlace(placeAccount));
+  const [view, setView] = useState<DashboardView>(() => restoredPlace?.view ?? 'skill-tree');
   const [banner, setBanner] = useState<{ message: string; type: 'warning' | 'error' | 'info' } | null>(null);
   const [shakingId, setShakingId] = useState<string | null>(null);
   const [selected, setSelected] = useState<CurriculumNode | null>(null);
@@ -106,6 +124,13 @@ export default function DashboardScreen() {
   // D1: where this lesson's results are saved, decided once when it is opened.
   const [activeDestination, setActiveDestination] = useState<ResultDestination>('learner');
   const [placementDone, setPlacementDone] = useState(false);
+  // P4: camera check, offered once per device right after placement, and from Settings.
+  const [cameraCheckOpen, setCameraCheckOpen] = useState(false);
+  const [cameraCheckResult, setCameraCheckResult] = useState(readCameraCheck);
+  const closeCameraCheck = useCallback(() => {
+    setCameraCheckOpen(false);
+    setCameraCheckResult(readCameraCheck());
+  }, []);
   // T-14 (U-25): the welcome step shows until placement is finished; placement itself is stored on the account.
   const [welcomeSeen, setWelcomeSeen] = useState(false);
   const [analyticsRange, setAnalyticsRange] = useState<AnalyticsDateRange>('7d');
@@ -217,6 +242,7 @@ export default function DashboardScreen() {
     if (!profile) return;
     await savePlacement(supabase, profile.id, startUnit, data.lessons);
     setPlacementDone(true);
+    if (readCameraCheck() === null) setCameraCheckOpen(true);
     await refreshProfile();
     data.reload();
   };
@@ -372,7 +398,7 @@ export default function DashboardScreen() {
       return feedback;
     } catch (err) {
       if (destination === 'dev-test') {
-        return { note: 'Your result could not be saved.' };
+        return { note: 'Your result could not be saved.', saved: false };
       }
       // T-13 (SRS 3.3.2): offline, keep the run in the local queue and sync it when the connection returns.
       if (isNetworkError(err) && syncQueueRef.current) {
@@ -397,6 +423,7 @@ export default function DashboardScreen() {
           ? `Could not save to server; achievements checked locally.\n${badgeNote}`
           : 'Your result could not be saved.',
         expAwarded: 0,
+        saved: false,
       };
     }
   };
@@ -417,8 +444,67 @@ export default function DashboardScreen() {
     return null;
   }, [data.lessons, data.progress, exp]);
 
+  // Polish 2026-11-28: each tab opens at its top (the workspace scroll was shared, so switching
+  // from a long page could land mid-page), and the background glow drifts slower than the content.
+  const mainRef = useRef<HTMLElement | null>(null);
+  const atmosphereRef = useRef<HTMLDivElement | null>(null);
+  const reducedMotion = useReducedMotion();
+  // Layout effect: runs before the new tab's own effects, so the Skill Tree can still scroll to
+  // the current lesson afterwards.
+  useLayoutEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 });
+  }, [view]);
+  useEffect(() => {
+    const main = mainRef.current;
+    const layer = atmosphereRef.current;
+    if (!main || !layer) return;
+    if (reducedMotion) {
+      layer.style.removeProperty('--muz-parallax');
+      return;
+    }
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      layer.style.setProperty('--muz-parallax', `${-Math.min(main.scrollTop * 0.06, 90).toFixed(1)}px`);
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(update);
+    };
+    update();
+    main.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      main.removeEventListener('scroll', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [reducedMotion]);
+
+  // Remember where the learner is (this tab only), so a refresh comes back here.
+  useEffect(() => {
+    savePlace({ account: placeAccount, view, lessonId: activeLesson?.id ?? null });
+  }, [placeAccount, view, activeLesson]);
+
+  // Reopen the lesson that was open before the refresh, once, if the same rules that guard the
+  // Start button still allow it (unlocked or developer access, and hearts for practice lessons).
+  const lessonRestoreTried = useRef(false);
+  useEffect(() => {
+    if (lessonRestoreTried.current) return;
+    const lessonId = restoredPlace?.lessonId;
+    if (!lessonId) {
+      lessonRestoreTried.current = true;
+      return;
+    }
+    if (data.loading || (!isDemo && !profileIsLoaded) || data.lessons.length === 0) return;
+    lessonRestoreTried.current = true;
+    const found = findLessonStatus(lessonId, data.lessons, data.progress, exp);
+    if (!found || !isLessonPayload(found.lesson.payload) || !canOpenLesson(found.status, isDev)) return;
+    if (hearts === 0 && lessonNeedsHearts(found.lesson.payload)) return;
+    setActiveLesson(found.lesson);
+    setActiveDestination(resultDestination(found.status));
+  }, [restoredPlace, data.loading, data.lessons, data.progress, exp, isDemo, profileIsLoaded, isDev, hearts]);
+
   // Click handler for Skill Tree & Lesson nodes
-  const handleSelect = (lesson: CurriculumNode, status: NodeStatus) => {
+  /** Select a node (opens its detail panel). Returns false when it cannot be opened (locked / no hearts). */
+  const handleSelect = (lesson: CurriculumNode, status: NodeStatus): boolean => {
     if (!canOpenLesson(status, isDev)) {
       setSelected(null);
       setSelectedStatus(null);
@@ -438,7 +524,7 @@ export default function DashboardScreen() {
         message: `Node Locked: "${lesson.title}". ${reason}`,
         type: 'warning',
       });
-      return;
+      return false;
     }
 
     if (profileIsLoaded && hearts === 0 && isLessonPayload(lesson.payload) && lessonNeedsHearts(lesson.payload)) {
@@ -450,13 +536,58 @@ export default function DashboardScreen() {
         message: 'No Stamina Hearts remaining! Complete a free Theory unit or wait for your heart regeneration.',
         type: 'error',
       });
-      return;
+      return false;
     }
 
     setBanner(null);
     setSelected(lesson);
     setSelectedStatus(status);
+    return true;
   };
+
+  // Accessibility pass: the detail panel is far down the page after every node, so when it opens
+  // focus moves to its Start button; Escape or ✕ closes it and returns focus to the node.
+  const startButtonRef = useRef<HTMLButtonElement>(null);
+  const selectedId = selected?.id ?? null;
+  const lastSelectedId = useRef<string | null>(null);
+  useEffect(() => {
+    if (selectedId) {
+      lastSelectedId.current = selectedId;
+      startButtonRef.current?.focus({ preventScroll: true });
+    }
+  }, [selectedId]);
+  const closeNodePanel = useCallback(() => {
+    setSelected(null);
+    setSelectedStatus(null);
+    const id = lastSelectedId.current;
+    if (id) window.requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-node-id="' + id + '"]')?.focus());
+  }, []);
+  useEffect(() => {
+    if (!selectedId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeNodePanel();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedId, closeNodePanel]);
+
+  /** Open a lesson straight away (Continue / Next lesson), with the same checks as the Start button. */
+  const openLesson = (lesson: CurriculumNode, status: NodeStatus) => {
+    if (!handleSelect(lesson, status)) return;
+    if (!isLessonPayload(lesson.payload)) {
+      setBanner({ message: 'This lesson has no playable content yet.', type: 'warning' });
+      return;
+    }
+    setActiveLesson(lesson);
+    setActiveDestination(resultDestination(status));
+    setSelected(null);
+    setSelectedStatus(null);
+  };
+
+  // UX 2026-11-27: what to do next. Continue = the first open lesson not yet mastered; Next = the
+  // lesson after the one open now (recomputed after a pass reloads progress).
+  const continueStatus: NodeStatus = 'current';
+  const nextAfterActive = activeLesson ? nextLessonAfter(activeLesson.id, data.lessons, data.progress, exp) : null;
 
 
   return (
@@ -558,7 +689,8 @@ export default function DashboardScreen() {
       {/* =========================================================================
           MAIN APPLICATION WORKSPACE (TOP HEADER & VIEWPORT)
           ========================================================================= */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-muz-bg">
+      <div className="relative isolate flex min-w-0 flex-1 flex-col overflow-clip bg-muz-bg">
+        <div ref={atmosphereRef} className="muz-atmosphere" aria-hidden="true" />
         {isDemo && <DemoBanner onExit={() => void signOut()} />}
         {/* TOP GAMIFICATION HEADER */}
         <header className="flex min-h-20 shrink-0 flex-wrap items-center justify-between gap-4 border-b border-slate-800/90 bg-muz-sidebar/90 px-8 py-3 backdrop-blur-md">
@@ -586,6 +718,8 @@ export default function DashboardScreen() {
                       ? 'Lesson Notes'
                       : view === 'sandbox'
                         ? 'Piano Sandbox'
+                        : view === 'perform'
+                          ? 'Performance Mode'
                         : 'Studio Settings'}
               </h1>
             </div>
@@ -646,9 +780,17 @@ export default function DashboardScreen() {
         )}
 
         {/* Scrollable Main Content Container */}
-        <main className="relative flex-1 overflow-y-auto px-8 py-8">
+        <main ref={mainRef} className="relative flex-1 overflow-y-auto px-8 py-8">
+          {/* Keyed by tab: a short enter transition on every switch (none with reduced motion). */}
+          <div key={view} className="muz-view-enter">
           {/* VIEW 1: SKILL TREE PROGRESSION (Default State) */}
           {view === 'skill-tree' && !treeReady && <SkillTreeSkeleton />}
+          {view === 'skill-tree' && treeReady && currentNode && (
+            // Sticky: the tree scrolls to your current node, which used to push Continue off screen.
+            <div className="sticky -top-8 z-20 -mx-8 -mt-8 mb-6 px-8 pb-3 pt-5 bg-gradient-to-b from-muz-bg via-muz-bg/95 to-transparent">
+              <ContinueCard lesson={currentNode} onContinue={() => openLesson(currentNode, continueStatus)} className="mb-0" />
+            </div>
+          )}
           {view === 'skill-tree' && treeReady && (
             <SkillTreeView
               lessons={data.lessons}
@@ -664,20 +806,34 @@ export default function DashboardScreen() {
 
           {/* VIEW 2: PROFILE & ANALYTICS DASHBOARD */}
           {view === 'profile' && (
-            <ProfileAnalyticsView
-              profile={profile}
-              userEmail={user?.email}
-              masteredCount={masteredCount}
-              totalLessons={data.lessons.length}
-              unlockedAchievements={mergedAchievements}
-              sessions={analytics.sessions}
-              rhythmHistogram={analytics.rhythmHistogram}
-              range={analyticsRange}
-              onRangeChange={setAnalyticsRange}
-              loading={analytics.loading}
-              error={analytics.error}
-              look={look}
-            />
+            <LazyBoundary label="profile" onCancel={() => setView('skill-tree')}>
+              <ProfileAnalyticsView
+                profile={profile}
+                userEmail={user?.email}
+                masteredCount={masteredCount}
+                totalLessons={data.lessons.length}
+                unlockedAchievements={mergedAchievements}
+                sessions={analytics.sessions}
+                rhythmHistogram={analytics.rhythmHistogram}
+                range={analyticsRange}
+                onRangeChange={setAnalyticsRange}
+                loading={analytics.loading}
+                error={analytics.error}
+                look={look}
+                userId={profile?.id ?? null}
+                isDemo={isDemo}
+                continueLesson={currentNode}
+                suggestion={{ lessons: data.lessons, progress: data.progress, exp, onOpen: openLesson }}
+                onContinue={currentNode ? () => openLesson(currentNode, continueStatus) : undefined}
+              />
+            </LazyBoundary>
+          )}
+
+          {/* Performance mode: songs and progressions in time (practice only). */}
+          {view === 'perform' && (
+            <LazyBoundary label="performance mode" onCancel={() => setView('skill-tree')}>
+              <PerformView />
+            </LazyBoundary>
           )}
 
           {/* VIEW 3: LESSON NOTES (read-only study notes; practice lives on the Skill Tree) */}
@@ -759,6 +915,21 @@ export default function DashboardScreen() {
               </div>
 
               <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-xl">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Camera check</h3>
+                <p className="mb-3 mt-1 text-xs text-slate-400">
+                  Checks that your camera can see your shoulder, elbow and wrist for practice lessons.
+                  {cameraCheckResult === 'passed' ? ' Last check on this device: passed.' : cameraCheckResult === 'skipped' ? ' Last time it was skipped on this device.' : ''}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setCameraCheckOpen(true)}
+                  className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-violet-500"
+                >
+                  Check my camera
+                </button>
+              </div>
+
+              <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-xl">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Rhythm timing</h3>
                 <p className="mb-3 mt-1 text-xs text-slate-400">
                   Measures your speakers' or headphones' delay so rhythm taps are judged fairly. Saved on this device.
@@ -801,17 +972,21 @@ export default function DashboardScreen() {
               </div>
             </div>
           )}
+          </div>
 
           {/* =========================================================================
               SELECTED NODE INTERACTIVE TRAY / DRAWER
               ========================================================================= */}
           {selected && (
             <div className="pointer-events-none fixed bottom-8 left-1/2 z-30 w-full max-w-xl -translate-x-1/2 px-4">
-              <div className="pointer-events-auto rounded-3xl border border-violet-500/50 bg-muz-panel/95 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.65)] backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-200">
+              <div
+                role="region"
+                aria-labelledby="node-panel-title"
+                className="pointer-events-auto rounded-3xl border border-violet-500/50 bg-muz-panel/95 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.65)] backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-200">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="rounded-full border border-violet-500/40 bg-violet-500/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-300">
+                      <span className="rounded-full border border-violet-500/40 bg-violet-500/15 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider text-violet-300">
                         {selected.kind} Unit
                       </span>
                       <span className="text-xs text-slate-400">
@@ -819,7 +994,7 @@ export default function DashboardScreen() {
                       </span>
                     </div>
 
-                    <h3 className="mt-2 text-xl font-bold text-white">{selected.title}</h3>
+                    <h3 id="node-panel-title" className="mt-2 text-xl font-bold text-white">{selected.title}</h3>
                     <p className="mt-1 text-sm text-slate-300 leading-relaxed">
                       {selected.description}
                     </p>
@@ -827,13 +1002,11 @@ export default function DashboardScreen() {
 
                   <button
                     type="button"
-                    onClick={() => {
-                      setSelected(null);
-                      setSelectedStatus(null);
-                    }}
-                    className="rounded-lg p-1 text-slate-400 hover:text-white"
+                    aria-label="Close lesson details"
+                    onClick={closeNodePanel}
+                    className="rounded-lg p-1 text-slate-400 hover:text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-300"
                   >
-                    ✕
+                    <span aria-hidden="true">✕</span>
                   </button>
                 </div>
 
@@ -851,6 +1024,7 @@ export default function DashboardScreen() {
                   </div>
 
                   <button
+                    ref={startButtonRef}
                     type="button"
                     onClick={() => {
                       if (!isLessonPayload(selected.payload)) {
@@ -863,7 +1037,7 @@ export default function DashboardScreen() {
                       setSelected(null);
                       setSelectedStatus(null);
                     }}
-                    className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(139,92,246,0.4)] hover:brightness-110 active:scale-95 transition-all"
+                    className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(139,92,246,0.4)] hover:brightness-110 active:scale-95 transition-all focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-300"
                   >
                     {selectedStatus === 'mastered' ? (
                       <>
@@ -886,20 +1060,35 @@ export default function DashboardScreen() {
 
       {/* COURSE-3: the lesson player covers the dashboard while a lesson is open. */}
       {activeLesson && isLessonPayload(activeLesson.payload) && (
-        <LessonPlayer
-          key={activeLesson.id}
-          lessonId={activeLesson.id}
-          title={activeLesson.title}
-          payload={activeLesson.payload}
-          hearts={hearts}
-          onComplete={(result) => handleLessonComplete(activeLesson, result, activeDestination)}
-          testRun={activeDestination === 'dev-test'}
-          onClose={() => setActiveLesson(null)}
-        />
+        <LazyBoundary key={activeLesson.id} label="lesson" overlay onCancel={() => setActiveLesson(null)}>
+          <LessonPlayer
+            lessonId={activeLesson.id}
+            title={activeLesson.title}
+            payload={activeLesson.payload}
+            hearts={hearts}
+            onComplete={(result) => handleLessonComplete(activeLesson, result, activeDestination)}
+            testRun={activeDestination === 'dev-test'}
+            onClose={() => setActiveLesson(null)}
+            nextTitle={nextAfterActive?.lesson.title ?? null}
+            onNext={
+              nextAfterActive
+                ? () => {
+                    setActiveLesson(null);
+                    openLesson(nextAfterActive.lesson, nextAfterActive.status);
+                  }
+                : undefined
+            }
+          />
+        </LazyBoundary>
       )}
 
       {needsPlacement && !welcomeSeen && <OnboardingWelcome onContinue={() => setWelcomeSeen(true)} />}
       {needsPlacement && welcomeSeen && <PlacementModal onChoose={choosePlacement} />}
+      {cameraCheckOpen && !activeLesson && (
+        <LazyBoundary label="camera check" overlay onCancel={closeCameraCheck}>
+          <CameraCheckModal onClose={closeCameraCheck} />
+        </LazyBoundary>
+      )}
       <AchievementToast toasts={achievementToasts} onDismiss={dismissAchievementToast} />
       {!isDemo && <ConnectionStatus online={online} pending={pendingSync} justSynced={justSynced} />}
     </div>

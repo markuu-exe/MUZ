@@ -46,9 +46,9 @@ export default function OnboardingWelcome({ onContinue }: { onContinue: () => vo
               tabIndex={-1}
               className="cursor-not-allowed rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-center opacity-50"
             >
-              <Icon className="mx-auto h-8 w-8 text-slate-500" aria-hidden="true" />
+              <Icon className="mx-auto h-8 w-8 text-slate-400" aria-hidden="true" />
               <p className="mt-2 text-sm font-bold text-slate-400">{label}</p>
-              <p className="text-[11px] text-slate-500">Coming soon</p>
+              <p className="text-[11px] text-slate-400">Coming soon</p>
             </div>
           ))}
         </div>

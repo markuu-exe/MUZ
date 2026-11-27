@@ -16,6 +16,7 @@
     "eval:audio": "tsx scripts/eval/audio-eval.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.14.0",
     "@mediapipe/tasks-vision": "1.1.0",
     "@supabase/supabase-js": "^2.117.3",
     "chart.js": "^4.5.1",

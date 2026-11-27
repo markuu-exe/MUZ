@@ -32,6 +32,8 @@ import './lesson.css';
 export interface LessonSaveFeedback {
   note?: string | null;
   expAwarded?: number;
+  /** false: the run was NOT saved (and not queued); the results screen offers to try again. */
+  saved?: boolean;
 }
 
 type LessonCompleteReturn = void | string | LessonSaveFeedback;
@@ -50,6 +52,9 @@ export interface LessonPlayerProps {
    */
   onComplete?: (result: LessonResult) => LessonCompleteReturn | Promise<LessonCompleteReturn>;
   onClose: () => void;
+  /** Title of the lesson offered next on the results screen, and how to open it (UX 2026-11-27). */
+  nextTitle?: string | null;
+  onNext?: () => void;
   /** D1: this run is developer test data (lesson opened while locked); results never show EXP. */
   testRun?: boolean;
 }
@@ -74,6 +79,8 @@ export default function LessonPlayer({
   registry = EXERCISE_REGISTRY,
   onComplete,
   onClose,
+  nextTitle = null,
+  onNext,
   testRun = false,
 }: LessonPlayerProps) {
   const [run, setRun] = useState<LessonRunState>(() => createLessonRun(lessonId, payload, hearts, Date.now()));
@@ -81,6 +88,9 @@ export default function LessonPlayer({
   const [pending, setPending] = useState<ExerciseOutcome | null>(null);
   const [confirmQuit, setConfirmQuit] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  // UX 2026-11-27: a run whose save failed is not silently dropped; the learner can try again.
+  const [unsaved, setUnsaved] = useState(false);
+  const [retryingSave, setRetryingSave] = useState(false);
   const [savedExp, setSavedExp] = useState<number | null>(null);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
@@ -97,13 +107,12 @@ export default function LessonPlayer({
   const progress = lessonProgress(run);
   const result = useMemo(() => (run.status === 'running' ? null : buildLessonResult(run)), [run]);
 
-  // Report each finished run exactly once.
-  useEffect(() => {
-    if (!result || reported.current === run) return;
-    reported.current = run;
-    void Promise.resolve(onCompleteRef.current?.(result)).then(
+  const saveRun = useCallback((finished: LessonResult) =>
+    Promise.resolve(onCompleteRef.current?.(finished)).then(
       (feedback) => {
-        if (!mounted.current || !feedback) return;
+        if (!mounted.current) return;
+        setUnsaved(typeof feedback === 'object' && feedback !== null && feedback.saved === false);
+        if (!feedback) return;
         if (typeof feedback === 'string') {
           setNote(feedback);
           return;
@@ -112,10 +121,27 @@ export default function LessonPlayer({
         if (typeof feedback.expAwarded === 'number') setSavedExp(feedback.expAwarded);
       },
       () => {
-        if (mounted.current) setNote('Your result could not be saved.');
+        if (!mounted.current) return;
+        setNote('Your result could not be saved.');
+        setUnsaved(true);
       },
-    );
-  }, [result, run]);
+    ), []);
+
+  // Report each finished run exactly once (a retry after a failed save reuses the same run id).
+  useEffect(() => {
+    if (!result || reported.current === run) return;
+    reported.current = run;
+    void saveRun(result);
+  }, [result, run, saveRun]);
+
+  const retrySave = useCallback(() => {
+    if (!result || retryingSave) return;
+    setRetryingSave(true);
+    setNote(null);
+    void saveRun(result).finally(() => {
+      if (mounted.current) setRetryingSave(false);
+    });
+  }, [result, retryingSave, saveRun]);
 
   /** Hearts the current exercise has spent but not yet reported (T-06). */
   const inFlightHeartsLost = useRef(0);
@@ -170,6 +196,7 @@ export default function LessonPlayer({
   const retry = () => {
     inFlightHeartsLost.current = 0;
     setNote(null);
+    setUnsaved(false);
     setSavedExp(null);
     setPending(null);
     setRun(createLessonRun(lessonId, payload, result?.heartsEnd ?? hearts, Date.now()));
@@ -222,7 +249,7 @@ export default function LessonPlayer({
                 'rounded-full border px-3 py-1',
                 i === item.stageIndex && 'border-violet-400 bg-violet-500/20 text-violet-100 shadow-[0_0_12px_rgba(139,92,246,0.5)]',
                 i < item.stageIndex && 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
-                i > item.stageIndex && 'border-slate-800 text-slate-600',
+                i > item.stageIndex && 'border-slate-800 text-slate-400',
               )}
             >
               {STAGE_LABEL[kind]}
@@ -238,8 +265,13 @@ export default function LessonPlayer({
             title={title}
             result={savedExp === null ? result : { ...result, expAwarded: savedExp }}
             note={note}
+            unsaved={unsaved}
+            savingAgain={retryingSave}
+            onRetrySave={retrySave}
             onRetry={retry}
             onClose={onClose}
+            nextTitle={nextTitle}
+            onNext={onNext}
             testRun={testRun}
           />
         ) : (
@@ -247,7 +279,7 @@ export default function LessonPlayer({
           entry &&
           View && (
             <div className={cn('mx-auto w-full', entry.camera ? 'max-w-screen-2xl' : entry.wide ? 'max-w-5xl' : 'max-w-2xl')}>
-              <div className="mb-4 flex items-center justify-between text-xs uppercase tracking-widest text-slate-500">
+              <div className="mb-4 flex items-center justify-between text-xs uppercase tracking-widest text-slate-400">
                 <span className="font-bold text-cyan-300">{entry.label}</span>
                 <span>
                   {progress.done + 1} / {progress.total}
@@ -297,8 +329,8 @@ export default function LessonPlayer({
               className={cn(
                 'rounded-xl px-8 py-3 text-sm font-bold uppercase tracking-wider text-white transition hover:brightness-110 active:scale-[0.98]',
                 pending.passed
-                  ? 'bg-emerald-500 shadow-[0_0_20px_rgba(52,211,153,0.5)]'
-                  : 'bg-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.45)]',
+                  ? 'bg-emerald-700 shadow-[0_0_20px_rgba(52,211,153,0.5)]'
+                  : 'bg-rose-600 shadow-[0_0_20px_rgba(244,63,94,0.45)]',
               )}
             >
               Continue
@@ -324,7 +356,7 @@ export default function LessonPlayer({
               <button
                 type="button"
                 onClick={quit}
-                className="flex-1 rounded-xl bg-rose-500 px-4 py-2.5 text-sm font-bold text-white hover:brightness-110"
+                className="flex-1 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white hover:brightness-110"
               >
                 Leave
               </button>

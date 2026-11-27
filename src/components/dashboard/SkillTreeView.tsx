@@ -5,6 +5,7 @@ import {
   MODULE_COPY,
   groupByModule,
   nodeStatus,
+  nodeStatusLabel,
   type CurriculumNode,
   type NodeStatus,
 } from '../../lib/dashboard/curriculum';
@@ -69,12 +70,6 @@ function isCheckpoint(lesson: CurriculumNode): boolean {
   return isLessonPayload(lesson.payload) && lesson.payload.isCheckpoint;
 }
 
-function statusText(lesson: CurriculumNode, status: NodeStatus, exp: number): string {
-  if (status === 'mastered') return `Mastered · +${lesson.expReward} XP`;
-  if (status === 'current') return `Up next · +${lesson.expReward} XP`;
-  const required = lesson.required_exp ?? 0;
-  return required > exp ? `Locked · needs ${required} XP` : 'Locked · finish the previous step';
-}
 
 export default function SkillTreeView({
   lessons,
@@ -217,7 +212,7 @@ export default function SkillTreeView({
                   status !== 'locked' &&
                   isLessonPayload(lesson.payload) &&
                   lessonNeedsHearts(lesson.payload);
-                const meta = statusText(lesson, status, exp);
+                const meta = nodeStatusLabel(lesson, status, exp, lessons, progress);
 
                 return (
                   <div key={lesson.id}>
@@ -236,6 +231,7 @@ export default function SkillTreeView({
 
                     <button
                       ref={isCurrent ? currentRef : undefined}
+                      data-node-id={lesson.id}
                       type="button"
                       onClick={() => onSelect(lesson, status)}
                       aria-label={`${lesson.title}. ${kind.label} lesson${checkpoint ? ', checkpoint' : ''}. ${meta}.`}
@@ -247,7 +243,7 @@ export default function SkillTreeView({
                         status === 'mastered' &&
                           'border-emerald-300/60 bg-gradient-to-b from-emerald-400 to-emerald-600 text-slate-950 shadow-[0_6px_0_#065f46]',
                         isCurrent && cn('border-white/70 bg-gradient-to-b text-white ring-8', theme.node, theme.lip, theme.ring),
-                        status === 'locked' && 'border-slate-700 bg-slate-800 text-slate-500 shadow-[0_6px_0_#0f172a]',
+                        status === 'locked' && 'border-slate-700 bg-slate-800 text-slate-400 shadow-[0_6px_0_#0f172a]',
                         checkpoint && status !== 'locked' && 'border-amber-200/80',
                         shakingId === lesson.id && 'animate-node-shake ring-4 ring-amber-400/70',
                         selectedId === lesson.id && 'ring-4 ring-white/70',
@@ -294,7 +290,7 @@ export default function SkillTreeView({
                           'mt-0.5 text-[11px] font-semibold',
                           status === 'mastered' && 'text-emerald-400',
                           isCurrent && 'text-violet-200',
-                          status === 'locked' && 'text-slate-500',
+                          status === 'locked' && 'text-slate-400',
                         )}
                       >
                         {meta}
@@ -302,7 +298,7 @@ export default function SkillTreeView({
                       <span
                         className={cn(
                           'mt-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider',
-                          status === 'locked' ? 'border-slate-800 text-slate-500' : 'border-slate-700 bg-slate-900/80 text-slate-300',
+                          status === 'locked' ? 'border-slate-800 text-slate-400' : 'border-slate-700 bg-slate-900/80 text-slate-300',
                         )}
                       >
                         <KindIcon className="h-3 w-3" />

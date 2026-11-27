@@ -14,7 +14,9 @@ import { cn } from '../../../lib/cn';
 import { buildRhythmPlan, scoreRhythm, type RhythmScore } from '../../../lib/rhythm/plan';
 import { POINTS } from '../../../lib/rhythm/timing';
 import type { TapExercise, TapExerciseType } from '../../../types/lesson.types';
+import { useRhythmCue } from '../../../hooks/useRhythmCue';
 import BeatHighway from './BeatHighway';
+import CountInBadge from './CountInBadge';
 import RhythmNotation from './RhythmNotation';
 
 const COPY: Record<TapExerciseType, { title: string; how: string; showNotation: boolean }> = {
@@ -64,6 +66,8 @@ export default function TapExerciseView({ exercise, payload, settings, onOutcome
     },
     windows,
   );
+  // The count-in follows the meter (4/4 counts 4, 3/4 counts two bars of 3, 6/8 one bar of 6).
+  const cue = useRhythmCue(plan, session.now, session.phase === 'running');
   const copy = COPY[exercise.type];
   const [needsCalibration, setNeedsCalibration] = useState(() => !hasTapCalibration());
   const last = session.taps[session.taps.length - 1];
@@ -137,6 +141,7 @@ export default function TapExerciseView({ exercise, payload, settings, onOutcome
           </p>
         )}
       </div>
+      {session.phase === 'running' && <CountInBadge cue={cue} mode={exercise.type} />}
 
       {session.phase === 'idle' && !done && needsCalibration && (
         <details className="rounded-xl border border-cyan-500/30 bg-cyan-950/30 p-4 text-sm text-cyan-100" open>
@@ -177,7 +182,7 @@ export default function TapExerciseView({ exercise, payload, settings, onOutcome
             <span className="text-slate-200">
               Score {counts.Perfect * POINTS.Perfect + counts.Good * POINTS.Good}
             </span>
-            <span className="text-slate-500">of {plan.targets.length}</span>
+            <span className="text-slate-400">of {plan.targets.length}</span>
           </span>
         </div>
       )}
@@ -198,19 +203,19 @@ export default function TapExerciseView({ exercise, payload, settings, onOutcome
           <div className="grid grid-cols-4 gap-2 text-center text-sm">
             <div className="rounded-lg bg-slate-900/80 p-2">
               <p className="text-lg font-bold text-emerald-300">{done.summary.perfect}</p>
-              <p className="text-xs text-slate-500">Perfect</p>
+              <p className="text-xs text-slate-400">Perfect</p>
             </div>
             <div className="rounded-lg bg-slate-900/80 p-2">
               <p className="text-lg font-bold text-amber-300">{done.summary.good}</p>
-              <p className="text-xs text-slate-500">Good</p>
+              <p className="text-xs text-slate-400">Good</p>
             </div>
             <div className="rounded-lg bg-slate-900/80 p-2">
               <p className="text-lg font-bold text-rose-300">{plan.targets.length - done.summary.perfect - done.summary.good}</p>
-              <p className="text-xs text-slate-500">Missed</p>
+              <p className="text-xs text-slate-400">Missed</p>
             </div>
             <div className="rounded-lg bg-slate-900/80 p-2">
               <p className="text-lg font-bold text-slate-200">{done.score.extraTaps}</p>
-              <p className="text-xs text-slate-500">Extra taps</p>
+              <p className="text-xs text-slate-400">Extra taps</p>
             </div>
           </div>
           <p className="text-xs text-slate-400">
@@ -227,7 +232,7 @@ export default function TapExerciseView({ exercise, payload, settings, onOutcome
             onClick={finish}
             className={cn(
               'w-full rounded-xl px-6 py-3 text-sm font-bold uppercase tracking-wider text-white transition hover:brightness-110 active:scale-[0.98]',
-              done.score.passed ? 'bg-emerald-500' : 'bg-rose-500',
+              done.score.passed ? 'bg-emerald-700' : 'bg-rose-600',
             )}
           >
             Continue (Enter)

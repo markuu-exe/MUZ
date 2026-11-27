@@ -5,6 +5,7 @@ import { OFFLINE_NOTE } from '../../lib/sync/syncLoop';
 import { Heart, RotateCcw, Sparkles, Target, Timer } from 'lucide-react';
 import type { LessonResult } from '../../lesson/types';
 import { cn } from '../../lib/cn';
+import CoachTip from './CoachTip';
 
 interface LessonResultsProps {
   title: string;
@@ -15,6 +16,13 @@ interface LessonResultsProps {
   onClose: () => void;
   /** D1: a developer test run (lesson opened while locked); never shown as learner progress. */
   testRun?: boolean;
+  /** The run was not saved (and not queued); offer to try again. */
+  unsaved?: boolean;
+  savingAgain?: boolean;
+  onRetrySave?: () => void;
+  /** After a pass: open the next lesson straight away. */
+  nextTitle?: string | null;
+  onNext?: () => void;
 }
 
 const HEADLINE: Record<LessonResult['status'], { title: string; body: string }> = {
@@ -91,7 +99,19 @@ function CountUp({ text, animate }: { text: string; animate: boolean }) {
   );
 }
 
-export default function LessonResults({ title, result, note, onRetry, onClose, testRun = false }: LessonResultsProps) {
+export default function LessonResults({
+  title,
+  result,
+  note,
+  onRetry,
+  onClose,
+  testRun = false,
+  unsaved = false,
+  savingAgain = false,
+  onRetrySave,
+  nextTitle = null,
+  onNext,
+}: LessonResultsProps) {
   const head = resultSummary(result, { testRun });
   const reduced = useReducedMotion();
   // One chime when the results appear (the lesson, and any microphone, has finished).
@@ -139,14 +159,30 @@ export default function LessonResults({ title, result, note, onRetry, onClose, t
               {note}
             </p>
           ) : (
-            <p className="mt-2 text-xs text-slate-500">{note}</p>
+            <p className="mt-2 text-xs text-slate-400">{note}</p>
           ))}
       </div>
+
+      {(unsaved || savingAgain) && onRetrySave && (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-500/50 bg-rose-950/50 px-4 py-3 text-left">
+          <p className="text-sm font-semibold text-rose-100">
+            {savingAgain ? 'Saving your result…' : 'This result was not saved yet. Your progress, EXP and streak will not count until it is.'}
+          </p>
+          <button
+            type="button"
+            disabled={savingAgain}
+            onClick={onRetrySave}
+            className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-rose-700 disabled:opacity-60"
+          >
+            {savingAgain ? 'Saving…' : 'Try saving again'}
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         {stats.map(({ label, value, icon: Icon, tone }) => (
           <div key={label} className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 text-left">
-            <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-slate-500">
+            <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-slate-400">
               <Icon className={cn('h-3.5 w-3.5', tone)} />
               {label}
             </div>
@@ -165,6 +201,8 @@ export default function LessonResults({ title, result, note, onRetry, onClose, t
         </div>
       )}
 
+      {result.status !== 'quit' && !testRun && <CoachTip result={result} title={title} />}
+
       {result.heartRestored && (
         <p className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-2 text-sm text-rose-200">
           ♥ One heart restored for scoring {Math.round(result.theoryScore ?? 0)}% on theory.
@@ -181,13 +219,32 @@ export default function LessonResults({ title, result, note, onRetry, onClose, t
             <RotateCcw className="h-4 w-4" /> Try again
           </button>
         )}
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex-1 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 py-3 text-sm font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(168,85,247,0.45)] transition hover:brightness-110 active:scale-[0.98]"
-        >
-          {result.passed ? 'Continue' : 'Back to skill tree'}
-        </button>
+        {result.passed && onNext && nextTitle && !testRun ? (
+          <>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-xl border border-slate-600 px-6 py-3 text-sm font-bold uppercase tracking-wider text-slate-200 transition hover:border-slate-400"
+            >
+              Skill tree
+            </button>
+            <button
+              type="button"
+              onClick={onNext}
+              className="flex flex-[2] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 py-3 text-sm font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(168,85,247,0.45)] transition hover:brightness-110 active:scale-[0.98]"
+            >
+              <span className="truncate">Next: {nextTitle}</span>
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 py-3 text-sm font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(168,85,247,0.45)] transition hover:brightness-110 active:scale-[0.98]"
+          >
+            {result.passed ? 'Continue' : 'Back to skill tree'}
+          </button>
+        )}
       </div>
     </div>
   );

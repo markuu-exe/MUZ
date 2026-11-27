@@ -13,7 +13,7 @@ import type { UserProfile } from '../../types/auth.types';
 
 export type LessonKind = 'theory' | 'practice' | 'rhythm';
 export type NodeStatus = 'mastered' | 'current' | 'locked';
-export type DashboardView = 'skill-tree' | 'lessons' | 'sandbox' | 'profile' | 'settings';
+export type DashboardView = 'skill-tree' | 'perform' | 'lessons' | 'sandbox' | 'profile' | 'settings';
 
 /** Minimal progress row the dashboard needs. */
 export type ProgressLike = Pick<UserProgress, 'lesson_id' | 'completed'> &
@@ -187,4 +187,55 @@ export function groupByModule(lessons: CurriculumNode[]): Array<{ moduleIndex: n
 
 export function displayNameFromProfile(profile: UserProfile | null, email?: string | null): string {
   return profile?.username || email?.split('@')[0] || 'Pianist';
+}
+
+/**
+ * The text shown under a Skill Tree node (and read out in its label). A locked node names what
+ * unlocks it right on the node: the lesson to finish first, or the EXP it needs (UX request
+ * 2026-11-27: the reason used to appear only in a banner after clicking).
+ */
+export function nodeStatusLabel(
+  lesson: CurriculumNode,
+  status: NodeStatus,
+  exp: number,
+  catalog: CurriculumNode[],
+  progress: ProgressMap,
+): string {
+  if (status === 'mastered') return `Mastered · +${lesson.expReward} XP`;
+  if (status === 'current') return `Up next · +${lesson.expReward} XP`;
+  const blocking = blockingLesson(lesson, catalog, progress);
+  if (blocking) return `Locked · finish "${blocking.title}" first`;
+  const required = lesson.required_exp ?? 0;
+  return required > exp ? `Locked · needs ${required} XP (you have ${exp})` : 'Locked · finish the previous step';
+}
+
+/** Every lesson in path order (unit by unit), each with its current status. */
+export function lessonsInOrder(
+  lessons: CurriculumNode[],
+  progress: ProgressMap,
+  exp: number,
+): Array<{ lesson: CurriculumNode; status: NodeStatus }> {
+  const out: Array<{ lesson: CurriculumNode; status: NodeStatus }> = [];
+  for (const group of groupByModule(lessons)) {
+    group.lessons.forEach((lesson, index) => out.push({ lesson, status: nodeStatus(lesson, index, group.lessons, progress, exp, lessons) }));
+  }
+  return out;
+}
+
+/**
+ * "Next lesson" after finishing `lessonId` (UX 2026-11-27): the first later lesson that is open
+ * and not yet mastered; if every later open lesson is mastered (a replay, or demo mode), the
+ * very next open one. Locked lessons are never offered. Null at the end of the course.
+ */
+export function nextLessonAfter(
+  lessonId: string,
+  lessons: CurriculumNode[],
+  progress: ProgressMap,
+  exp: number,
+): { lesson: CurriculumNode; status: NodeStatus } | null {
+  const ordered = lessonsInOrder(lessons, progress, exp);
+  const index = ordered.findIndex((x) => x.lesson.id === lessonId);
+  if (index < 0) return null;
+  const later = ordered.slice(index + 1).filter((x) => x.status !== 'locked');
+  return later.find((x) => x.status !== 'mastered') ?? later[0] ?? null;
 }

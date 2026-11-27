@@ -104,7 +104,17 @@ export type IllustrationId =
   | 'triplets'
   | 'scale-formula'
   | 'circle-of-fifths'
-  | 'roman-numerals';
+  | 'roman-numerals'
+  | 'dotted-quarter'
+  | 'tie'
+  | 'six-eight'
+  | 'key-signature-sharp'
+  | 'key-signature-flat'
+  | 'syncopation'
+  | 'swing'
+  | 'two-five-one'
+  | 'new-keys'
+  | 'flat-seven';
 
 export interface ChooseAnswerExercise extends ExerciseBase {
   type: 'choose-answer';
