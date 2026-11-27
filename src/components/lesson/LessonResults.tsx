@@ -5,6 +5,7 @@ import { OFFLINE_NOTE } from '../../lib/sync/syncLoop';
 import { Heart, RotateCcw, Sparkles, Target, Timer } from 'lucide-react';
 import type { LessonResult } from '../../lesson/types';
 import { cn } from '../../lib/cn';
+import CoachTip from './CoachTip';
 
 interface LessonResultsProps {
   title: string;
@@ -164,6 +165,8 @@ export default function LessonResults({ title, result, note, onRetry, onClose, t
           {used('practice') && <p>Posture score: {Math.round(result.metrics.postureScore)}%</p>}
         </div>
       )}
+
+      {result.status !== 'quit' && !testRun && <CoachTip result={result} title={title} />}
 
       {result.heartRestored && (
         <p className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-2 text-sm text-rose-200">
