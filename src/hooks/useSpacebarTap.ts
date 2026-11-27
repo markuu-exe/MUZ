@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { audioTimeAt } from "../lib/rhythm/audioClock";
 
 export interface TapEvent {
   audioTime: number; 
@@ -22,12 +23,8 @@ export function useSpacebarTap(
       const ctx = ctxRef.current;
       if (!ctx) return;
 
-      const ts = ctx.getOutputTimestamp();
-      const contextTime = ts.contextTime ?? ctx.currentTime;
-      const performanceTime = ts.performanceTime ?? performance.now();
-      const audioTime = contextTime + (e.timeStamp - performanceTime) / 1000;
-
-      onTapRef.current({ audioTime, perfTime: e.timeStamp });
+      // Guarded: getOutputTimestamp is missing in some browsers and reports 0 before output starts.
+      onTapRef.current({ audioTime: audioTimeAt(ctx, e.timeStamp), perfTime: e.timeStamp });
     };
 
     window.addEventListener("keydown", handleKeyDown);

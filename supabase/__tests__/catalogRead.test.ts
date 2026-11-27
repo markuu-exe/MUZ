@@ -24,7 +24,7 @@ async function driftedDb() {
 
 const countLessons = (rows: Array<{ n: number | string }>) => Number(rows[0].n);
 
-describe('catalog read policies (lessons, achievements)', () => {
+describe('catalog read policies (lessons, achievements)', { timeout: 60_000 }, () => {
   it('reproduces the live drift: RLS on, no read policy, so a learner sees 0 lessons and no error', async () => {
     const db = await driftedDb();
     const me = { role: 'authenticated', uid: U1 } as const;

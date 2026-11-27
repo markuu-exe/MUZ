@@ -22,6 +22,31 @@ export function harmonicTemplate(pcs: readonly number[], harmonics: number, deca
   return v;
 }
 
+/**
+ * Harmonic-leakage compensation, shared by grading (ChordMatcher.match) and the
+ * live "Hearing" display (src/practice/heard.ts) so the two cannot disagree about
+ * which pitch classes are sounding. A tone's 3rd harmonic lands a fifth up
+ * (decay² ≈ 0.36) and its 5th harmonic a major third up (decay⁴ ≈ 0.13); both
+ * are subtracted, negatives clamp to 0. Returns the maximum of the result.
+ * Without this, root + third alone "covers" the fifth via the root's 3rd harmonic.
+ */
+export function compensateHarmonics(chroma: ArrayLike<number>, decay: number, out: Float64Array): number {
+  const k3 = decay * decay;
+  const k5 = decay ** 4;
+  for (let i = 0; i < 12; i++) out[i] = chroma[i] ?? 0;
+  for (let p = 0; p < 12; p++) {
+    const v = chroma[p] ?? 0;
+    out[(p + 7) % 12] -= k3 * v;
+    out[(p + 4) % 12] -= k5 * v;
+  }
+  let max = 0;
+  for (let i = 0; i < 12; i++) {
+    if (out[i] < 0) out[i] = 0;
+    if (out[i] > max) max = out[i];
+  }
+  return max;
+}
+
 function dot(a: ArrayLike<number>, b: ArrayLike<number>): number {
   let s = 0;
   for (let i = 0; i < 12; i++) s += a[i] * b[i];
@@ -128,23 +153,9 @@ export class ChordMatcher {
     let bestPartial = -Infinity;
     for (const p of c.partials) bestPartial = Math.max(bestPartial, dot(chroma, p) / norm);
 
-    // Harmonic-leakage compensation: a tone's 3rd harmonic lands a fifth up
-    // (decay² ≈ 0.36) and its 5th harmonic a major third up (decay⁴ ≈ 0.13).
-    // Without this, root+third alone "covers" the fifth via the root's 3rd harmonic.
-    const d = cfg.harmonicDecay;
-    const k3 = d * d;
-    const k5 = d ** 4;
+    // Harmonic-leakage compensation (shared with the Hearing display).
     const comp = this.comp;
-    for (let i = 0; i < 12; i++) comp[i] = chroma[i];
-    for (let p = 0; p < 12; p++) {
-      comp[(p + 7) % 12] -= k3 * chroma[p];
-      comp[(p + 4) % 12] -= k5 * chroma[p];
-    }
-    let maxComp = 0;
-    for (let i = 0; i < 12; i++) {
-      if (comp[i] < 0) comp[i] = 0;
-      if (comp[i] > maxComp) maxComp = comp[i];
-    }
+    const maxComp = compensateHarmonics(chroma, cfg.harmonicDecay, comp);
     let toneCoverage = Infinity;
     let weakestTone = 0;
     c.spec.pcs.forEach((p, idx) => {

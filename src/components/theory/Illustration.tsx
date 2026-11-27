@@ -320,7 +320,296 @@ function RomanNumerals() {
   );
 }
 
+/** A beat grid with "1 & 2 & …" under it; `x0` is the first beat, `gap` one beat. */
+function CountGrid({ beats, x0, gap, y, strong = [] }: { beats: number; x0: number; gap: number; y: number; strong?: number[] }) {
+  return (
+    <g>
+      <line x1={x0 - 8} x2={x0 + gap * beats - 8} y1={y} y2={y} stroke={MUTED} strokeWidth={1.5} />
+      {Array.from({ length: beats * 2 }, (_, i) => {
+        const x = x0 + (i * gap) / 2;
+        const onBeat = i % 2 === 0;
+        const hot = strong.includes(i);
+        return (
+          <g key={i}>
+            <line x1={x} x2={x} y1={y - (onBeat ? 5 : 3)} y2={y + (onBeat ? 5 : 3)} stroke={MUTED} strokeWidth={1.5} />
+            <text x={x} y={y + 18} textAnchor="middle" fontSize="10" fontWeight={hot ? 800 : 400} fill={hot ? ACCENT : MUTED}>
+              {onBeat ? String(i / 2 + 1) : '&'}
+            </text>
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
+/** Dotted quarter = quarter + eighth = 1½ beats (proficient "The dot"). */
+function DottedQuarter() {
+  return (
+    <g>
+      <NoteHead x={40} y={48} />
+      <circle cx={52} cy={48} r={2.6} fill={INK} />
+      {/* 1½ beats on the grid below: from beat 1 (x 40) to the "&" of 2 (x 130). */}
+      <rect x={40} y={64} width={90} height={10} rx={5} fill={ACCENT} opacity={0.75} />
+      <text x={140} y={73} fontSize="11" fontWeight="700" fill={ACCENT}>1½ beats</text>
+      <text x={150} y={30} fontSize="11" fill={INK}>= 1 + ½</text>
+      <text x={150} y={46} fontSize="9" fill={MUTED}>the dot adds half</text>
+      <CountGrid beats={2} x0={40} gap={60} y={90} />
+    </g>
+  );
+}
+
+/** Two quarters of the same pitch joined by a tie: one sound, held for both beats. */
+function Tie() {
+  return (
+    <g>
+      <NoteHead x={50} y={46} />
+      <NoteHead x={110} y={46} />
+      <path d="M 52 56 Q 80 72 108 56" fill="none" stroke={ACCENT} strokeWidth={2.5} strokeLinecap="round" />
+      <text x={80} y={78} textAnchor="middle" fontSize="10" fontWeight="700" fill={ACCENT}>tie</text>
+      <circle cx={50} cy={96} r={6} fill={ACCENT} />
+      <rect x={50} y={91} width={110} height={10} rx={5} fill={ACCENT} opacity={0.45} />
+      <text x={50} y={114} textAnchor="middle" fontSize="9" fill={INK}>play</text>
+      <text x={110} y={114} textAnchor="middle" fontSize="9" fill={MUTED}>keep holding</text>
+      <text x={196} y={44} textAnchor="middle" fontSize="10" fill={MUTED}>same pitch:</text>
+      <text x={196} y={58} textAnchor="middle" fontSize="10" fill={MUTED}>one long sound</text>
+    </g>
+  );
+}
+
+/** 6/8: six eighths beamed 3 + 3, felt as two big beats. */
+function SixEight() {
+  const xs = [52, 76, 100, 140, 164, 188];
+  return (
+    <g>
+      <text x={18} y={46} textAnchor="middle" fontSize="18" fontWeight="900" fill={INK}>6</text>
+      <text x={18} y={66} textAnchor="middle" fontSize="18" fontWeight="900" fill={INK}>8</text>
+      {xs.map((x, i) => (
+        <g key={i}>
+          <ellipse cx={x} cy={62} rx={6} ry={4.5} transform={`rotate(-20 ${x} 62)`} fill={INK} />
+          <line x1={x + 5} x2={x + 5} y1={62} y2={34} stroke={INK} strokeWidth={2} />
+          <text x={x} y={86} textAnchor="middle" fontSize={i % 3 === 0 ? 12 : 10} fontWeight={i % 3 === 0 ? 800 : 400} fill={i % 3 === 0 ? ACCENT : MUTED}>
+            {i + 1}
+          </text>
+        </g>
+      ))}
+      <line x1={57} x2={105} y1={34} y2={34} stroke={INK} strokeWidth={4} />
+      <line x1={145} x2={193} y1={34} y2={34} stroke={INK} strokeWidth={4} />
+      <line x1={120} x2={120} y1={28} y2={70} stroke={MUTED} strokeWidth={1} strokeDasharray="3 3" />
+      <text x={78} y={108} textAnchor="middle" fontSize="10" fontWeight="700" fill={ACCENT}>big beat 1</text>
+      <text x={166} y={108} textAnchor="middle" fontSize="10" fontWeight="700" fill={ACCENT}>big beat 2</text>
+    </g>
+  );
+}
+
+/**
+ * A treble staff with a one-accidental key signature: F# sits on the top line (F5),
+ * Bb on the middle line (B4), the standard positions in treble clef.
+ */
+function KeySignature({ accidental }: { accidental: 'sharp' | 'flat' }) {
+  const lines = [28, 38, 48, 58, 68]; // F5 D5 B4 G4 E4
+  const sharp = accidental === 'sharp';
+  const y = sharp ? lines[0] : lines[2];
+  return (
+    <g>
+      {lines.map((ly) => (
+        <line key={ly} x1={14} x2={150} y1={ly} y2={ly} stroke={INK} strokeWidth={1.2} />
+      ))}
+      <text x={16} y={76} fontSize={56} fill={INK}>{'\u{1D11E}'}</text>
+      {/* Drawn as paths (not font glyphs) so the accidental is centred exactly on its line. */}
+      {sharp ? (
+        <g stroke={ACCENT} strokeLinecap="round">
+          <line x1={70} x2={70} y1={y - 11} y2={y + 12} strokeWidth={1.6} />
+          <line x1={76} x2={76} y1={y - 12} y2={y + 11} strokeWidth={1.6} />
+          <line x1={66} x2={80} y1={y - 2} y2={y - 6} strokeWidth={3} />
+          <line x1={66} x2={80} y1={y + 6} y2={y + 2} strokeWidth={3} />
+        </g>
+      ) : (
+        <path
+          d={`M 70 ${y - 18} L 70 ${y + 4} C 79 ${y} 80 ${y - 8} 70 ${y - 4}`}
+          fill="none"
+          stroke={ACCENT}
+          strokeWidth={2}
+          strokeLinejoin="round"
+        />
+      )}
+      <line x1={86} x2={104} y1={y} y2={y} stroke={ACCENT} strokeWidth={1} strokeDasharray="2 2" />
+      <text x={108} y={y + 3} fontSize="9" fill={ACCENT}>{sharp ? 'F line' : 'B line'}</text>
+      <text x={196} y={44} textAnchor="middle" fontSize="12" fontWeight="800" fill={INK}>{sharp ? 'one sharp' : 'one flat'}</text>
+      <text x={196} y={60} textAnchor="middle" fontSize="11" fill={ACCENT}>{sharp ? 'F# → G major' : 'B♭ → F major'}</text>
+      <text x={82} y={100} textAnchor="middle" fontSize="9" fill={MUTED}>
+        {sharp ? 'every F is played as F#' : 'every B is played as B♭'}
+      </text>
+    </g>
+  );
+}
+
+/** Syncopation: the click stays on the numbers, the strong sounds land on "&". */
+function Syncopation() {
+  const x0 = 36;
+  const gap = 50;
+  const accents = [1, 3, 6]; // "&" of 1, "&" of 2, beat 4
+  return (
+    <g>
+      <text x={8} y={36} fontSize="9" fill={MUTED}>click</text>
+      {[0, 1, 2, 3].map((b) => (
+        <circle key={b} cx={x0 + b * gap} cy={33} r={4} fill="none" stroke={MUTED} strokeWidth={1.5} />
+      ))}
+      <text x={8} y={64} fontSize="9" fill={INK}>you</text>
+      {accents.map((i) => {
+        const x = x0 + (i * gap) / 2;
+        const off = i % 2 === 1;
+        return (
+          <g key={i}>
+            <circle cx={x} cy={60} r={off ? 9 : 6} fill={off ? ACCENT : INK} />
+            {off && <text x={x} y={46} textAnchor="middle" fontSize="11" fontWeight="900" fill={ACCENT}>&gt;</text>}
+          </g>
+        );
+      })}
+      <CountGrid beats={4} x0={x0} gap={gap} y={84} strong={[1, 3]} />
+      <text x={120} y={116} textAnchor="middle" fontSize="9" fill={MUTED}>accents (&gt;) on “&amp;”, the click stays on 1 2 3 4</text>
+    </g>
+  );
+}
+
+/** Swing: written straight eighths are played long-short, on the 1st and 3rd triplet notes. */
+function Swing() {
+  return (
+    <g>
+      <text x={10} y={22} fontSize="9" fill={MUTED}>written</text>
+      {[60, 100].map((x) => (
+        <g key={x}>
+          <ellipse cx={x} cy={34} rx={6} ry={4.5} transform={`rotate(-20 ${x} 34)`} fill={INK} />
+          <line x1={x + 5} x2={x + 5} y1={34} y2={12} stroke={INK} strokeWidth={2} />
+        </g>
+      ))}
+      <line x1={65} x2={105} y1={12} y2={12} stroke={INK} strokeWidth={4} />
+      <text x={150} y={30} fontSize="10" fill={INK}>two eighths</text>
+
+      <text x={10} y={62} fontSize="9" fill={MUTED}>triplet</text>
+      {['1', 'trip', 'let'].map((t, i) => {
+        const used = i !== 1;
+        return (
+          <g key={t}>
+            <rect x={56 + i * 40} y={52} width={36} height={14} rx={4} fill={used ? ACCENT : 'none'} opacity={used ? 0.85 : 1} stroke={used ? ACCENT : MUTED} strokeDasharray={used ? undefined : '3 3'} />
+            <text x={74 + i * 40} y={62} textAnchor="middle" fontSize="9" fontWeight="700" fill={used ? '#0f172a' : MUTED}>{t}</text>
+          </g>
+        );
+      })}
+
+      <text x={10} y={96} fontSize="9" fill={MUTED}>played</text>
+      <rect x={56} y={86} width={76} height={14} rx={5} fill={ACCENT} opacity={0.75} />
+      <rect x={136} y={86} width={36} height={14} rx={5} fill={ACCENT} opacity={0.75} />
+      <text x={94} y={96} textAnchor="middle" fontSize="9" fontWeight="800" fill="#0f172a">long</text>
+      <text x={154} y={96} textAnchor="middle" fontSize="9" fontWeight="800" fill="#0f172a">short</text>
+      <text x={120} y={116} textAnchor="middle" fontSize="9" fill={MUTED}>one beat · notes on the 1st and 3rd triplet</text>
+    </g>
+  );
+}
+
+/** A row of chord chips with Roman numerals under them, joined by arrows. */
+function ChordChips({ chords, y, hot = [] }: { chords: Array<{ name: string; numeral: string; notes?: string }>; y: number; hot?: number[] }) {
+  const w = chords.length === 4 ? 44 : 58;
+  const gap = chords.length === 4 ? 14 : 18;
+  const total = chords.length * w + (chords.length - 1) * gap;
+  const x0 = (240 - total) / 2;
+  return (
+    <g>
+      {chords.map((c, i) => {
+        const x = x0 + i * (w + gap);
+        const isHot = hot.includes(i);
+        return (
+          <g key={i}>
+            <rect x={x} y={y} width={w} height={26} rx={6} fill={isHot ? ACCENT : '#1e293b'} stroke={isHot ? ACCENT : MUTED} />
+            <text x={x + w / 2} y={y + 17} textAnchor="middle" fontSize="11" fontWeight="800" fill={isHot ? '#0f172a' : INK}>{c.name}</text>
+            <text x={x + w / 2} y={y + 42} textAnchor="middle" fontSize="11" fontWeight="800" fill={isHot ? ACCENT : MUTED}>{c.numeral}</text>
+            {c.notes && <text x={x + w / 2} y={y + 56} textAnchor="middle" fontSize="8" fill={MUTED}>{c.notes}</text>}
+            {i < chords.length - 1 && (
+              <text x={x + w + gap / 2} y={y + 18} textAnchor="middle" fontSize="13" fill={MUTED}>→</text>
+            )}
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
+function TwoFiveOne() {
+  return (
+    <g>
+      <ChordChips
+        y={26}
+        hot={[2]}
+        chords={[
+          { name: 'Dm7', numeral: 'ii7', notes: 'D F A C' },
+          { name: 'G7', numeral: 'V7', notes: 'G B D F' },
+          { name: 'Cmaj7', numeral: 'Imaj7', notes: 'C E G B' },
+        ]}
+      />
+      <text x={120} y={16} textAnchor="middle" fontSize="10" fill={MUTED}>in C major: each chord pulls into the next</text>
+      <text x={120} y={110} textAnchor="middle" fontSize="9" fill={ACCENT}>…and lands home on I</text>
+    </g>
+  );
+}
+
+function NewKeys() {
+  const rows: Array<[string, string[]]> = [
+    ['C', ['Dm7', 'G7', 'Cmaj7']],
+    ['G', ['Am7', 'D7', 'Gmaj7']],
+    ['F', ['Gm7', 'C7', 'Fmaj7']],
+  ];
+  return (
+    <g>
+      {['ii7', 'V7', 'Imaj7'].map((n, i) => (
+        <text key={n} x={92 + i * 56} y={18} textAnchor="middle" fontSize="11" fontWeight="800" fill={ACCENT}>{n}</text>
+      ))}
+      {rows.map(([key, chords], r) => (
+        <g key={key}>
+          <text x={30} y={40 + r * 26} textAnchor="middle" fontSize="10" fontWeight="700" fill={r === 0 ? MUTED : INK}>in {key}</text>
+          {chords.map((c, i) => (
+            <g key={c}>
+              <rect x={68 + i * 56} y={26 + r * 26} width={48} height={20} rx={5} fill="#1e293b" stroke={r === 0 ? MUTED : ACCENT} />
+              <text x={92 + i * 56} y={40 + r * 26} textAnchor="middle" fontSize="10" fontWeight="800" fill={INK}>{c}</text>
+              {i < 2 && <text x={120 + i * 56} y={40 + r * 26} textAnchor="middle" fontSize="9" fill={MUTED}>→</text>}
+            </g>
+          ))}
+        </g>
+      ))}
+      <text x={120} y={114} textAnchor="middle" fontSize="9" fill={MUTED}>same numbers, new letters</text>
+    </g>
+  );
+}
+
+function FlatSeven() {
+  return (
+    <g>
+      <ChordChips
+        y={30}
+        hot={[1]}
+        chords={[
+          { name: 'C', numeral: 'I' },
+          { name: 'B♭', numeral: '♭VII' },
+          { name: 'F', numeral: 'IV' },
+          { name: 'C', numeral: 'I' },
+        ]}
+      />
+      <text x={120} y={18} textAnchor="middle" fontSize="10" fill={MUTED}>in C major</text>
+      <text x={120} y={98} textAnchor="middle" fontSize="10" fontWeight="700" fill={ACCENT}>♭VII: borrowed from C minor</text>
+      <text x={120} y={112} textAnchor="middle" fontSize="9" fill={MUTED}>B♭ is not in C major, so it stands out</text>
+    </g>
+  );
+}
+
 const DRAWINGS: Record<IllustrationId, () => JSX.Element> = {
+  'dotted-quarter': DottedQuarter,
+  tie: Tie,
+  'six-eight': SixEight,
+  'key-signature-sharp': () => <KeySignature accidental="sharp" />,
+  'key-signature-flat': () => <KeySignature accidental="flat" />,
+  syncopation: Syncopation,
+  swing: Swing,
+  'two-five-one': TwoFiveOne,
+  'new-keys': NewKeys,
+  'flat-seven': FlatSeven,
   eighths: () => <Subdivision per={2} counts={['1', '&']} />,
   sixteenths: () => <Subdivision per={4} counts={['1', 'e', '&', 'a']} />,
   triplets: () => <Subdivision per={3} counts={['1', 'trip', 'let']} triplet />,
@@ -341,7 +630,10 @@ const DRAWINGS: Record<IllustrationId, () => JSX.Element> = {
 };
 
 export default function Illustration({ id }: { id: IllustrationId }) {
-  const Drawing = DRAWINGS[id];
+  const Drawing = DRAWINGS[id] as (() => JSX.Element) | undefined;
+  // Lesson payloads come from the database, which can be re-seeded ahead of a deploy:
+  // an id this build does not know is skipped instead of crashing the lesson.
+  if (!Drawing) return null;
   return (
     <div className="rounded-xl border border-[#7c3aed]/25 bg-[#0b1120] p-4">
       <svg viewBox="0 0 240 120" className="mx-auto h-auto w-full max-w-md" aria-hidden="true" focusable="false">

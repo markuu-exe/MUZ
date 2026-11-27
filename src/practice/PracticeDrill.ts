@@ -106,7 +106,8 @@ export interface PracticeDrillOptions {
 }
 
 /** One matcher of each kind is enough for the whole app. */
-const chordMatcher = new ChordMatcher();
+/** Shared with the Hearing display (src/practice/heard.ts) so both judge with one matcher. */
+export const chordMatcher = new ChordMatcher();
 const noteMatcher = new NoteMatcher();
 
 /** The chroma, pitch-class-only verifier (kept for comparison in T-19, ruling D4). */
