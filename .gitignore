@@ -14,3 +14,6 @@ vite.config.d.ts
 eval-data/
 # Supabase CLI local cache (project ref, pooler host). Never commit.
 supabase/.temp/
+
+# CI: compiled API functions (scripts/check-api-load.mjs)
+.api-check/

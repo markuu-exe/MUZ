@@ -8,8 +8,8 @@
  * the content to improve its products. The default model `gemini-3.5-flash-lite` is listed
  * there as free; set GEMINI_MODEL in Vercel to use another model.
  */
-import { COACH_SYSTEM_PROMPT, coachUserMessage, type CoachInput } from './coach';
-import type { TipResult } from './handler';
+import { COACH_SYSTEM_PROMPT, coachUserMessage, type CoachInput } from './coach.js';
+import type { TipResult } from './handler.js';
 
 export const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash-lite';
 export const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';

@@ -11,8 +11,8 @@
  * The model has no tools and the prompt holds no secrets, so a prompt-injection can at most
  * produce an odd answer, which the learner sees labelled as AI.
  */
-import { clientIp, createRateLimiter, json, readJson, sameSite } from './guard';
-import type { CoachSource, TipResult } from './handler';
+import { clientIp, createRateLimiter, json, readJson, sameSite } from './guard.js';
+import type { CoachSource, TipResult } from './handler.js';
 
 export const MIN_QUESTION = 3;
 export const MAX_QUESTION = 300;
