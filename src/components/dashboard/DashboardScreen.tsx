@@ -43,6 +43,7 @@ import LessonNotesView from './LessonNotesView';
 import type { LessonSaveFeedback } from '../lesson/LessonPlayer';
 import LazyBoundary from '../common/LazyBoundary';
 import { readCameraCheck } from '../../practice/cameraCheck';
+import { findLessonStatus, readPlace, savePlace } from '../../lib/dashboard/sessionPlace';
 import { isLessonPayload, type LessonPayload } from '../../types/lesson.types';
 import type { AnalyticsDateRange } from './ProfileAnalyticsView';
 import PlacementModal from './PlacementModal';
@@ -103,7 +104,10 @@ export default function DashboardScreen() {
   const isDev = isDevAccount(profile, isDemo);
   const [theme, setThemeChoice] = useTheme();
   const data = useDashboardData(profile, isDemo);
-  const [view, setView] = useState<DashboardView>('skill-tree');
+  // Owner request 2026-11-27: a refresh returns to the same tab and reopens the open lesson.
+  const placeAccount = isDemo ? 'demo' : (user?.id ?? 'signed-out');
+  const [restoredPlace] = useState(() => readPlace(placeAccount));
+  const [view, setView] = useState<DashboardView>(() => restoredPlace?.view ?? 'skill-tree');
   const [banner, setBanner] = useState<{ message: string; type: 'warning' | 'error' | 'info' } | null>(null);
   const [shakingId, setShakingId] = useState<string | null>(null);
   const [selected, setSelected] = useState<CurriculumNode | null>(null);
@@ -430,6 +434,30 @@ export default function DashboardScreen() {
     }
     return null;
   }, [data.lessons, data.progress, exp]);
+
+  // Remember where the learner is (this tab only), so a refresh comes back here.
+  useEffect(() => {
+    savePlace({ account: placeAccount, view, lessonId: activeLesson?.id ?? null });
+  }, [placeAccount, view, activeLesson]);
+
+  // Reopen the lesson that was open before the refresh, once, if the same rules that guard the
+  // Start button still allow it (unlocked or developer access, and hearts for practice lessons).
+  const lessonRestoreTried = useRef(false);
+  useEffect(() => {
+    if (lessonRestoreTried.current) return;
+    const lessonId = restoredPlace?.lessonId;
+    if (!lessonId) {
+      lessonRestoreTried.current = true;
+      return;
+    }
+    if (data.loading || (!isDemo && !profileIsLoaded) || data.lessons.length === 0) return;
+    lessonRestoreTried.current = true;
+    const found = findLessonStatus(lessonId, data.lessons, data.progress, exp);
+    if (!found || !isLessonPayload(found.lesson.payload) || !canOpenLesson(found.status, isDev)) return;
+    if (hearts === 0 && lessonNeedsHearts(found.lesson.payload)) return;
+    setActiveLesson(found.lesson);
+    setActiveDestination(resultDestination(found.status));
+  }, [restoredPlace, data.loading, data.lessons, data.progress, exp, isDemo, profileIsLoaded, isDev, hearts]);
 
   // Click handler for Skill Tree & Lesson nodes
   const handleSelect = (lesson: CurriculumNode, status: NodeStatus) => {

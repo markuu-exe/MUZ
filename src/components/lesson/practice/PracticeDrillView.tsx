@@ -7,14 +7,16 @@
 import { parseChord } from '../../../audio/chords/vocabulary';
 import { chordCheckReasons } from '../../../practice/chordReport';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useCountIn } from '../../../hooks/useCountIn';
 import { usePracticeDrill } from '../../../hooks/usePracticeDrill';
+import CountInBadge from '../rhythm/CountInBadge';
 import type { ExerciseViewProps } from '../../../lesson/registry';
 import { cn } from '../../../lib/cn';
 import { PITCH_CLASS_NAMES } from '../../../audio/dsp/pitch';
 import { chordMatcher, drillTargets, targetLabel, type DrillStats, type DrillTarget } from '../../../practice/PracticeDrill';
 import { FramingTracker, type FramingState } from '../../../practice/framing';
 import { INITIAL_DRILL_PHASE, drillPhaseReducer, practiceDrillOptions } from '../../../practice/practicePhase';
-import { NOTHING_HEARD, frameMatchesTarget, heardFromFrame, heardKeys, heardLabel, type Heard } from '../../../practice/heard';
+import { HearingWindow, NOTHING_HEARD, heardKeys, heardLabel, type Heard } from '../../../practice/heard';
 import { NOT_VISIBLE_MESSAGE } from '../../../practice/visibilityCue';
 import type { PlayChordExercise, PlayNoteExercise, PlaySequenceExercise } from '../../../types/lesson.types';
 import GrandStaff from '../../theory/GrandStaff';
@@ -65,22 +67,32 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
   const canRun = ready && framing === 'framed';
 
   // Live feedback: which key or chord the microphone is hearing right now (display only). It uses
-  // the grader's own per-frame analysis (src/practice/heard.ts), so green here means the grader
-  // accepted this moment too; grading still needs it to hold for the 200 ms window.
+  // the grader's own analysis over a short window (src/practice/heard.ts HearingWindow): only
+  // notes the grader would count are listed, and green means the grader's test passed on most
+  // of the last 150 ms. Grading itself still needs the match to hold for its 200 ms window.
   const [heard, setHeard] = useState<{ heard: Heard; matches: boolean }>({ heard: NOTHING_HEARD, matches: false });
   const liveTargetRef = useRef<DrillTarget>(targets[0]);
   useEffect(() => {
     let lastUi = 0;
     let lastHeardAt = 0;
+    const hearing = new HearingWindow();
+    let windowTarget = liveTargetRef.current;
     return rig.on('audio', (frame) => {
+      const target = liveTargetRef.current;
+      if (target !== windowTarget) {
+        hearing.clear(); // a new step: do not carry the last chord over
+        windowTarget = target;
+      }
+      hearing.push(frame, target, chordMatcher);
       const now = performance.now();
-      const next = heardFromFrame(frame);
-      const something = next.midi !== null || next.pitchClasses.length > 0;
-      if (something) lastHeardAt = now;
       if (now - lastUi < 100) return;
       lastUi = now;
-      if (something) setHeard({ heard: next, matches: frameMatchesTarget(frame, liveTargetRef.current, chordMatcher) });
-      else if (now - lastHeardAt > HEARD_HOLD_MS) setHeard({ heard: NOTHING_HEARD, matches: false });
+      const next = hearing.read(target.kind === 'chord' ? parseChord(target.chord).pcs : []);
+      const something = next.heard.midi !== null || next.heard.pitchClasses.length > 0;
+      if (something) {
+        lastHeardAt = now;
+        setHeard(next);
+      } else if (now - lastHeardAt > HEARD_HOLD_MS) setHeard({ heard: NOTHING_HEARD, matches: false });
     });
   }, [rig]);
 
@@ -129,6 +141,34 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
   };
   const running = drill.running;
 
+  // Hands-free (owner request 2026-11-27): after a practice pass the graded attempt counts itself
+  // in with the one-bar metronome (lesson tempo) and starts, so the learner can stay at the piano.
+  // "Keep practising" cancels; Enter starts at once for anyone at the computer.
+  const countIn = useCountIn(settings.bpm, () => startGradedAttempt());
+  const { start: startCountIn, cancel: cancelCountIn, counting } = countIn;
+  useEffect(() => {
+    if (justPassed) void startCountIn();
+  }, [justPassed, startCountIn]);
+  const keepPractising = () => {
+    cancelCountIn();
+    practiseAgain();
+  };
+  const startNowRef = useRef<() => void>(() => undefined);
+  startNowRef.current = () => {
+    if (!practicing || ended) return;
+    cancelCountIn();
+    startGradedAttempt();
+  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || e.repeat) return;
+      e.preventDefault();
+      startNowRef.current();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   // Tell the player about every heart as it is lost, so quitting mid-drill
   // (or during the outcome pause below) cannot refund it (T-06). Only the graded run can lose one.
   const { heartsLost } = graded;
@@ -168,7 +208,7 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
   else if (framing === 'lost') status = { text: `Paused: ${NOT_VISIBLE_MESSAGE} No heart is lost while paused.`, tone: 'amber' };
   else if (justPassed)
     status = {
-      text: 'That counted: the right sound with good posture. Practise again, or start the graded attempt when you are ready.',
+      text: 'That counted: the right sound with good posture. Stay at the piano: the graded attempt starts after a 4-beat count-in.',
       tone: 'emerald',
     };
   else if (!running) status = { text: 'Get ready…', tone: 'slate' };
@@ -223,26 +263,35 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
           <p role="status" className={cn('rounded-xl border px-5 py-3 text-base font-semibold', TONE[status.tone])}>
             {status.text}
           </p>
+          {practicing && !ended && counting && countIn.cue && (
+            <CountInBadge
+              cue={countIn.cue}
+              countText={(c) => `Graded attempt in: ${c.measureBeat} of ${c.beatsPerMeasure}. Get your hands ready.`}
+              tapText="Graded attempt starting…"
+            />
+          )}
           {practicing && !ended && (
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                onClick={startGradedAttempt}
+                onClick={() => startNowRef.current()}
                 className="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-2.5 text-sm font-bold uppercase tracking-wider text-white transition hover:brightness-110 focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-300"
               >
-                Start graded attempt
+                {counting ? 'Start now (Enter)' : 'Start graded attempt (Enter)'}
               </button>
               {justPassed && (
                 <button
                   type="button"
-                  onClick={practiseAgain}
+                  onClick={keepPractising}
                   className="rounded-xl border border-slate-600 px-5 py-2.5 text-sm font-bold text-slate-200 transition hover:border-slate-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-300"
                 >
-                  Practise again
+                  Keep practising
                 </button>
               )}
               <span className="text-xs text-slate-400">
-                The graded attempt uses your hearts and a {settings.timeoutSec}-second timer, which starts when you press it.
+                {justPassed
+                  ? 'No need to come back to the computer: the graded attempt starts by itself.'
+                  : `Play it right once and the graded attempt (hearts and a ${settings.timeoutSec}-second timer) starts by itself after a count-in.`}
               </span>
             </div>
           )}
