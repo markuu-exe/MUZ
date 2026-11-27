@@ -227,10 +227,10 @@ textarea {
 /* ---------------------------------------------------------------------------
    Dashboard polish (2026-11-28)
    - View enter: a short fade + rise when switching tabs. Never delays input.
-   - Atmosphere: two soft brand glows (green "see", violet "hear") behind the
+   - Atmosphere: soft brand glows (green "see", violet "hear") behind the
      workspace. The layer is position: absolute and only moves by transform
-     (--muz-parallax, set from the main scroll at a fraction of its speed), so
-     it never causes layout shifts.
+     (--muz-parallax, set from the main scroll progress, slower than the
+     content), so it never causes layout shifts.
    --------------------------------------------------------------------------- */
 @keyframes muz-view-enter {
   from {
@@ -252,13 +252,16 @@ textarea {
   --muz-glow-violet: 139 92 246;
   --muz-glow-strength: 1;
   position: absolute;
-  inset: -12% -6%;
+  /* Tall: the layer travels up to 35 % of the viewport as you scroll (DashboardScreen). */
+  inset: -10% -6% -45%;
   pointer-events: none;
   z-index: -1; /* the workspace column is isolated, so this sits behind all of its content */
+  /* Top: green ("see") at the left; middle: violet ("hear"); bottom of long pages: green again. */
   background:
-    radial-gradient(42% 38% at 12% 8%, rgb(var(--muz-glow-green) / calc(0.1 * var(--muz-glow-strength))), transparent 70%),
-    radial-gradient(48% 44% at 92% 88%, rgb(var(--muz-glow-violet) / calc(0.13 * var(--muz-glow-strength))), transparent 72%),
-    radial-gradient(36% 30% at 70% 30%, rgb(var(--muz-glow-violet) / calc(0.05 * var(--muz-glow-strength))), transparent 70%);
+    radial-gradient(42% 24% at 12% 10%, rgb(var(--muz-glow-green) / calc(0.1 * var(--muz-glow-strength))), transparent 70%),
+    radial-gradient(48% 28% at 92% 52%, rgb(var(--muz-glow-violet) / calc(0.13 * var(--muz-glow-strength))), transparent 72%),
+    radial-gradient(36% 19% at 68% 26%, rgb(var(--muz-glow-violet) / calc(0.05 * var(--muz-glow-strength))), transparent 70%),
+    radial-gradient(44% 24% at 10% 88%, rgb(var(--muz-glow-green) / calc(0.08 * var(--muz-glow-strength))), transparent 70%);
   transform: translate3d(0, var(--muz-parallax, 0px), 0);
   will-change: transform;
 }
