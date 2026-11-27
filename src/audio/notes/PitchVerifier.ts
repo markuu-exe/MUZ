@@ -11,7 +11,6 @@ const PLAUSIBLE_SEMITONES = 14;
  * the new note and its ringing neighbour (up to a whole tone and a half away), not a wrong note.
  */
 const RINGING_NEAR_CENTS = 300;
-
 /** Shared chroma cross-check: the target must also be the dominant pitch class. */
 const defaultMatcher = new NoteMatcher();
 
@@ -93,9 +92,18 @@ export class PitchVerifier implements AcousticVerifier {
         passed = Math.abs(centsOff(hz, this.targetMidi)) <= cfg.centsTolerance && this.chromaPasses(frame);
       }
     }
-    // Every confident in-band reading feeds "That sounded like …", in either branch above.
-    if (usableHz && clarity >= cfg.minClarity && hz >= DEFAULT_CHROMA_CONFIG.minFreqHz && hz <= DEFAULT_CHROMA_CONFIG.maxFreqHz) {
-      const midi = Math.round(freqToMidi(hz));
+    // Confident in-band readings feed "That sounded like …", in either branch above, with the
+    // grader's own tolerance: a reading 40 cents off F4 is not "F4" (owner report 2026-11-28:
+    // "That was F4. Try F4 again." for an out-of-tune F4 the grader had rightly rejected).
+    const nearest = usableHz ? Math.round(freqToMidi(hz)) : -1;
+    if (
+      usableHz &&
+      clarity >= cfg.minClarity &&
+      hz >= DEFAULT_CHROMA_CONFIG.minFreqHz &&
+      hz <= DEFAULT_CHROMA_CONFIG.maxFreqHz &&
+      Math.abs(centsOff(hz, nearest)) <= cfg.centsTolerance
+    ) {
+      const midi = nearest;
       const seen = this.heard.get(midi);
       if (seen) {
         seen[0]++;

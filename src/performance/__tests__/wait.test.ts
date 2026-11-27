@@ -70,7 +70,7 @@ describe('wait-for-me stepper', () => {
   it('a wrong note does not advance, and is reported', () => {
     const { s, events } = run([C, E], strike('n62'));
     expect(s.index).toBe(0);
-    expect(events).toEqual([{ kind: 'wrong', index: 0, heard: null }]);
+    expect(events).toEqual([{ kind: 'wrong', index: 0, heard: null, heardTarget: false }]);
   });
 
   it('no input does not advance', () => {
@@ -90,6 +90,14 @@ describe('wait-for-me stepper', () => {
     expect(s.index).toBe(1);
     expect(events[events.length - 1]).toEqual({ kind: 'advance', index: 0, firstTry: false });
     expect(s.summary()).toMatchObject({ total: 2, firstTry: 0, wrong: 1 });
+  });
+
+  it('a miss whose clearest pitch was the target is flagged, not named as "that was C4"', () => {
+    // Fake verifier that rejects the attempt but heard the target (e.g. C4 with another key held).
+    const v: AcousticVerifier & { lastHeardMidi: number } = { ...fake({ kind: 'note', note: 61 }), lastHeardMidi: 60 };
+    const s = new WaitStepper([C], () => v);
+    const e = [...strike('n60')].map((f) => s.push(f)).find(Boolean);
+    expect(e).toEqual({ kind: 'wrong', index: 0, heard: null, heardTarget: true });
   });
 
   it('a whole piece: done after the last note; further input changes nothing', () => {

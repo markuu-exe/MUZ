@@ -7,7 +7,7 @@
  * - Chord target: ChordMatcher's closest competing chord for the strike's average chroma.
  */
 import { DEFAULT_PITCH_CONFIG } from '../audio/config';
-import { freqToMidi, midiToNoteName } from '../audio/dsp/pitch';
+import { centsOff, freqToMidi, midiToNoteName } from '../audio/dsp/pitch';
 import { chordMatcher } from '../practice/PracticeDrill';
 import type { HeardFrameLike } from '../practice/heard';
 import type { SongTarget } from './songs';
@@ -23,12 +23,15 @@ export function describeHeard(frames: readonly HeardFrameLike[], target: SongTar
       if (f.pitchHz == null || !(f.pitchHz > 0) || (f.clarity ?? 0) < DEFAULT_PITCH_CONFIG.minClarity) continue;
       const midi = Math.round(freqToMidi(f.pitchHz));
       if (Math.abs(midi - target.note) > PLAUSIBLE_SEMITONES) continue;
+      // The grader's tolerance: 40 cents off F4 is not "F4".
+      if (Math.abs(centsOff(f.pitchHz, midi)) > DEFAULT_PITCH_CONFIG.centsTolerance) continue;
       counts.set(midi, (counts.get(midi) ?? 0) + 1);
     }
     let best = -1;
     let bestCount = 0;
     for (const [midi, n] of counts) if (n > bestCount) [best, bestCount] = [midi, n];
-    return best >= 0 ? midiToNoteName(best) : null;
+    // The target itself was clearest but the attempt failed (other notes with it): not "played F4".
+    return best >= 0 && best !== target.note ? midiToNoteName(best) : null;
   }
   const avg = new Float64Array(12);
   for (const f of voiced) for (let i = 0; i < 12; i++) avg[i] += (f.chroma[i] ?? 0) / voiced.length;
