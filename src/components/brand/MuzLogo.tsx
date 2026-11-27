@@ -1,13 +1,12 @@
 /**
- * The MUZ logo. Concept: "the M becomes a note" — a single continuous,
- * round-jointed M (its peaks read as keys and as a sound wave) whose right leg
- * is the stem of a quarter note: an emerald note head sits at its foot, tilted
- * like an engraved note head. The M is shifted 2 units left to balance the
- * head's weight in the bottom right.
- * Built on a 64-unit grid; see docs/brand/LOGO.md for construction and usage.
+ * The MUZ logo. Concept: "the M becomes two eighth notes" — a single unified
+ * beamed eighth-note pair whose top beam dips into an M, filled with a smooth
+ * purple-to-emerald gradient so the stems and note heads flow as one shape.
+ * Built on a 64-unit grid and optically centred at (32, 32); see docs/brand/LOGO.md.
  *
- * - MuzMark variant="app": gradient squircle container (app icon, favicon).
- * - MuzMark variant="flat": no container; the M takes currentColor (one-colour use).
+ * - MuzMark variant="app": dark indigo-violet squircle with unified purple-to-green
+ *   beamed M-note (app icon, favicon).
+ * - MuzMark variant="flat": no container; the unified M-note takes currentColor.
  * - MuzLogo: mark + wordmark lockup.
  */
 import { useId } from 'react';
@@ -15,12 +14,34 @@ import { cn } from '../../lib/cn';
 
 export const BRAND = Object.freeze({
   violet: '#7c3aed',
-  fuchsia: '#c026d3',
+  violetMid: '#8b5cf6',
+  violetBright: '#a78bfa',
+  violetSoft: '#c4b5fd',
   note: '#6ee7b7',
+  noteDeep: '#34d399',
+  surfaceTop: '#1e1145',
+  surfaceBottom: '#080d1a',
 });
 
-/** The M: one stroke, rounded caps and joins. */
-const M_PATH = 'M16 46 V20 L30 35 L44 20 V44';
+/** Single unified closed silhouette: M-shaped top beam + stems flowing into two note heads, centred by visual mass at (32, 32). */
+const NOTE_M_PATH =
+  'M 19 17.2 ' +
+  'C 19 14.4 21.5 13.1 23.8 14.8 ' +
+  'L 33 23 Q 33.95 23.7 34.9 23 L 44.1 14.8 ' +
+  'C 46.4 13.1 48.9 14.4 48.9 17.2 ' +
+  'L 48.9 40.2 ' +
+  'C 48.9 44.2 45 47.2 40.6 47.2 ' +
+  'C 36.4 47.2 34 44.6 34.6 41.4 ' +
+  'C 35.1 38 39.2 36.6 42.1 37 ' +
+  'C 43 37.1 43.5 36.4 43.5 35.2 ' +
+  'L 43.5 21.6 ' +
+  'L 35 29.1 C 34.3 29.7 33.6 29.7 32.9 29.1 L 24.4 21.6 ' +
+  'L 24.4 41.6 ' +
+  'C 24.4 45.6 20.5 48.6 16.1 48.6 ' +
+  'C 11.9 48.6 9.5 46 10.1 42.8 ' +
+  'C 10.6 39.4 14.7 38 17.6 38.4 ' +
+  'C 18.5 38.5 19 37.8 19 36.6 ' +
+  'Z';
 
 interface MuzMarkProps {
   size?: number;
@@ -49,27 +70,25 @@ export function MuzMark({ size = 40, variant = 'app', className, title }: MuzMar
         <>
           <defs>
             <linearGradient id={`${id}-bg`} x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stopColor={BRAND.violet} />
-              <stop offset="1" stopColor={BRAND.fuchsia} />
+              <stop offset="0" stopColor={BRAND.surfaceTop} />
+              <stop offset="1" stopColor={BRAND.surfaceBottom} />
             </linearGradient>
-            <linearGradient id={`${id}-gloss`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="#fff" stopOpacity="0.22" />
-              <stop offset="0.55" stopColor="#fff" stopOpacity="0" />
+            <linearGradient id={`${id}-rim`} x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stopColor={BRAND.violetBright} stopOpacity="0.55" />
+              <stop offset="1" stopColor={BRAND.note} stopOpacity="0.45" />
+            </linearGradient>
+            <linearGradient id={`${id}-mark`} x1="0.1" y1="0" x2="0.2" y2="1">
+              <stop offset="0" stopColor={BRAND.violetSoft} />
+              <stop offset="0.38" stopColor={BRAND.violetMid} />
+              <stop offset="0.72" stopColor={BRAND.noteDeep} />
+              <stop offset="1" stopColor={BRAND.note} />
             </linearGradient>
           </defs>
           <rect width="64" height="64" rx="18" fill={`url(#${id}-bg)`} />
-          <rect width="64" height="64" rx="18" fill={`url(#${id}-gloss)`} />
+          <rect x="0.75" y="0.75" width="62.5" height="62.5" rx="17.25" fill="none" stroke={`url(#${id}-rim)`} strokeWidth="1.5" />
         </>
       )}
-      <path
-        d={M_PATH}
-        fill="none"
-        stroke={app ? '#ffffff' : 'currentColor'}
-        strokeWidth="7.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <ellipse cx="38.4" cy="46.4" rx="7" ry="5.2" transform="rotate(-28 38.4 46.4)" fill={BRAND.note} />
+      <path d={NOTE_M_PATH} fill={app ? `url(#${id}-mark)` : 'currentColor'} />
     </svg>
   );
 }
