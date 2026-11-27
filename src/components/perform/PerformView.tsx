@@ -19,6 +19,7 @@ import { PerformanceJudge, type EventResult, type PerfFrame, type PerformanceSum
 import { songPlan } from '../../performance/plan';
 import { WaitStepper, type WaitSummary } from '../../performance/wait';
 import { describeHeard } from '../../performance/heardLabel';
+import { barsOf, loopRange, sliceSong } from '../../performance/loop';
 import { SONGS, targetLabel, type Song } from '../../performance/songs';
 import MediaDiagnostics, { mediaProblems } from '../lesson/practice/MediaDiagnostics';
 import { PracticeRigProvider, usePracticeRig } from '../lesson/practice/PracticeRigContext';
@@ -28,6 +29,11 @@ import CountInBadge from '../lesson/rhythm/CountInBadge';
 type Frame = PerfFrame & HeardFrameLike;
 const LEAD_SEC = 0.4;
 const TAIL_SEC = 0.6;
+
+/** "bar 3" or "bars 3–4" (1-based, as musicians count). */
+function barsLabel({ from, to }: { from: number; to: number }): string {
+  return from === to ? `bar ${from + 1}` : `bars ${from + 1}–${to + 1}`;
+}
 
 const MODES = [
   ['time', 'In time'],
@@ -160,8 +166,14 @@ function WaitDisplay({ song, phase, current, wrongs, lastWrong, lastHeard, summa
   );
 }
 
-function Player({ song, onBack, onBest }: { song: Song; onBack: () => void; onBest: () => void }) {
+function Player({ song: fullSong, onBack, onBest }: { song: Song; onBack: () => void; onBest: () => void }) {
   const { rig, state } = usePracticeRig();
+  // "Loop the bars you missed": `song` is the piece being played, the whole song or a slice.
+  const [loop, setLoop] = useState<{ from: number; to: number } | null>(null);
+  const [loopPasses, setLoopPasses] = useState<string[]>([]);
+  const song = useMemo(() => (loop ? sliceSong(fullSong, loop.from, loop.to) : fullSong), [fullSong, loop]);
+  const loopRef = useRef(loop);
+  loopRef.current = loop;
   const [slow, setSlow] = useState(false);
   const plan = useMemo(() => songPlan(song, slow ? Math.round(song.bpm * 0.75) : song.bpm), [song, slow]);
   const [phase, setPhase] = useState<'idle' | 'running' | 'done'>('idle');
@@ -242,6 +254,12 @@ function Player({ song, onBack, onBest }: { song: Song; onBack: () => void; onBe
       if (t >= plan.endSec + TAIL_SEC) {
         const s = judge.summary();
         teardown();
+        if (loopRef.current) {
+          // Looping: note the pass and go again (each pass has its own count-in).
+          setLoopPasses((p) => [...p, `${s.score}%`]);
+          void startRef.current();
+          return;
+        }
         setSummary({ ...s, newBest: !slow && saveBestScore(song.id, s.score) });
         onBest();
         setPhase('done');
@@ -271,15 +289,50 @@ function Player({ song, onBack, onBest }: { song: Song; onBack: () => void; onBe
       setLastWrong(false);
       setCurrent(Math.min(stepper.index, song.events.length - 1));
       if (stepper.done) {
-        setWaitSummary(stepper.summary());
+        const s = stepper.summary();
+        if (loopRef.current) {
+          setLoopPasses((p) => [...p, `${s.firstTry}/${s.total}`]);
+          queueMicrotask(() => startWaitRef.current()); // not from inside the rig's own emit
+          return;
+        }
+        setWaitSummary(s);
         setPhase('done');
-        queueMicrotask(teardown); // not from inside the rig's own emit
+        queueMicrotask(teardown);
       }
     });
     setPhase('running');
   }, [rig, song, teardown]);
 
+  const startRef = useRef(start);
+  startRef.current = start;
+  const startWaitRef = useRef(startWait);
+  startWaitRef.current = startWait;
+
   const begin = () => (mode === 'wait' ? startWait() : void start());
+
+  /** Enter or leave a loop; the next Start plays it. */
+  const chooseLoop = (next: { from: number; to: number } | null) => {
+    teardown();
+    setLoop(next);
+    setLoopPasses([]);
+    setPhase('idle');
+    setSummary(null);
+    setWaitSummary(null);
+    setCurrent(0);
+    setLastWrong(false);
+  };
+  // A new piece (loop on or off) needs per-step counters of its own length.
+  useEffect(() => {
+    setWrongs(song.events.map(() => 0));
+  }, [song]);
+  const missedLoop =
+    phase !== 'done' || loop
+      ? null
+      : mode === 'time' && summary
+        ? loopRange(barsOf(song, summary.results.filter((r) => r.rating === 'Miss').map((r) => r.index)))
+        : mode === 'wait' && waitSummary
+          ? loopRange(barsOf(song, waitSummary.perEvent.flatMap((w, i) => (w > 0 ? [i] : []))))
+          : null;
 
   const resetForMode = (next: 'time' | 'wait') => {
     setMode(next);
@@ -382,6 +435,35 @@ function Player({ song, onBack, onBest }: { song: Song; onBack: () => void; onBe
           )}
         </div>
       </div>
+
+      {loop && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/40 bg-amber-950/30 px-4 py-2.5 text-sm" role="status">
+          <p className="font-semibold text-amber-100">
+            Looping {barsLabel(loop)}
+            {phase === 'running' ? ' · keeps going until you press Stop' : ''}
+            {loopPasses.length > 0 && <span className="text-amber-200/80"> · passes: {loopPasses.slice(-6).join(' · ')}</span>}
+          </p>
+          <button
+            type="button"
+            onClick={() => chooseLoop(null)}
+            className="rounded-lg border border-amber-500/50 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-amber-100 hover:bg-amber-500/10 focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-300"
+          >
+            Whole piece
+          </button>
+        </div>
+      )}
+      {missedLoop && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-2.5 text-sm">
+          <p className="text-slate-300">Drill the trouble spot: replay just those bars until they feel easy.</p>
+          <button
+            type="button"
+            onClick={() => chooseLoop(missedLoop)}
+            className="rounded-lg bg-amber-500/90 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-slate-950 hover:bg-amber-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-300"
+          >
+            Loop {barsLabel(missedLoop)}
+          </button>
+        </div>
+      )}
 
       {problems.length > 0 ? (
         <MediaDiagnostics problems={problems} onRetry={() => void rig.startMic()} needsMic />
