@@ -1,6 +1,6 @@
 # MUZ logo
 
-**Concept: the M becomes a note.** A single, continuous, round-jointed **M**. Its two peaks read as piano keys and as a sound wave. Its right leg is the **stem of a quarter note**, with an emerald note head at its foot. The letter and the note are one shape, which is the app in one picture: you play, and MUZ hears the note.
+**Concept: the M becomes a unified beamed eighth-note pair.** Two stems joined by a V-dipped beam flow seamlessly into two tilted note heads as one continuous closed glyph, optically centred in the 64 × 64 frame with a smooth purple-to-emerald gradient.
 
 Component: `src/components/brand/MuzLogo.tsx` (`MuzMark`, `MuzLogo`). Favicon: `public/favicon.svg`.
 
@@ -8,22 +8,20 @@ Component: `src/components/brand/MuzLogo.tsx` (`MuzMark`, `MuzLogo`). Favicon: `
 
 | Part | Value |
 |---|---|
-| Container (app icon) | Rounded square, corner radius 18; 135° gradient `#7c3aed` → `#c026d3`; top-down gloss of white at 22% → 0% |
-| M | One stroke `M16 46 V20 L30 35 L44 20 V44`, width 7.5, round caps and joins, white |
-| Note head | Ellipse centred (38.4, 46.4), radii 7 × 5.2, rotated −28°, `#6ee7b7` |
-| Optical balance | The M sits 2 units left of centre to balance the note head's weight in the bottom right |
+| Container (app icon) | Rounded square, corner radius 18; 135° dark indigo-navy gradient `#1e1145` → `#080d1a`; 1.5 px border gradient `#a78bfa` (55%) → `#6ee7b7` (45%) |
+| Unified M-note glyph | Single closed path (`NOTE_M_PATH`) spanning `x: 9.9–48.9`, `y: 13.7–48.6` (visual centroid at `(32.0, 32.0)`), blending `#c4b5fd` → `#8b5cf6` → `#34d399` → `#6ee7b7` top to bottom |
 
 ## Variants
 
 | Variant | Use |
 |---|---|
 | `MuzMark` `variant="app"` | App icon, favicon, sidebar, loading screen. The default. |
-| `MuzMark` `variant="flat"` | No container. The M takes the text colour and the note head stays emerald. For small inline marks and one-colour contexts. |
+| `MuzMark` `variant="flat"` | No container. The unified glyph takes `currentColor` for small inline marks and one-colour contexts. |
 | `MuzLogo` | Mark plus the **MUZ** wordmark (UI typeface, black weight, 0.2 em tracking), with an optional tagline. Headers. |
 
 ## Rules
 
 - **Clear space:** at least a quarter of the mark's width on every side.
 - **Minimum size:** 16 px for the mark; 28 px for the lockup with tagline.
-- Don't recolour the container outside the violet→fuchsia gradient. Don't stretch, rotate or outline the mark. Don't separate the note head from the M.
-- On light backgrounds, use the flat mark with a dark M (`#0f172a`). The note head keeps its emerald.
+- Don't stretch, rotate or outline the mark. Don't separate the note heads from the M.
+- On light backgrounds, use the flat mark with a dark colour (`#0f172a`).
