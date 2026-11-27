@@ -5,7 +5,10 @@
  * - Each event owns a time window around its beat: from EARLY_SEC before it to LATE_SEC after
  *   it, cut short so windows of neighbouring events never overlap.
  * - A hit needs an onset (a new strike) inside the window, followed by the grader's own
- *   per-frame test passing on at least MIN_PASS of the next PASS_FRAMES voiced frames. The
+ *   per-frame test passing on at least MIN_PASS of the next PASS_FRAMES voiced frames, not
+ *   counting the first ATTACK_SKIP_MS after the onset (those frames still hear the old sound) and
+ *   decided within DECIDE_WITHIN_MS of it (later frames hear what is still ringing). Both match
+ *   the lesson graders. The
  *   onset requirement stops a ringing note from scoring the next identical note (C C in
  *   Twinkle). The grader test is injected (notes: ±35 cents; chords: ChordMatcher), the same
  *   checks the lessons use.
@@ -13,8 +16,13 @@
  *   No hit is a Miss: "wrong" when something was played but did not match, "missed" otherwise.
  * Pure and deterministic: frames carry their own time (seconds on the song's plan clock).
  */
+import { DEFAULT_VERIFIER_CONFIG } from '../audio/config';
 import type { SongTarget } from './songs';
 
+/** Frames this soon after an onset are not judged: their analysis window still holds the previous sound. */
+export const ATTACK_SKIP_MS = DEFAULT_VERIFIER_CONFIG.attackSkipMs;
+/** A strike that has not matched this long after its onset is spent (ChordVerifier: sustain window + roll grace). */
+export const DECIDE_WITHIN_MS = DEFAULT_VERIFIER_CONFIG.sustainWindowMs + DEFAULT_VERIFIER_CONFIG.rollGraceMs;
 export const EARLY_SEC = 0.2;
 export const LATE_SEC = 0.45;
 export const PERFECT_SEC = 0.12;
@@ -100,6 +108,17 @@ export class PerformanceJudge<F extends PerfFrame> {
       s.played = true;
     }
     if (s.onsetT === null || !frame.voiced) return;
+    // The analysis window still holds the sound from before the strike for a few frames; judging
+    // them let a wrong key struck over a ringing note score that note. Skip them, as the lesson
+    // graders do (PitchVerifier / ChordVerifier: attackSkipMs).
+    const sinceMs = (frame.t - s.onsetT) * 1000;
+    if (sinceMs < ATTACK_SKIP_MS) return;
+    // A strike is decided within the lesson graders' horizon (sustain window + roll grace). Later
+    // frames belong to whatever is still ringing, not to this strike: wait for a new onset.
+    if (sinceMs > DECIDE_WITHIN_MS) {
+      s.onsetT = null;
+      return;
+    }
     s.recent.push(this.matches(frame, this.targets[i]));
     if (s.recent.length > PASS_FRAMES) s.recent.shift();
     if (s.recent.filter(Boolean).length >= MIN_PASS) s.hitT = s.onsetT;

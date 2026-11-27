@@ -110,6 +110,35 @@ describe('performance judge', () => {
     expect(struck.results.map((r) => r.rating)).toEqual(['Perfect', 'Perfect']);
   });
 
+  it('no input: nothing advances', () => {
+    const s = judge([1, 2], [C, G], frames([], 3));
+    expect(s.results.map((r) => r.missReason)).toEqual(['missed', 'missed']);
+    expect(s.perfect + s.good).toBe(0);
+  });
+
+  it('one strike, held and re-struck inside the window, counts once', () => {
+    const s = judge([1], [C], frames([{ at: 1, plays: 'n60', dur: 0.15 }, { at: 1.16, plays: 'n60' }, { at: 1.3, plays: 'n60' }], 2));
+    expect(s.results).toHaveLength(1);
+    expect(s.perfect + s.good).toBe(1);
+    expect(s.results[0].offsetMs).toBe(0); // the first strike is the one judged
+  });
+
+  it('a retry after a wrong note in the same window is judged on the retry', () => {
+    const s = judge([1], [C], frames([{ at: 0.95, plays: 'n62', dur: 0.1 }, { at: 1.08, plays: 'n60' }], 2));
+    expect(s.results[0]).toMatchObject({ rating: 'Perfect', offsetMs: 80 });
+  });
+
+  it('frames right after a strike still carry the previous sound: they do not count (attack skip, like the lesson graders)', () => {
+    // C rings; a wrong D is struck for the second C. The analysis window straddles the strike,
+    // so the first ~35 ms of frames still report C.
+    const input = frames([{ at: 1, plays: 'n60', dur: 2 }, { at: 1.5, plays: 'n62' }], 3).map((f) =>
+      f.t >= 1.5 && f.t < 1.535 ? { ...f, plays: 'n60' } : f,
+    );
+    const s = judge([1, 1.5], [C, C], input);
+    expect(s.results.map((r) => r.rating)).toEqual(['Perfect', 'Miss']);
+    expect(s.results[1].missReason).toBe('wrong');
+  });
+
   it('a slightly early strike still counts and reports a negative offset', () => {
     const s = judge([1], [C], frames([{ at: 0.9, plays: 'n60' }], 2));
     expect(s.results[0]).toMatchObject({ rating: 'Perfect', offsetMs: -100 });
@@ -141,6 +170,37 @@ describe('performance judge on real piano audio (grader checks)', { timeout: 60_
     expect(s.results[2]).toMatchObject({ rating: 'Miss', missReason: 'wrong' });
     // The analysis reports an onset a little after the strike; it must stay well inside the late window.
     for (const r of s.results.slice(0, 2)) expect(Math.abs(r.offsetMs ?? 999)).toBeLessThan(LATE_SEC * 1000 - 150);
+  });
+});
+
+describe('performance judge on real piano audio: a wrong strike over a ringing note', { timeout: 120_000 }, () => {
+  // Regression (2026-11-28): with C4 still ringing, a softer wrong key struck on the next C's
+  // beat scored "Perfect", because the first frames after the onset still analysed the old C.
+  const C: SongTarget = { kind: 'note', note: 60 };
+  const run = (second: number | null, seed: number, decaySec = 1.5) => {
+    const notes = [{ midi: 60, at: 1 }, ...(second === null ? [] : [{ midi: second, at: 1.833, gainDb: second === 60 ? 0 : -8 }])];
+    const audio = renderPiano(notes, { sampleRate: 48000, durationSec: 3, seed, decaySec });
+    const j = new PerformanceJudge<PerfFrame & HeardFrameLike>([1, 1.833], [C, C], (f, target) => frameMatchesTarget(f, target, chordMatcher));
+    const proc = new ChromaFrameProcessor(48000, (f) =>
+      j.push({ t: f.time, voiced: f.voiced, onset: f.onset, onsetT: f.onset ? f.onsetTime : undefined, chroma: f.chroma, ringing: f.ringing, pitchHz: f.pitchHz, clarity: f.clarity }),
+    );
+    feed(proc, audio, 48000);
+    return j.summary().results.map((r) => r.rating);
+  };
+
+  // Not covered: C5 struck softly over a ringing C4. The microphone genuinely hears C4 loudest
+  // (the pitch tracker reads the whole signal), so that still counts; telling them apart needs
+  // new analysis that has not been checked on a real piano.
+  it.each([59, 62, 64, 65])('wrong note %i on the repeated C is a Miss', (wrong) => {
+    for (const seed of [1, 3, 5]) expect(run(wrong, seed)).toEqual(['Perfect', 'Miss']);
+  });
+
+  it('re-striking the C is still a hit; not striking it is a Miss', () => {
+    for (const seed of [1, 3, 5]) {
+      // The renderer has no dampers, so the first C is let ring shorter before the re-strike.
+      expect(run(60, seed, 0.6)).toEqual(['Perfect', 'Perfect']);
+      expect(run(null, seed)).toEqual(['Perfect', 'Miss']);
+    }
   });
 });
 

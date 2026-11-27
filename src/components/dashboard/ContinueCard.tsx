@@ -3,21 +3,26 @@
  * Profile) that opens the next lesson straight away, with the same checks as the Start button.
  */
 import { Play } from 'lucide-react';
+import { cn } from '../../lib/cn';
 import type { CurriculumNode } from '../../lib/dashboard/curriculum';
 
 interface ContinueCardProps {
   lesson: Pick<CurriculumNode, 'title' | 'description' | 'kind'>;
   onContinue: () => void;
   compact?: boolean;
+  className?: string;
 }
 
 const KIND_LABEL: Record<string, string> = { theory: 'Theory', practice: 'Practice', rhythm: 'Rhythm' };
 
-export default function ContinueCard({ lesson, onContinue, compact = false }: ContinueCardProps) {
+export default function ContinueCard({ lesson, onContinue, compact = false, className }: ContinueCardProps) {
   return (
     <section
       aria-label="Continue where you left off"
-      className="mx-auto mb-6 flex w-full max-w-3xl flex-wrap items-center justify-between gap-4 rounded-2xl border border-violet-500/40 bg-violet-950/40 px-5 py-4"
+      className={cn(
+        'mx-auto mb-6 flex w-full max-w-3xl flex-wrap items-center justify-between gap-4 rounded-2xl border border-violet-500/40 bg-violet-950/60 px-5 py-4 shadow-lg shadow-black/20 backdrop-blur-md',
+        className,
+      )}
     >
       <div className="min-w-0">
         <p className="text-xs font-bold uppercase tracking-widest text-violet-300">
