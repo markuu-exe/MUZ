@@ -505,6 +505,32 @@ export default function DashboardScreen() {
     return true;
   };
 
+  // Accessibility pass: the detail panel is far down the page after every node, so when it opens
+  // focus moves to its Start button; Escape or ✕ closes it and returns focus to the node.
+  const startButtonRef = useRef<HTMLButtonElement>(null);
+  const selectedId = selected?.id ?? null;
+  const lastSelectedId = useRef<string | null>(null);
+  useEffect(() => {
+    if (selectedId) {
+      lastSelectedId.current = selectedId;
+      startButtonRef.current?.focus({ preventScroll: true });
+    }
+  }, [selectedId]);
+  const closeNodePanel = useCallback(() => {
+    setSelected(null);
+    setSelectedStatus(null);
+    const id = lastSelectedId.current;
+    if (id) window.requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-node-id="' + id + '"]')?.focus());
+  }, []);
+  useEffect(() => {
+    if (!selectedId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeNodePanel();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedId, closeNodePanel]);
+
   /** Open a lesson straight away (Continue / Next lesson), with the same checks as the Start button. */
   const openLesson = (lesson: CurriculumNode, status: NodeStatus) => {
     if (!handleSelect(lesson, status)) return;
@@ -892,11 +918,14 @@ export default function DashboardScreen() {
               ========================================================================= */}
           {selected && (
             <div className="pointer-events-none fixed bottom-8 left-1/2 z-30 w-full max-w-xl -translate-x-1/2 px-4">
-              <div className="pointer-events-auto rounded-3xl border border-violet-500/50 bg-muz-panel/95 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.65)] backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-200">
+              <div
+                role="region"
+                aria-labelledby="node-panel-title"
+                className="pointer-events-auto rounded-3xl border border-violet-500/50 bg-muz-panel/95 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.65)] backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-200">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="rounded-full border border-violet-500/40 bg-violet-500/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-300">
+                      <span className="rounded-full border border-violet-500/40 bg-violet-500/15 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider text-violet-300">
                         {selected.kind} Unit
                       </span>
                       <span className="text-xs text-slate-400">
@@ -904,7 +933,7 @@ export default function DashboardScreen() {
                       </span>
                     </div>
 
-                    <h3 className="mt-2 text-xl font-bold text-white">{selected.title}</h3>
+                    <h3 id="node-panel-title" className="mt-2 text-xl font-bold text-white">{selected.title}</h3>
                     <p className="mt-1 text-sm text-slate-300 leading-relaxed">
                       {selected.description}
                     </p>
@@ -912,13 +941,11 @@ export default function DashboardScreen() {
 
                   <button
                     type="button"
-                    onClick={() => {
-                      setSelected(null);
-                      setSelectedStatus(null);
-                    }}
-                    className="rounded-lg p-1 text-slate-400 hover:text-white"
+                    aria-label="Close lesson details"
+                    onClick={closeNodePanel}
+                    className="rounded-lg p-1 text-slate-400 hover:text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-300"
                   >
-                    ✕
+                    <span aria-hidden="true">✕</span>
                   </button>
                 </div>
 
@@ -936,6 +963,7 @@ export default function DashboardScreen() {
                   </div>
 
                   <button
+                    ref={startButtonRef}
                     type="button"
                     onClick={() => {
                       if (!isLessonPayload(selected.payload)) {
@@ -948,7 +976,7 @@ export default function DashboardScreen() {
                       setSelected(null);
                       setSelectedStatus(null);
                     }}
-                    className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(139,92,246,0.4)] hover:brightness-110 active:scale-95 transition-all"
+                    className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(139,92,246,0.4)] hover:brightness-110 active:scale-95 transition-all focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-300"
                   >
                     {selectedStatus === 'mastered' ? (
                       <>

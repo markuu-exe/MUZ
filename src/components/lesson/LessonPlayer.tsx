@@ -249,7 +249,7 @@ export default function LessonPlayer({
                 'rounded-full border px-3 py-1',
                 i === item.stageIndex && 'border-violet-400 bg-violet-500/20 text-violet-100 shadow-[0_0_12px_rgba(139,92,246,0.5)]',
                 i < item.stageIndex && 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
-                i > item.stageIndex && 'border-slate-800 text-slate-600',
+                i > item.stageIndex && 'border-slate-800 text-slate-400',
               )}
             >
               {STAGE_LABEL[kind]}
@@ -279,7 +279,7 @@ export default function LessonPlayer({
           entry &&
           View && (
             <div className={cn('mx-auto w-full', entry.camera ? 'max-w-screen-2xl' : entry.wide ? 'max-w-5xl' : 'max-w-2xl')}>
-              <div className="mb-4 flex items-center justify-between text-xs uppercase tracking-widest text-slate-500">
+              <div className="mb-4 flex items-center justify-between text-xs uppercase tracking-widest text-slate-400">
                 <span className="font-bold text-cyan-300">{entry.label}</span>
                 <span>
                   {progress.done + 1} / {progress.total}
@@ -329,8 +329,8 @@ export default function LessonPlayer({
               className={cn(
                 'rounded-xl px-8 py-3 text-sm font-bold uppercase tracking-wider text-white transition hover:brightness-110 active:scale-[0.98]',
                 pending.passed
-                  ? 'bg-emerald-500 shadow-[0_0_20px_rgba(52,211,153,0.5)]'
-                  : 'bg-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.45)]',
+                  ? 'bg-emerald-700 shadow-[0_0_20px_rgba(52,211,153,0.5)]'
+                  : 'bg-rose-600 shadow-[0_0_20px_rgba(244,63,94,0.45)]',
               )}
             >
               Continue
@@ -356,7 +356,7 @@ export default function LessonPlayer({
               <button
                 type="button"
                 onClick={quit}
-                className="flex-1 rounded-xl bg-rose-500 px-4 py-2.5 text-sm font-bold text-white hover:brightness-110"
+                className="flex-1 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white hover:brightness-110"
               >
                 Leave
               </button>

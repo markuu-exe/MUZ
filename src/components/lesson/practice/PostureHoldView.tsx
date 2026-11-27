@@ -88,7 +88,7 @@ export default function PostureHoldView({ exercise, settings, onOutcome }: Exerc
         <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-6 text-center">
           <Ring fraction={view.progress} label={view.done ? '✓' : String(secondsLeft)} tone={view.done ? 'emerald' : 'violet'} />
           <p className="text-sm font-semibold text-slate-200">{message}</p>
-          <ul className="space-y-1 text-left text-xs text-slate-500">
+          <ul className="space-y-1 text-left text-xs text-slate-400">
             <li>Elbow angle between 80° and 110°</li>
             <li>Wrist close to straight (140° to 180°)</li>
             <li>Green lines mean good, red lines need fixing</li>

@@ -95,12 +95,12 @@ export default function LandingPage({ onSignIn, onSignUp, onDemo }: LandingPageP
               <Presentation className="h-4 w-4" aria-hidden="true" /> Try Demo Mode
             </button>
           </div>
-          <p className="mt-3 text-xs text-slate-500">Demo Mode: every lesson unlocked, nothing saved.</p>
+          <p className="mt-3 text-xs text-slate-400">Demo Mode: every lesson unlocked, nothing saved.</p>
         </div>
         <HeroKeyboard />
         <a
           href="#how"
-          className="absolute bottom-4 left-1/2 hidden -translate-x-1/2 flex-col items-center text-xs text-slate-500 transition hover:text-white lg:flex"
+          className="absolute bottom-4 left-1/2 hidden -translate-x-1/2 flex-col items-center text-xs text-slate-400 transition hover:text-white lg:flex"
           onClick={(e) => {
             e.preventDefault();
             document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' });
@@ -148,7 +148,7 @@ export default function LandingPage({ onSignIn, onSignUp, onDemo }: LandingPageP
         </Reveal>
       </section>
 
-      <footer className="relative z-10 flex items-center justify-center gap-2 border-t border-slate-800/80 py-6 text-xs text-slate-500">
+      <footer className="relative z-10 flex items-center justify-center gap-2 border-t border-slate-800/80 py-6 text-xs text-slate-400">
         <MuzMark size={18} /> MUZ · DAWGZ · CIT-U Capstone 2026
       </footer>
     </div>

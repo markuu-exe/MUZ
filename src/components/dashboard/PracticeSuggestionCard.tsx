@@ -34,7 +34,7 @@ export default function PracticeSuggestionCard({ userId, isDemo, lessons, progre
         <h3 id="suggestion-title" className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400">
           <Lightbulb className="h-4 w-4 text-amber-300" aria-hidden="true" /> Suggested practice
         </h3>
-        <span className="text-xs text-slate-500">Last {WINDOW_DAYS} days</span>
+        <span className="text-xs text-slate-400">Last {WINDOW_DAYS} days</span>
       </div>
 
       {loading ? (
@@ -56,7 +56,7 @@ export default function PracticeSuggestionCard({ userId, isDemo, lessons, progre
             <button
               type="button"
               onClick={() => onOpen(suggestion.lesson, suggestion.status)}
-              className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-950 transition hover:bg-amber-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-200"
+              className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#020617] transition hover:bg-amber-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-200"
             >
               Replay this lesson
             </button>
@@ -92,7 +92,7 @@ export default function PracticeSuggestionCard({ userId, isDemo, lessons, progre
             : 'Finish a few practice or rhythm lessons and MUZ will suggest the one to replay, based on your weakest skill.'}
         </p>
       )}
-      <p className="mt-3 text-xs text-slate-500">
+      <p className="mt-3 text-xs text-slate-400">
         Based on your own results only (rhythm, notes, chords and posture from lessons that measured them, and first-try theory accuracy). Worked out on this device; nothing is sent anywhere.
       </p>
     </section>

@@ -36,7 +36,7 @@ export default function WeeklyGoalCard({ userId, isDemo, lastActivityDate }: Wee
           {goalMet ? (
             <CheckCircle2 className="h-6 w-6 text-emerald-400" aria-hidden="true" />
           ) : (
-            <Circle className="h-6 w-6 text-slate-500" aria-hidden="true" />
+            <Circle className="h-6 w-6 text-slate-400" aria-hidden="true" />
           )}
           {goalMet ? DAILY_GOAL_LESSONS : 0} of {DAILY_GOAL_LESSONS} lesson
         </p>

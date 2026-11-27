@@ -364,7 +364,7 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
                     'rounded-lg border px-2.5 py-1 text-sm font-bold',
                     (i < drill.stepIndex || ended?.passed) && 'border-emerald-500/50 bg-emerald-500/15 text-emerald-200',
                     i === drill.stepIndex && !ended?.passed && 'border-violet-400 bg-violet-500/25 text-white shadow-[0_0_12px_rgba(139,92,246,0.5)]',
-                    i > drill.stepIndex && 'border-slate-700 text-slate-500',
+                    i > drill.stepIndex && 'border-slate-700 text-slate-400',
                   )}
                 >
                   {targetLabel(t)}
@@ -385,14 +385,14 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
             className={cn(
               'rounded-xl border px-4 text-center font-black',
               bench ? 'py-4 text-4xl' : 'py-2 text-lg',
-              !heardText && 'border-slate-800 text-slate-500',
+              !heardText && 'border-slate-800 text-slate-400',
               heardText && heardMatches && 'border-emerald-500/50 bg-emerald-950/40 text-emerald-200',
               heardText && !heardMatches && 'border-amber-500/50 bg-amber-950/40 text-amber-200',
             )}
           >
             {heardText ? `Hearing: ${heardText}${heardMatches ? ' (matches)' : ''}` : 'Hearing: nothing yet'}
           </div>
-          {rawText && <p className="text-center text-xs text-slate-500">Raw chroma (debug): {rawText}</p>}
+          {rawText && <p className="text-center text-xs text-slate-400">Raw chroma (debug): {rawText}</p>}
           {chordReasons.length > 0 && (
             <div className="rounded-xl border border-rose-500/30 bg-rose-950/30 px-4 py-2 text-left text-sm text-rose-100">
               <p className="font-bold">Why that chord did not count:</p>
@@ -403,7 +403,7 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
               </ul>
             </div>
           )}
-          <p className="text-center text-xs text-slate-500">
+          <p className="text-center text-xs text-slate-400">
             {target.kind === 'chord' ? 'Any octave and any inversion counts.' : 'Play this exact key: the octave counts.'} Amber keys
             are what the microphone hears; green means it matches.
           </p>

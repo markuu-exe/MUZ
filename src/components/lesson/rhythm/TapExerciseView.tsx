@@ -182,7 +182,7 @@ export default function TapExerciseView({ exercise, payload, settings, onOutcome
             <span className="text-slate-200">
               Score {counts.Perfect * POINTS.Perfect + counts.Good * POINTS.Good}
             </span>
-            <span className="text-slate-500">of {plan.targets.length}</span>
+            <span className="text-slate-400">of {plan.targets.length}</span>
           </span>
         </div>
       )}
@@ -203,19 +203,19 @@ export default function TapExerciseView({ exercise, payload, settings, onOutcome
           <div className="grid grid-cols-4 gap-2 text-center text-sm">
             <div className="rounded-lg bg-slate-900/80 p-2">
               <p className="text-lg font-bold text-emerald-300">{done.summary.perfect}</p>
-              <p className="text-xs text-slate-500">Perfect</p>
+              <p className="text-xs text-slate-400">Perfect</p>
             </div>
             <div className="rounded-lg bg-slate-900/80 p-2">
               <p className="text-lg font-bold text-amber-300">{done.summary.good}</p>
-              <p className="text-xs text-slate-500">Good</p>
+              <p className="text-xs text-slate-400">Good</p>
             </div>
             <div className="rounded-lg bg-slate-900/80 p-2">
               <p className="text-lg font-bold text-rose-300">{plan.targets.length - done.summary.perfect - done.summary.good}</p>
-              <p className="text-xs text-slate-500">Missed</p>
+              <p className="text-xs text-slate-400">Missed</p>
             </div>
             <div className="rounded-lg bg-slate-900/80 p-2">
               <p className="text-lg font-bold text-slate-200">{done.score.extraTaps}</p>
-              <p className="text-xs text-slate-500">Extra taps</p>
+              <p className="text-xs text-slate-400">Extra taps</p>
             </div>
           </div>
           <p className="text-xs text-slate-400">
@@ -232,7 +232,7 @@ export default function TapExerciseView({ exercise, payload, settings, onOutcome
             onClick={finish}
             className={cn(
               'w-full rounded-xl px-6 py-3 text-sm font-bold uppercase tracking-wider text-white transition hover:brightness-110 active:scale-[0.98]',
-              done.score.passed ? 'bg-emerald-500' : 'bg-rose-500',
+              done.score.passed ? 'bg-emerald-700' : 'bg-rose-600',
             )}
           >
             Continue (Enter)

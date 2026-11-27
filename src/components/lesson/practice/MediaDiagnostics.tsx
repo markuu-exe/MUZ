@@ -68,7 +68,7 @@ export default function MediaDiagnostics({ problems, onRetry, needsMic = true }:
               {p.device}: {HELP[p.code].title}
             </p>
             <p className="mt-1 text-sm text-slate-300">{HELP[p.code].fix}</p>
-            <p className="mt-2 font-mono text-[11px] text-slate-500">{p.code}</p>
+            <p className="mt-2 font-mono text-[11px] text-slate-400">{p.code}</p>
           </li>
         ))}
       </ul>
@@ -83,7 +83,7 @@ export default function MediaDiagnostics({ problems, onRetry, needsMic = true }:
         <button
           type="button"
           onClick={onRetry}
-          className="rounded-xl bg-rose-500 px-6 py-2.5 text-sm font-bold uppercase tracking-wider text-white transition hover:brightness-110"
+          className="rounded-xl bg-rose-600 px-6 py-2.5 text-sm font-bold uppercase tracking-wider text-white transition hover:brightness-110"
         >
           Try again
         </button>
