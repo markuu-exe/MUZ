@@ -139,6 +139,20 @@ describe('performance judge', () => {
     expect(s.results[1].missReason).toBe('wrong');
   });
 
+  it('a wrong note names what was played (for "you played X")', () => {
+    const input = frames([{ at: 1, plays: 'n62' }], 2);
+    const j = new PerformanceJudge<TestFrame>([1], [C], (f, target) => f.plays === key(target), (fs) => {
+      const played = fs.find((f) => f.plays)?.plays;
+      return played ? `heard ${played}` : null;
+    });
+    for (const f of input) j.push(f);
+    expect(j.summary().results[0]).toMatchObject({ rating: 'Miss', missReason: 'wrong', heard: 'heard n62' });
+    // Nothing played: nothing to name.
+    const silent = new PerformanceJudge<TestFrame>([1], [C], (f, target) => f.plays === key(target), () => 'x');
+    for (const f of frames([], 2)) silent.push(f);
+    expect(silent.summary().results[0]).toMatchObject({ missReason: 'missed', heard: null });
+  });
+
   it('a slightly early strike still counts and reports a negative offset', () => {
     const s = judge([1], [C], frames([{ at: 0.9, plays: 'n60' }], 2));
     expect(s.results[0]).toMatchObject({ rating: 'Perfect', offsetMs: -100 });
@@ -209,7 +223,7 @@ describe('live snapshot for the highway', () => {
     const C: SongTarget = { kind: 'note', note: 60 };
     const j = new PerformanceJudge<TestFrame>([1, 2], [C, C], (f, target) => f.plays === key(target));
     for (const f of frames([{ at: 1.0, plays: 'n60' }], 1.5)) j.push(f);
-    expect(j.snapshot(1.5)).toEqual([{ index: 0, rating: 'Perfect', offsetMs: 0, missReason: null }]);
+    expect(j.snapshot(1.5)).toEqual([{ index: 0, rating: 'Perfect', offsetMs: 0, missReason: null, heard: null }]);
     expect(j.snapshot(2.5).map((r) => r.rating)).toEqual(['Perfect', 'Miss']);
   });
 });

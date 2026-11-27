@@ -18,6 +18,7 @@ import { scheduleNoiseClick } from '../../performance/click';
 import { PerformanceJudge, type EventResult, type PerfFrame, type PerformanceSummary } from '../../performance/judge';
 import { songPlan } from '../../performance/plan';
 import { WaitStepper, type WaitSummary } from '../../performance/wait';
+import { describeHeard } from '../../performance/heardLabel';
 import { SONGS, targetLabel, type Song } from '../../performance/songs';
 import MediaDiagnostics, { mediaProblems } from '../lesson/practice/MediaDiagnostics';
 import { PracticeRigProvider, usePracticeRig } from '../lesson/practice/PracticeRigContext';
@@ -77,13 +78,15 @@ interface WaitDisplayProps {
   current: number;
   wrongs: number[];
   lastWrong: boolean;
+  /** What the last wrong attempt sounded like ("E4", "D minor"), when known. */
+  lastHeard: string | null;
   summary: WaitSummary | null;
   nowLabel: string;
   nextLabel: string | null;
 }
 
 /** "Wait for me": every step of the piece as a chip, the step being waited on, and the result. */
-function WaitDisplay({ song, phase, current, wrongs, lastWrong, summary, nowLabel, nextLabel }: WaitDisplayProps) {
+function WaitDisplay({ song, phase, current, wrongs, lastWrong, lastHeard, summary, nowLabel, nextLabel }: WaitDisplayProps) {
   return (
     <div className="space-y-4">
       <ol className="flex flex-wrap gap-1.5" aria-label="Notes and chords in this piece">
@@ -133,7 +136,7 @@ function WaitDisplay({ song, phase, current, wrongs, lastWrong, summary, nowLabe
             </div>
           </div>
           <p className="min-h-5 text-sm font-semibold text-rose-200" aria-live="polite">
-            {lastWrong ? `Not quite. Try ${nowLabel} again.` : ''}
+            {lastWrong ? `${lastHeard ? `That was ${lastHeard}.` : 'Not quite.'} Try ${nowLabel} again.` : ''}
           </p>
         </>
       )}
@@ -169,6 +172,7 @@ function Player({ song, onBack, onBest }: { song: Song; onBack: () => void; onBe
   const [mode, setMode] = useState<'time' | 'wait'>('time');
   const [wrongs, setWrongs] = useState<number[]>(() => song.events.map(() => 0));
   const [lastWrong, setLastWrong] = useState(false);
+  const [lastHeard, setLastHeard] = useState<string | null>(null);
   const [waitSummary, setWaitSummary] = useState<WaitSummary | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
   const t0Ref = useRef<number | null>(null);
@@ -210,7 +214,7 @@ function Player({ song, onBack, onBest }: { song: Song; onBack: () => void; onBe
     const t0 = ctx.currentTime + LEAD_SEC;
     t0Ref.current = t0;
     for (const c of plan.clicks) scheduleNoiseClick(ctx, t0 + c.time, c.accent, c.countIn);
-    const judge = new PerformanceJudge<Frame>(plan.targets, song.events.map((e) => e.target), (f, target) => frameMatchesTarget(f, target, chordMatcher));
+    const judge = new PerformanceJudge<Frame>(plan.targets, song.events.map((e) => e.target), (f, target) => frameMatchesTarget(f, target, chordMatcher), describeHeard);
     judgeRef.current = judge;
     setLive([]);
     setSummary(null);
@@ -261,6 +265,7 @@ function Player({ song, onBack, onBest }: { song: Song; onBack: () => void; onBe
       if (e.kind === 'wrong') {
         setWrongs(stepper.summary().perEvent);
         setLastWrong(true);
+        setLastHeard(e.heard);
         return;
       }
       setLastWrong(false);
@@ -406,6 +411,7 @@ function Player({ song, onBack, onBest }: { song: Song; onBack: () => void; onBe
           current={current}
           wrongs={wrongs}
           lastWrong={lastWrong}
+          lastHeard={lastHeard}
           summary={waitSummary}
           nowLabel={nowLabel}
           nextLabel={nextLabel}
@@ -460,7 +466,13 @@ function Player({ song, onBack, onBest }: { song: Song; onBack: () => void; onBe
                 )}
               >
                 {plan.labels[r.index]}: {r.rating}
-                {r.rating === 'Miss' ? (r.missReason === 'wrong' ? ' (wrong)' : '') : ` ${r.offsetMs! > 0 ? '+' : ''}${r.offsetMs} ms`}
+                {r.rating === 'Miss'
+                  ? r.missReason === 'wrong'
+                    ? r.heard
+                      ? ` (played ${r.heard})`
+                      : ' (wrong)'
+                    : ''
+                  : ` ${r.offsetMs! > 0 ? '+' : ''}${r.offsetMs} ms`}
               </li>
             ))}
           </ol>

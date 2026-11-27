@@ -91,13 +91,16 @@ export class PitchVerifier implements AcousticVerifier {
         passed = this.chromaPasses(frame);
       } else if (hz <= DEFAULT_CHROMA_CONFIG.maxFreqHz) {
         passed = Math.abs(centsOff(hz, this.targetMidi)) <= cfg.centsTolerance && this.chromaPasses(frame);
-        const midi = Math.round(freqToMidi(hz));
-        const seen = this.heard.get(midi);
-        if (seen) {
-          seen[0]++;
-          seen[1] = Math.max(seen[1], clarity);
-        } else this.heard.set(midi, [1, clarity]);
       }
+    }
+    // Every confident in-band reading feeds "That sounded like …", in either branch above.
+    if (usableHz && clarity >= cfg.minClarity && hz >= DEFAULT_CHROMA_CONFIG.minFreqHz && hz <= DEFAULT_CHROMA_CONFIG.maxFreqHz) {
+      const midi = Math.round(freqToMidi(hz));
+      const seen = this.heard.get(midi);
+      if (seen) {
+        seen[0]++;
+        seen[1] = Math.max(seen[1], clarity);
+      } else this.heard.set(midi, [1, clarity]);
     }
     this.frames.push({ tMs: frame.tMs, voiced: frame.voiced, passed });
 

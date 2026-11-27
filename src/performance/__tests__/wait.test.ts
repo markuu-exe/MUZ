@@ -70,7 +70,7 @@ describe('wait-for-me stepper', () => {
   it('a wrong note does not advance, and is reported', () => {
     const { s, events } = run([C, E], strike('n62'));
     expect(s.index).toBe(0);
-    expect(events).toEqual([{ kind: 'wrong', index: 0 }]);
+    expect(events).toEqual([{ kind: 'wrong', index: 0, heard: null }]);
   });
 
   it('no input does not advance', () => {
@@ -135,6 +135,8 @@ describe('wait-for-me on real piano audio (lesson verifiers)', { timeout: 120_00
     );
     expect(s.done).toBe(true);
     expect(events.map((e) => e.kind)).toEqual(['advance', 'wrong', 'advance', 'advance']);
+    // "You played X": the wrong attempt names what was heard.
+    expect(events[1]).toMatchObject({ kind: 'wrong', index: 1, heard: 'D4' });
     expect(s.summary().perEvent).toEqual([0, 1, 0]);
   });
 
