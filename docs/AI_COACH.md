@@ -33,3 +33,13 @@ Only: the lesson's course title, its status (passed / failed / out of hearts), f
 
 - AI tips can be wrong; the card says so. Lesson results and grading never depend on them.
 - It works in demo mode on purpose (for the capstone demo), so anyone using the live site can request tips within those limits.
+
+## Ask the coach (Lesson Notes)
+
+A box at the top of **Lesson Notes** answers one music question at a time (`/api/ask`, same keys and providers as the coach; shared code in `server/llm.ts`). Because the learner's own words are sent, the guards are tighter (`src/lib/coach/ask.ts`):
+
+- 3–300 characters, plain text; one question per request, no chat history kept.
+- The prompt limits answers to piano, music and using MUZ (2–5 sentences, under 120 words); anything else gets one fixed reply, and the question is treated as a question, never as instructions. The model has no tools and the prompt holds no secrets.
+- 6 questions a minute per IP per server instance.
+- The box says the question goes to Google Gemini's free tier (used to improve Google's products) or Anthropic Claude, and asks learners not to type personal details.
+- When AI is not set up, busy, offline, declines or the question is off-topic, MUZ searches the Lesson Notes on the device instead (`src/lib/coach/notesSearch.ts`) and labels the result "not AI".
