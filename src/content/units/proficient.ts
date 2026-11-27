@@ -43,8 +43,8 @@ export const PROFICIENT_UNITS = [
         description: 'Notes that last longer than one beat.',
         stages: [
           learn(
-            card('The dot', 'A dot adds half the note’s value. A dotted quarter (♩.) lasts 1½ beats.'),
-            card('Ties', 'A tie joins two notes of the same pitch. Play the first, then hold through the second.'),
+            card('The dot', 'A dot adds half the note’s value. A dotted quarter (♩.) lasts 1½ beats.', { illustration: 'dotted-quarter' }),
+            card('Ties', 'A tie joins two notes of the same pitch. Play the first, then hold through the second.', { illustration: 'tie' }),
           ),
           check(
             choose('How long is a dotted quarter note?', '1½ beats', ['1 beat', '2 beats', '3 beats'], 'Quarter (1) + half of it (½) = 1½.'),
@@ -57,7 +57,7 @@ export const PROFICIENT_UNITS = [
         title: '6/8 Time',
         description: 'Six eighth-note pulses, felt in two big beats.',
         stages: [
-          learn(card('6/8', 'In 6/8 the metronome clicks six eighth notes per measure, grouped 1 2 3 | 4 5 6. It feels like two big beats.')),
+          learn(card('6/8', 'In 6/8 the metronome clicks six eighth notes per measure, grouped 1 2 3 | 4 5 6. It feels like two big beats.', { illustration: 'six-eight' })),
           check(choose('How many big beats does a 6/8 measure feel like?', '2', ['3', '6', '4'], 'The six eighths group into two sets of three.')),
           rhythm(tapEcho('six-eight'), tapAlong('six-eight-dotted')),
         ],
@@ -137,7 +137,7 @@ export const PROFICIENT_UNITS = [
               notes: ns('G4 A4 B4 C5 D5 E5 F#5 G5'),
               display: 'both',
             }),
-            card('Key signature', 'One sharp (F#) at the start of the staff means the key of G major.'),
+            card('Key signature', 'One sharp (F#) at the start of the staff means the key of G major.', { illustration: 'key-signature-sharp' }),
           ),
           check(
             findKey('Click the sharp note used in G major.', 'F#4', 'G major uses F#.', { anyOctave: true, range: [60, 72] }),
@@ -155,7 +155,7 @@ export const PROFICIENT_UNITS = [
               notes: ns('F4 G4 A4 Bb4 C5 D5 E5 F5'),
               display: 'both',
             }),
-            card('Key signature', 'One flat (Bb) at the start of the staff means the key of F major.'),
+            card('Key signature', 'One flat (Bb) at the start of the staff means the key of F major.', { illustration: 'key-signature-flat' }),
           ),
           check(
             findKey('Click the flat note used in F major.', 'Bb4', 'F major uses B flat.', { anyOctave: true, range: [60, 72] }),

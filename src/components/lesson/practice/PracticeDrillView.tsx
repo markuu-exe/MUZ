@@ -10,9 +10,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePracticeDrill } from '../../../hooks/usePracticeDrill';
 import type { ExerciseViewProps } from '../../../lesson/registry';
 import { cn } from '../../../lib/cn';
-import { drillTargets, targetLabel, type DrillStats, type DrillTarget } from '../../../practice/PracticeDrill';
+import { PITCH_CLASS_NAMES } from '../../../audio/dsp/pitch';
+import { chordMatcher, drillTargets, targetLabel, type DrillStats, type DrillTarget } from '../../../practice/PracticeDrill';
 import { FramingTracker, type FramingState } from '../../../practice/framing';
-import { NOTHING_HEARD, heardFromFrame, heardKeys, heardLabel, type Heard } from '../../../practice/heard';
+import { NOTHING_HEARD, frameMatchesTarget, heardFromFrame, heardKeys, heardLabel, type Heard } from '../../../practice/heard';
 import { NOT_VISIBLE_MESSAGE } from '../../../practice/visibilityCue';
 import type { PlayChordExercise, PlayNoteExercise, PlaySequenceExercise } from '../../../types/lesson.types';
 import GrandStaff from '../../theory/GrandStaff';
@@ -62,8 +63,11 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
   }, [rig]);
   const canRun = ready && framing === 'framed';
 
-  // Live feedback: which key or chord the microphone is hearing right now (display only).
-  const [heard, setHeard] = useState<Heard>(NOTHING_HEARD);
+  // Live feedback: which key or chord the microphone is hearing right now (display only). It uses
+  // the grader's own per-frame analysis (src/practice/heard.ts), so green here means the grader
+  // accepted this moment too; grading still needs it to hold for the 200 ms window.
+  const [heard, setHeard] = useState<{ heard: Heard; matches: boolean }>({ heard: NOTHING_HEARD, matches: false });
+  const liveTargetRef = useRef<DrillTarget>(targets[0]);
   useEffect(() => {
     let lastUi = 0;
     let lastHeardAt = 0;
@@ -74,8 +78,8 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
       if (something) lastHeardAt = now;
       if (now - lastUi < 100) return;
       lastUi = now;
-      if (something) setHeard(next);
-      else if (now - lastHeardAt > HEARD_HOLD_MS) setHeard(NOTHING_HEARD);
+      if (something) setHeard({ heard: next, matches: frameMatchesTarget(frame, liveTargetRef.current, chordMatcher) });
+      else if (now - lastHeardAt > HEARD_HOLD_MS) setHeard({ heard: NOTHING_HEARD, matches: false });
     });
   }, [rig]);
 
@@ -121,6 +125,7 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
   }, [ended]);
 
   const target = targets[Math.min(drill.stepIndex, targets.length - 1)];
+  liveTargetRef.current = target;
   const seconds = Math.ceil(drill.remainingMs / 1000);
 
   let status: { text: string; tone: 'slate' | 'cyan' | 'emerald' | 'amber' | 'rose' };
@@ -159,11 +164,11 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
     chordTarget && drill.lastCheck && (drill.lastAttempt === 'miss' || isPerfDebug())
       ? chordCheckReasons(drill.lastCheck, parseChord(target.chord).pcs)
       : [];
-  const heardText = heardLabel(heard, chordTarget);
-  const targetPcs = new Set(targetNotes(target).map((n) => ((n % 12) + 12) % 12));
-  const heardMatches = chordTarget
-    ? heard.pitchClasses.length > 0 && [...targetPcs].every((p) => heard.pitchClasses.includes(p))
-    : heard.midi !== null && target.kind === 'note' && heard.midi === target.note;
+  const heardText = heardLabel(heard.heard, chordTarget);
+  const heardMatches = heardText !== null && heard.matches;
+  const rawText = isPerfDebug() && chordTarget && heard.heard.rawPitchClasses.length > 0
+    ? heard.heard.rawPitchClasses.map((p) => PITCH_CLASS_NAMES[p]).join(' · ')
+    : null;
 
   return (
     <div className="space-y-5">
@@ -220,9 +225,10 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
               <GrandStaff notes={[target.note]} color="#c4b5fd" />
             </div>
           )}
-          <TargetKeyboard notes={targetNotes(target)} maxWidth={420} heard={(start, end) => heardKeys(heard, chordTarget, start, end)} />
+          <TargetKeyboard notes={targetNotes(target)} maxWidth={420} heard={(start, end) => heardKeys(heard.heard, chordTarget, start, end)} />
           <div
             aria-live="polite"
+            data-matches={heardMatches ? 'true' : 'false'}
             className={cn(
               'rounded-xl border px-4 py-2 text-center text-lg font-black',
               !heardText && 'border-slate-800 text-slate-500',
@@ -230,8 +236,9 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
               heardText && !heardMatches && 'border-amber-500/50 bg-amber-950/40 text-amber-200',
             )}
           >
-            {heardText ? `Hearing: ${heardText}` : 'Hearing: nothing yet'}
+            {heardText ? `Hearing: ${heardText}${heardMatches ? ' (matches)' : ''}` : 'Hearing: nothing yet'}
           </div>
+          {rawText && <p className="text-center text-xs text-slate-500">Raw chroma (debug): {rawText}</p>}
           {chordReasons.length > 0 && (
             <div className="rounded-xl border border-rose-500/30 bg-rose-950/30 px-4 py-2 text-left text-sm text-rose-100">
               <p className="font-bold">Why that chord did not count:</p>

@@ -36,7 +36,7 @@ export const VIRTUOSO_UNITS = [
         title: 'Syncopation',
         description: 'Accents that land between the beats.',
         stages: [
-          learn(card('Off the beat', 'Syncopation puts the strong sound on an "&" instead of a number. Keep the click steady in your head.')),
+          learn(card('Off the beat', 'Syncopation puts the strong sound on an "&" instead of a number. Keep the click steady in your head.', { illustration: 'syncopation' })),
           check(choose('A syncopated note usually starts…', 'Between the beats', ['Exactly on beat 1', 'Only on rests', 'After the measure ends'], 'Syncopation moves accents off the main beats.')),
           rhythm(tapRead('syncopation'), tapEcho('syncopation')),
         ],
@@ -56,7 +56,7 @@ export const VIRTUOSO_UNITS = [
         stages: [
           learn(
             card('Triplets', 'A triplet squeezes three equal notes into one beat. Count "1 trip-let 2 trip-let".', { illustration: 'triplets' }),
-            card('Swing', 'Swing plays pairs of eighths long-short, using the first and third notes of a triplet.'),
+            card('Swing', 'Swing plays pairs of eighths long-short, using the first and third notes of a triplet.', { illustration: 'swing' }),
           ),
           check(choose('How many triplet eighths fit in one beat?', '3', ['2', '4', '6'], 'Three equal notes per beat.')),
           rhythm(tapAlong('triplets'), tapEcho('swing')),
@@ -125,7 +125,7 @@ export const VIRTUOSO_UNITS = [
         title: 'The ii–V–I',
         description: 'The core progression of jazz.',
         stages: [
-          learn(card('ii–V–I in C', 'Dm7 → G7 → Cmaj7. Each chord pulls into the next.')),
+          learn(card('ii–V–I in C', 'Dm7 → G7 → Cmaj7. Each chord pulls into the next.', { illustration: 'two-five-one' })),
           check(choose('In C major, the ii chord is…', 'Dm7', ['Em7', 'G7', 'Am7'], 'D is the 2nd note; ii is a minor 7th: Dm7.')),
           play(playChords('Dm7 G7 Cmaj7', { prompt: 'Play ii–V–I in C.' })),
         ],
@@ -134,7 +134,7 @@ export const VIRTUOSO_UNITS = [
         title: 'ii–V–I in Other Keys',
         description: 'Take the progression to G and F.',
         stages: [
-          learn(card('New keys', 'In G: Am7 → D7 → Gmaj7. In F: Gm7 → C7 → Fmaj7.')),
+          learn(card('New keys', 'In G: Am7 → D7 → Gmaj7. In F: Gm7 → C7 → Fmaj7.', { illustration: 'new-keys' })),
           check(choose('In F major, the ii chord is…', 'Gm7', ['Am7', 'C7', 'Dm7'], 'G is the 2nd note of F major.')),
           play(playChords('Am7 D7 Gmaj7', { prompt: 'ii–V–I in G.' }), playChords('Gm7 C7 Fmaj7', { prompt: 'ii–V–I in F.' })),
         ],
@@ -207,7 +207,7 @@ export const VIRTUOSO_UNITS = [
               display: 'both',
               chord: true,
             }),
-            card('Flat VII', 'Bb major (bVII) is borrowed too: C → Bb → F → C.'),
+            card('Flat VII', 'Bb major (bVII) is borrowed too: C → Bb → F → C.', { illustration: 'flat-seven' }),
           ),
           check(
             choose('F minor in the key of C major is borrowed from…', 'C minor', ['F major', 'G major', 'A minor'], 'iv comes from the parallel minor key.'),

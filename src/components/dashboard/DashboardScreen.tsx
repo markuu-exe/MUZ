@@ -1,7 +1,7 @@
 import { Moon, Sun } from 'lucide-react';
 import { useTheme } from '../../lib/theme';
 import { MuzLogo } from '../brand/MuzLogo';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   BookOpen,
@@ -40,9 +40,10 @@ import SoundToggle from './SoundToggle';
 import AppearanceCard from './AppearanceCard';
 import SkillTreeSkeleton from './SkillTreeSkeleton';
 import LessonNotesView from './LessonNotesView';
-import LessonPlayer, { type LessonSaveFeedback } from '../lesson/LessonPlayer';
+import type { LessonSaveFeedback } from '../lesson/LessonPlayer';
+import LazyBoundary from '../common/LazyBoundary';
 import { isLessonPayload, type LessonPayload } from '../../types/lesson.types';
-import ProfileAnalyticsView, { type AnalyticsDateRange } from './ProfileAnalyticsView';
+import type { AnalyticsDateRange } from './ProfileAnalyticsView';
 import PlacementModal from './PlacementModal';
 import OnboardingWelcome from './OnboardingWelcome';
 import DemoBanner from '../common/DemoBanner';
@@ -86,6 +87,11 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'profile', label: 'Profile & Analytics', icon: UserRound },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
+
+// E9: downloaded only when opened, so the first page load does not carry the lesson
+// player (and its exercise views) or chart.js for the Profile charts.
+const LessonPlayer = lazy(() => import('../lesson/LessonPlayer'));
+const ProfileAnalyticsView = lazy(() => import('./ProfileAnalyticsView'));
 
 export default function DashboardScreen() {
   const { user, profile, profileStatus, isDemo, signOut, refreshProfile } = useAuth();
@@ -660,20 +666,22 @@ export default function DashboardScreen() {
 
           {/* VIEW 2: PROFILE & ANALYTICS DASHBOARD */}
           {view === 'profile' && (
-            <ProfileAnalyticsView
-              profile={profile}
-              userEmail={user?.email}
-              masteredCount={masteredCount}
-              totalLessons={data.lessons.length}
-              unlockedAchievements={mergedAchievements}
-              sessions={analytics.sessions}
-              rhythmHistogram={analytics.rhythmHistogram}
-              range={analyticsRange}
-              onRangeChange={setAnalyticsRange}
-              loading={analytics.loading}
-              error={analytics.error}
-              look={look}
-            />
+            <LazyBoundary label="profile" onCancel={() => setView('skill-tree')}>
+              <ProfileAnalyticsView
+                profile={profile}
+                userEmail={user?.email}
+                masteredCount={masteredCount}
+                totalLessons={data.lessons.length}
+                unlockedAchievements={mergedAchievements}
+                sessions={analytics.sessions}
+                rhythmHistogram={analytics.rhythmHistogram}
+                range={analyticsRange}
+                onRangeChange={setAnalyticsRange}
+                loading={analytics.loading}
+                error={analytics.error}
+                look={look}
+              />
+            </LazyBoundary>
           )}
 
           {/* VIEW 3: LESSON NOTES (read-only study notes; practice lives on the Skill Tree) */}
@@ -879,16 +887,17 @@ export default function DashboardScreen() {
 
       {/* COURSE-3: the lesson player covers the dashboard while a lesson is open. */}
       {activeLesson && isLessonPayload(activeLesson.payload) && (
-        <LessonPlayer
-          key={activeLesson.id}
-          lessonId={activeLesson.id}
-          title={activeLesson.title}
-          payload={activeLesson.payload}
-          hearts={hearts}
-          onComplete={(result) => handleLessonComplete(activeLesson, result, activeDestination)}
-          testRun={activeDestination === 'dev-test'}
-          onClose={() => setActiveLesson(null)}
-        />
+        <LazyBoundary key={activeLesson.id} label="lesson" overlay onCancel={() => setActiveLesson(null)}>
+          <LessonPlayer
+            lessonId={activeLesson.id}
+            title={activeLesson.title}
+            payload={activeLesson.payload}
+            hearts={hearts}
+            onComplete={(result) => handleLessonComplete(activeLesson, result, activeDestination)}
+            testRun={activeDestination === 'dev-test'}
+            onClose={() => setActiveLesson(null)}
+          />
+        </LazyBoundary>
       )}
 
       {needsPlacement && !welcomeSeen && <OnboardingWelcome onContinue={() => setWelcomeSeen(true)} />}

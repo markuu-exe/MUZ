@@ -57,3 +57,47 @@ export function saveTapLatencyMs(ms: number): void {
     // Storage unavailable (private mode): the measurement simply is not kept.
   }
 }
+
+/**
+ * Count-in before the measured clicks (owner feedback 2026-11-27: without it the first click
+ * was already being measured and took the learner by surprise). Same length and voice as the
+ * rhythm-lesson count-in (tiers.ts countInBeats: 4; clickVoice countIn).
+ */
+export const CALIBRATION_COUNT_IN = 4;
+
+export interface CalibrationSchedule {
+  /** AudioContext times of the count-in clicks (not measured). */
+  countIn: number[];
+  /** AudioContext times of the measured clicks. */
+  measured: number[];
+}
+
+export function calibrationSchedule(startSec: number, gapSec: number, measuredClicks: number, countIn = CALIBRATION_COUNT_IN): CalibrationSchedule {
+  return {
+    countIn: Array.from({ length: countIn }, (_, i) => startSec + i * gapSec),
+    measured: Array.from({ length: measuredClicks }, (_, i) => startSec + (countIn + i) * gapSec),
+  };
+}
+
+/** Taps made during the count-in are practice: only taps from half a gap before the first measured click count. */
+export function measuredTaps(tapTimesSec: readonly number[], schedule: CalibrationSchedule, gapSec: number): number[] {
+  const first = schedule.measured[0];
+  if (first === undefined) return [];
+  return tapTimesSec.filter((t) => t >= first - gapSec / 2);
+}
+
+export type CalibrationCue =
+  | { kind: 'wait' }
+  /** `beat` is 1-based; `of` is the count-in length. Shown as "4 3 2 1" counting down. */
+  | { kind: 'count'; beat: number; of: number }
+  | { kind: 'tap' };
+
+/** What to show at audible time `nowSec`: wait before the first click, count down during the count-in, then tap. */
+export function calibrationCue(nowSec: number, schedule: CalibrationSchedule): CalibrationCue {
+  const { countIn, measured } = schedule;
+  if (measured.length > 0 && nowSec >= measured[0]) return { kind: 'tap' };
+  if (countIn.length === 0 || nowSec < countIn[0]) return { kind: 'wait' };
+  let beat = 0;
+  for (let i = 0; i < countIn.length; i++) if (nowSec >= countIn[i]) beat = i + 1;
+  return { kind: 'count', beat, of: countIn.length };
+}
