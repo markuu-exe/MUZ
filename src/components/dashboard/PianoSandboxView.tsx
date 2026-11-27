@@ -319,7 +319,7 @@ export default function PianoSandboxView() {
                     </span>
                   ))
                 ) : (
-                  <span className="text-xs text-slate-500">{lastPlayedLabel}</span>
+                  <span className="text-xs text-slate-400">{lastPlayedLabel}</span>
                 )}
               </div>
             </div>
@@ -335,7 +335,7 @@ export default function PianoSandboxView() {
                     {detectedChord}
                   </span>
                 ) : (
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-slate-400">
                     {activeMidis.length === 0
                       ? 'Play 3+ keys for chord detection'
                       : activeMidis.length < 3
