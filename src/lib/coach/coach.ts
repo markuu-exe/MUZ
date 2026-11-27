@@ -8,7 +8,7 @@
  * Prompt safety: the server accepts numbers and fixed enum values only (plus the course title,
  * length-limited and stripped of control characters), so nothing the learner types reaches Claude.
  */
-import type { LessonResult } from '../../lesson/types';
+import type { LessonResult } from '../../lesson/types.js';
 
 export const COACH_STATUSES = ['passed', 'failed', 'out-of-hearts', 'quit'] as const;
 export const COACH_SKILLS = ['theory', 'rhythm', 'notes', 'chords', 'posture'] as const;

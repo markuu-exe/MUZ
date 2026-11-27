@@ -9,8 +9,8 @@
  * Keys live only in Vercel environment variables. No request contents are logged.
  */
 import Anthropic from '@anthropic-ai/sdk';
-import { DEFAULT_GEMINI_MODEL, geminiTextBody, geminiUrl, parseGeminiResponse } from '../src/lib/coach/gemini';
-import type { TipResult } from '../src/lib/coach/handler';
+import { DEFAULT_GEMINI_MODEL, geminiTextBody, geminiUrl, parseGeminiResponse } from '../src/lib/coach/gemini.js';
+import type { TipResult } from '../src/lib/coach/handler.js';
 
 const CLAUDE_MODEL = 'claude-opus-5-5';
 

@@ -9,8 +9,8 @@
  * - A small per-IP limit per server instance (best effort; the real ceiling is the spend limit
  *   set on the Anthropic Console key).
  */
-import { cleanTip, parseCoachInput, type CoachInput } from './coach';
-import { clientIp, createRateLimiter, json, readJson, sameSite } from './guard';
+import { cleanTip, parseCoachInput, type CoachInput } from './coach.js';
+import { clientIp, createRateLimiter, json, readJson, sameSite } from './guard.js';
 
 export type CoachSource = 'gemini' | 'claude';
 export type TipResult = { kind: 'tip'; text: string; source?: CoachSource } | { kind: 'declined' } | { kind: 'error'; retryable: boolean };
