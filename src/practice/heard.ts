@@ -16,7 +16,8 @@
  */
 import { compensateHarmonics, type ChordMatcher } from '../audio/chords/ChordMatcher';
 import { DEFAULT_MATCHER_CONFIG, DEFAULT_PITCH_CONFIG, DEFAULT_VERIFIER_CONFIG, type MatcherConfig } from '../audio/config';
-import { PITCH_CLASS_NAMES, centsOff, freqToMidi, midiToNoteName } from '../audio/dsp/pitch';
+import { PITCH_CLASS_NAMES, freqToMidi, midiToNoteName } from '../audio/dsp/pitch';
+import { tunedCentsOff } from '../audio/tuning';
 
 export interface HeardFrameLike {
   voiced: boolean;
@@ -105,7 +106,7 @@ export function frameMatchesTarget(
   if (target.kind === 'note') {
     const hz = frame.pitchHz;
     if (hz == null || !(hz > 0) || (frame.clarity ?? 0) < pitch.minClarity) return false;
-    return Math.abs(centsOff(hz, target.note)) <= pitch.centsTolerance;
+    return Math.abs(tunedCentsOff(hz, target.note)) <= pitch.centsTolerance;
   }
   return chordMatcher.match(frame.chroma, target.chord, frame.ringing ?? false).passes;
 }

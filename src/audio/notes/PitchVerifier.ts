@@ -1,5 +1,6 @@
 import { DEFAULT_CHROMA_CONFIG, DEFAULT_PITCH_CONFIG, DEFAULT_VERIFIER_CONFIG, type PitchConfig, type VerifierConfig } from '../config';
 import { centsOff, freqToMidi } from '../dsp/pitch';
+import { nearestTunedMidi, tunedCentsOff } from '../tuning';
 import type { AcousticFrame, AcousticVerifier, AttemptKind, AttemptResult } from '../practice/ChordVerifier';
 import { NoteMatcher } from './NoteMatcher';
 
@@ -80,7 +81,7 @@ export class PitchVerifier implements AcousticVerifier {
     const hz = frame.pitchHz;
     const clarity = frame.clarity ?? 0;
     const usableHz = frame.voiced && hz != null && Number.isFinite(hz) && hz > 0;
-    if (usableHz && frame.ringing && hz >= DEFAULT_CHROMA_CONFIG.minFreqHz && Math.abs(centsOff(hz, this.targetMidi)) <= RINGING_NEAR_CENTS) {
+    if (usableHz && frame.ringing && hz >= DEFAULT_CHROMA_CONFIG.minFreqHz && Math.abs(tunedCentsOff(hz, this.targetMidi)) <= RINGING_NEAR_CENTS) {
       // A neighbouring note still rings: pitchy measures the mix (F4 over a ringing G4 reads
       // ~380 Hz, often below the clarity floor), but the ringing-subtracted chroma holds the new
       // note. The reading is near the target, so the octave is right; the chroma decides.
@@ -89,19 +90,19 @@ export class PitchVerifier implements AcousticVerifier {
       if (hz < DEFAULT_CHROMA_CONFIG.minFreqHz) {
         passed = this.chromaPasses(frame);
       } else if (hz <= DEFAULT_CHROMA_CONFIG.maxFreqHz) {
-        passed = Math.abs(centsOff(hz, this.targetMidi)) <= cfg.centsTolerance && this.chromaPasses(frame);
+        passed = Math.abs(tunedCentsOff(hz, this.targetMidi)) <= cfg.centsTolerance && this.chromaPasses(frame);
       }
     }
     // Confident in-band readings feed "That sounded like …", in either branch above, with the
     // grader's own tolerance: a reading 40 cents off F4 is not "F4" (owner report 2026-11-28:
     // "That was F4. Try F4 again." for an out-of-tune F4 the grader had rightly rejected).
-    const nearest = usableHz ? Math.round(freqToMidi(hz)) : -1;
+    const nearest = usableHz ? nearestTunedMidi(hz) : -1;
     if (
       usableHz &&
       clarity >= cfg.minClarity &&
       hz >= DEFAULT_CHROMA_CONFIG.minFreqHz &&
       hz <= DEFAULT_CHROMA_CONFIG.maxFreqHz &&
-      Math.abs(centsOff(hz, nearest)) <= cfg.centsTolerance
+      Math.abs(tunedCentsOff(hz, nearest)) <= cfg.centsTolerance
     ) {
       const midi = nearest;
       const seen = this.heard.get(midi);
