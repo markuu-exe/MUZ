@@ -12,6 +12,8 @@ interface BeatHighwayProps {
   /** Seconds since the plan started, or null when idle. */
   now: () => number | null;
   taps: JudgedTap[];
+  /** Text drawn above each target (performance mode: note or chord name). */
+  labels?: readonly string[];
 }
 
 const COLORS = {
@@ -32,10 +34,10 @@ const HIT_X = 0.2;
 /** Clicks of travel visible ahead of the hit line. */
 const LOOKAHEAD_BEATS = 4;
 
-export default function BeatHighway({ plan, now, taps }: BeatHighwayProps) {
+export default function BeatHighway({ plan, now, taps, labels }: BeatHighwayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const live = useRef({ plan, now, taps });
-  live.current = { plan, now, taps };
+  const live = useRef({ plan, now, taps, labels });
+  live.current = { plan, now, taps, labels };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -61,7 +63,7 @@ export default function BeatHighway({ plan, now, taps }: BeatHighwayProps) {
 
     const draw = () => {
       raf = requestAnimationFrame(draw);
-      const { plan: p, now: getNow, taps: judged } = live.current;
+      const { plan: p, now: getNow, taps: judged, labels: names } = live.current;
       const t = getNow() ?? -0.0001;
       const hitX = width * HIT_X;
       const pxPerSec = (width * (1 - HIT_X)) / (LOOKAHEAD_BEATS * p.beatSec);
@@ -119,6 +121,14 @@ export default function BeatHighway({ plan, now, taps }: BeatHighwayProps) {
         g.arc(x, midY, 14, 0, Math.PI * 2);
         g.fill();
         g.shadowBlur = 0;
+        const name = names?.[i];
+        if (name) {
+          g.font = '800 13px Inter, "Segoe UI", sans-serif';
+          g.textAlign = 'center';
+          g.textBaseline = 'bottom';
+          g.fillStyle = COLORS.text;
+          g.fillText(name, x, midY - 18);
+        }
         g.globalAlpha = 1;
       });
 

@@ -13,7 +13,7 @@ import type { UserProfile } from '../../types/auth.types';
 
 export type LessonKind = 'theory' | 'practice' | 'rhythm';
 export type NodeStatus = 'mastered' | 'current' | 'locked';
-export type DashboardView = 'skill-tree' | 'lessons' | 'profile' | 'settings';
+export type DashboardView = 'skill-tree' | 'perform' | 'lessons' | 'profile' | 'settings';
 
 /** Minimal progress row the dashboard needs. */
 export type ProgressLike = Pick<UserProgress, 'lesson_id' | 'completed'> &

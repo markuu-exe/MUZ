@@ -12,7 +12,7 @@ import { groupByModule, nodeStatus, type CurriculumNode, type DashboardView, typ
 
 export const PLACE_KEY = 'muz-place';
 
-const VIEWS: readonly DashboardView[] = ['skill-tree', 'lessons', 'profile', 'settings'];
+const VIEWS: readonly DashboardView[] = ['skill-tree', 'perform', 'lessons', 'profile', 'settings'];
 
 export interface Place {
   account: string;
