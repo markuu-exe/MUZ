@@ -533,7 +533,7 @@ export default function ProfileAnalyticsView({
 
             <div className="relative mt-4 h-48 w-full">
               {loading ? (
-                <div className="flex h-full items-center justify-center text-xs text-slate-500">
+                <div className="flex h-full items-center justify-center text-xs text-slate-400">
                   Loading pitch telemetry…
                 </div>
               ) : hasPitchData ? (
@@ -542,7 +542,7 @@ export default function ProfileAnalyticsView({
                 <div className="flex h-full flex-col items-center justify-center rounded-2xl border border-dashed border-slate-800 bg-slate-950/50 px-4 text-center">
                   <Activity className="mb-2 h-5 w-5 text-slate-600" />
                   <p className="text-xs font-medium text-slate-400">No pitch sessions recorded yet</p>
-                  <p className="mt-0.5 text-[11px] text-slate-500">Complete a practice drill to plot accuracy</p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">Complete a practice drill to plot accuracy</p>
                 </div>
               )}
             </div>
@@ -567,7 +567,7 @@ export default function ProfileAnalyticsView({
 
             <div className="relative mt-4 h-48 w-full">
               {loading ? (
-                <div className="flex h-full items-center justify-center text-xs text-slate-500">
+                <div className="flex h-full items-center justify-center text-xs text-slate-400">
                   Loading rhythm histogram…
                 </div>
               ) : histogramTotal > 0 ? (
@@ -576,7 +576,7 @@ export default function ProfileAnalyticsView({
                 <div className="flex h-full flex-col items-center justify-center rounded-2xl border border-dashed border-slate-800 bg-slate-950/50 px-4 text-center">
                   <BarChart3 className="mb-2 h-5 w-5 text-slate-600" />
                   <p className="text-xs font-medium text-slate-400">No rhythm runs recorded yet</p>
-                  <p className="mt-0.5 text-[11px] text-slate-500">Buckets: 0–59, 60–69, 70–79, 80–89, 90–100</p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">Buckets: 0–59, 60–69, 70–79, 80–89, 90–100</p>
                 </div>
               )}
             </div>
@@ -601,7 +601,7 @@ export default function ProfileAnalyticsView({
 
             <div className="relative mt-4 h-48 w-full">
               {loading ? (
-                <div className="flex h-full items-center justify-center text-xs text-slate-500">
+                <div className="flex h-full items-center justify-center text-xs text-slate-400">
                   Loading posture telemetry…
                 </div>
               ) : hasPostureData ? (
@@ -610,7 +610,7 @@ export default function ProfileAnalyticsView({
                 <div className="flex h-full flex-col items-center justify-center rounded-2xl border border-dashed border-slate-800 bg-slate-950/50 px-4 text-center">
                   <ShieldCheck className="mb-2 h-5 w-5 text-slate-600" />
                   <p className="text-xs font-medium text-slate-400">No posture sessions recorded yet</p>
-                  <p className="mt-0.5 text-[11px] text-slate-500">Complete a camera-tracked drill to plot posture</p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">Complete a camera-tracked drill to plot posture</p>
                 </div>
               )}
             </div>
@@ -650,7 +650,7 @@ export default function ProfileAnalyticsView({
                       className={`flex h-11 w-11 items-center justify-center rounded-xl border ${
                         badge.unlocked
                           ? badge.color
-                          : 'border-slate-800 bg-slate-900 text-slate-600'
+                          : 'border-slate-800 bg-slate-900 text-slate-400'
                       }`}
                     >
                       <Icon className="h-5 w-5" />

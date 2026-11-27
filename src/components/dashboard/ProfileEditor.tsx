@@ -71,7 +71,7 @@ export default function ProfileEditor({ name, look, exp, isDemo, onSaveName, onS
         disabled={isDemo}
         className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-white outline-none transition focus:border-violet-400 disabled:opacity-60"
       />
-      {isDemo && <p className="mt-1 text-xs text-slate-500">Sign in to change your name.</p>}
+      {isDemo && <p className="mt-1 text-xs text-slate-400">Sign in to change your name.</p>}
       {nameProblem && <p className="mt-1 text-xs text-rose-300">{nameProblem}</p>}
 
       <p className="mt-6 text-xs font-bold uppercase tracking-wider text-slate-400">Avatar</p>

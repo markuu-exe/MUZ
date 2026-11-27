@@ -16,7 +16,7 @@ export default function SoundToggle() {
   return (
     <div className="flex items-center justify-between gap-4 rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-xl">
       <div className="flex items-center gap-3">
-        <Icon className={cn('h-5 w-5', on ? 'text-violet-300' : 'text-slate-500')} aria-hidden="true" />
+        <Icon className={cn('h-5 w-5', on ? 'text-violet-300' : 'text-slate-400')} aria-hidden="true" />
         <div>
           <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Sound effects</h3>
           <p className="mt-0.5 text-xs text-slate-400">Chimes for right and wrong answers and finished lessons. Never during microphone drills.</p>

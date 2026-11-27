@@ -49,7 +49,7 @@ function ListenVisual({ on }: { on: boolean }) {
               className={cn('w-5 rounded-t-md', lvl > 0.5 ? 'bg-gradient-to-t from-violet-600 to-fuchsia-400' : 'bg-slate-700')}
               style={{ height: `${(on ? lvl : 0.08) * 150}px`, transition: `height 0.9s cubic-bezier(0.3, 0.8, 0.2, 1) ${0.05 * i}s` }}
             />
-            <span className={cn('text-[10px] font-bold', lvl > 0.5 && on ? 'text-white' : 'text-slate-500')}>{PCS[i]}</span>
+            <span className={cn('text-[10px] font-bold', lvl > 0.5 && on ? 'text-white' : 'text-slate-400')}>{PCS[i]}</span>
           </div>
         ))}
       </div>

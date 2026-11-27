@@ -121,7 +121,7 @@ export default function HeroKeyboard() {
         className="relative rounded-[26px] border border-white/10 bg-gradient-to-b from-slate-800 to-slate-950 p-4 pt-10 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.8),0_0_60px_rgba(139,92,246,0.18)] transition-transform duration-200 ease-out"
         style={{ transform: reduced ? 'rotateX(14deg)' : `rotateX(${16 - tilt.y * 10}deg) rotateY(${tilt.x * 14}deg)`, transformStyle: 'preserve-3d' }}
       >
-        <div className="absolute left-5 top-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.3em] text-slate-500">
+        <div className="absolute left-5 top-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.3em] text-slate-400">
           <MuzMark size={14} variant="flat" className="text-slate-300" /> MUZ
         </div>
 
@@ -174,7 +174,7 @@ export default function HeroKeyboard() {
                 'absolute top-0 z-10 flex items-end justify-center rounded-b-md pb-1.5 text-[9px] font-semibold uppercase transition-all duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 ' +
                 (lit(midi)
                   ? 'translate-y-0.5 bg-gradient-to-b from-violet-500 to-fuchsia-600 text-white shadow-[0_0_20px_rgba(217,70,239,0.7)]'
-                  : 'bg-gradient-to-b from-slate-700 to-slate-950 text-slate-500 shadow-[0_5px_0_#020617]')
+                  : 'bg-gradient-to-b from-slate-700 to-slate-950 text-slate-400 shadow-[0_5px_0_#020617]')
               }
               style={{ left, width: BLACK_W, height: 104 }}
             >

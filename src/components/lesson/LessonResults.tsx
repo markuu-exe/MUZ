@@ -159,7 +159,7 @@ export default function LessonResults({
               {note}
             </p>
           ) : (
-            <p className="mt-2 text-xs text-slate-500">{note}</p>
+            <p className="mt-2 text-xs text-slate-400">{note}</p>
           ))}
       </div>
 
@@ -172,7 +172,7 @@ export default function LessonResults({
             type="button"
             disabled={savingAgain}
             onClick={onRetrySave}
-            className="rounded-lg bg-rose-500 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-rose-400 disabled:opacity-60"
+            className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-rose-700 disabled:opacity-60"
           >
             {savingAgain ? 'Saving…' : 'Try saving again'}
           </button>
@@ -182,7 +182,7 @@ export default function LessonResults({
       <div className="grid grid-cols-2 gap-3">
         {stats.map(({ label, value, icon: Icon, tone }) => (
           <div key={label} className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 text-left">
-            <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-slate-500">
+            <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-slate-400">
               <Icon className={cn('h-3.5 w-3.5', tone)} />
               {label}
             </div>

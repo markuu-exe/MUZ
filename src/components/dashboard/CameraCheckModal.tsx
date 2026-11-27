@@ -98,7 +98,7 @@ function CameraCheckBody({ onClose }: CameraCheckModalProps) {
         </button>
       </div>
       {!passed && (
-        <p className="text-right text-xs text-slate-500">You can run this check again any time from Settings.</p>
+        <p className="text-right text-xs text-slate-400">You can run this check again any time from Settings.</p>
       )}
     </div>
   );

@@ -47,7 +47,7 @@ export function HeartRow({ hearts }: { hearts: number }) {
 export function MicMeter({ rmsDb }: { rmsDb: number }) {
   const level = Number.isFinite(rmsDb) ? Math.max(0, Math.min(1, (rmsDb + 60) / 50)) : 0;
   return (
-    <div className="flex items-center gap-2 text-xs text-slate-500">
+    <div className="flex items-center gap-2 text-xs text-slate-400">
       <span>Mic</span>
       <div className="h-1.5 w-28 overflow-hidden rounded-full bg-slate-800">
         <div className="h-full rounded-full bg-cyan-400 transition-[width] duration-100" style={{ width: `${level * 100}%` }} />

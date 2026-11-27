@@ -169,7 +169,7 @@ export default function TapCalibration({ onSaved }: { onSaved?: (ms: number) => 
         >
           {phase.kind === 'idle' ? 'Start tap test' : phase.kind === 'running' ? 'Tap along…' : 'Run it again'}
         </button>
-        <span className="text-xs text-slate-500">Current correction: {stored} ms</span>
+        <span className="text-xs text-slate-400">Current correction: {stored} ms</span>
       </div>
     </div>
   );
