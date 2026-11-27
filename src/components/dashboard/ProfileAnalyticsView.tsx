@@ -1,4 +1,5 @@
 import ProfileAvatar from '../common/ProfileAvatar';
+import WeeklyGoalCard from './WeeklyGoalCard';
 import type { ProfileLook } from '../../lib/profile/look';
 import { useMemo, useState } from 'react';
 import {
@@ -92,6 +93,9 @@ interface ProfileAnalyticsViewProps {
   error?: string | null;
   /** Chosen avatar and frame (Settings → Profile). */
   look?: ProfileLook;
+  /** P8: whose week to load for the daily goal / weekly summary card. */
+  userId?: string | null;
+  isDemo?: boolean;
 }
 
 interface Achievement {
@@ -131,6 +135,8 @@ export default function ProfileAnalyticsView({
   loading = false,
   error = null,
   look,
+  userId = null,
+  isDemo = false,
 }: ProfileAnalyticsViewProps) {
   const [internalRange, setInternalRange] = useState<AnalyticsDateRange>('7d');
   const activeRange = controlledRange ?? internalRange;
@@ -395,6 +401,8 @@ export default function ProfileAnalyticsView({
       </div>
 
       {/* 2. Row of 4 Summary Statistic Cards */}
+      <WeeklyGoalCard userId={userId} isDemo={isDemo} lastActivityDate={profile?.last_activity_date} />
+
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-lg transition-all hover:border-cyan-500/40">
           <div className="flex items-center justify-between">

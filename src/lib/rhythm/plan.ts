@@ -134,3 +134,54 @@ export function scoreRhythm(summary: RhythmSummary, taps: readonly JudgedTap[], 
   const score = max > 0 ? Math.max(0, Math.min(1, raw / max)) : 0;
   return { score, passed: score >= passMark, extraTaps };
 }
+
+export type RhythmCue =
+  /** Before the first count-in click. */
+  | { kind: 'wait' }
+  /** Count-in click `beat` (1-based) of `of`; `measureBeat` is the beat inside its measure (1-based). */
+  | { kind: 'count'; beat: number; of: number; measureBeat: number; beatsPerMeasure: number }
+  | { kind: 'listen' }
+  | { kind: 'play' }
+  | { kind: 'done' };
+
+/**
+ * What the learner should be doing at plan time `t` (seconds; the same audible clock the
+ * highway and the taps use). The count-in follows the meter: buildRhythmPlan rounds it up to
+ * whole measures, so 4/4 counts 4, 3/4 counts 6 (two bars) and 6/8 counts 6 (one bar).
+ * Used for the on-screen and screen-reader count-in, so it changes as each click is heard.
+ */
+export function rhythmCue(plan: RhythmPlan, t: number): RhythmCue {
+  const countIn = plan.clicks.filter((c) => c.countIn);
+  if (countIn.length > 0 && t < countIn[0].time) return { kind: 'wait' };
+  if (t >= plan.endSec) return { kind: 'done' };
+  const seg = segmentAt(plan, t);
+  if (seg?.kind === 'count-in') {
+    let beat = 0;
+    for (let i = 0; i < countIn.length; i++) if (t >= countIn[i].time - 1e-9) beat = i + 1;
+    beat = Math.max(1, beat);
+    return {
+      kind: 'count',
+      beat,
+      of: countIn.length,
+      measureBeat: ((beat - 1) % plan.beatsPerMeasure) + 1,
+      beatsPerMeasure: plan.beatsPerMeasure,
+    };
+  }
+  return seg?.kind === 'listen' ? { kind: 'listen' } : { kind: 'play' };
+}
+
+/** Screen-reader / status text for a cue. */
+export function rhythmCueText(cue: RhythmCue, mode: TapExerciseType = 'tap-along'): string {
+  switch (cue.kind) {
+    case 'wait':
+      return 'Get ready: listen for the count-in.';
+    case 'count':
+      return `Count-in ${cue.measureBeat} of ${cue.beatsPerMeasure}${cue.of > cue.beatsPerMeasure ? ` (bar ${Math.ceil(cue.beat / cue.beatsPerMeasure)} of ${cue.of / cue.beatsPerMeasure})` : ''}. Listen, don't tap yet.`;
+    case 'listen':
+      return 'Listen to the rhythm.';
+    case 'play':
+      return mode === 'tap-echo' ? 'Your turn: tap it back.' : 'Tap now.';
+    case 'done':
+      return 'Done.';
+  }
+}

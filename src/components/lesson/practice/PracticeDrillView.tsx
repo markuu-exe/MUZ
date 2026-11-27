@@ -6,13 +6,14 @@
  */
 import { parseChord } from '../../../audio/chords/vocabulary';
 import { chordCheckReasons } from '../../../practice/chordReport';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { usePracticeDrill } from '../../../hooks/usePracticeDrill';
 import type { ExerciseViewProps } from '../../../lesson/registry';
 import { cn } from '../../../lib/cn';
 import { PITCH_CLASS_NAMES } from '../../../audio/dsp/pitch';
 import { chordMatcher, drillTargets, targetLabel, type DrillStats, type DrillTarget } from '../../../practice/PracticeDrill';
 import { FramingTracker, type FramingState } from '../../../practice/framing';
+import { INITIAL_DRILL_PHASE, drillPhaseReducer, practiceDrillOptions } from '../../../practice/practicePhase';
 import { NOTHING_HEARD, frameMatchesTarget, heardFromFrame, heardKeys, heardLabel, type Heard } from '../../../practice/heard';
 import { NOT_VISIBLE_MESSAGE } from '../../../practice/visibilityCue';
 import type { PlayChordExercise, PlayNoteExercise, PlaySequenceExercise } from '../../../types/lesson.types';
@@ -83,26 +84,54 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
     });
   }, [rig]);
 
-  const drill = usePracticeDrill({
+  // P5: every drill opens in an ungraded practice run: the same PracticeDrill (same verifiers,
+  // posture latch and feedback) with heartCost 0, never reported to the lesson. "Start graded
+  // attempt" discards it and arms the graded drill, whose timer only starts then.
+  const [phase, dispatchPhase] = useReducer(drillPhaseReducer, INITIAL_DRILL_PHASE);
+  const practicing = phase.kind === 'practice';
+  const practice = usePracticeDrill({
+    rig,
+    targets,
+    ...practiceDrillOptions(settings.timeoutSec),
+    suspended: !canRun || !practicing,
+    onComplete: () => dispatchPhase({ type: 'practice-passed' }),
+    onLocked: () => undefined, // cannot happen: heartCost 0
+  });
+  const graded = usePracticeDrill({
     rig,
     targets,
     hearts,
     timeoutSec: settings.timeoutSec,
     heartCost: settings.drillHeartCost ?? 1,
-    suspended: !canRun,
+    suspended: !canRun || practicing,
     onComplete: (stats) => setEnded({ passed: true, stats }),
     onLocked: (stats) => setEnded({ passed: false, stats }),
   });
+  const drill = practicing ? practice : graded;
 
   // Arm once the camera, the pose model and the microphone are live AND the camera can see the arm.
-  const { start, running } = drill;
+  const { start: startPractice, running: practiceRunning, reset: resetPractice } = practice;
+  const justPassed = phase.kind === 'practice' && phase.justPassed;
   useEffect(() => {
-    if (canRun && !running) start();
-  }, [canRun, running, start]);
+    if (canRun && practicing && !justPassed && !practiceRunning) startPractice();
+  }, [canRun, practicing, justPassed, practiceRunning, startPractice]);
+  const { start: startGraded, running: gradedRunning } = graded;
+  useEffect(() => {
+    if (canRun && !practicing && !gradedRunning) startGraded();
+  }, [canRun, practicing, gradedRunning, startGraded]);
+  const practiseAgain = () => {
+    resetPractice();
+    dispatchPhase({ type: 'retry-practice' });
+  };
+  const startGradedAttempt = () => {
+    resetPractice();
+    dispatchPhase({ type: 'start-graded' });
+  };
+  const running = drill.running;
 
   // Tell the player about every heart as it is lost, so quitting mid-drill
-  // (or during the outcome pause below) cannot refund it (T-06).
-  const { heartsLost } = drill;
+  // (or during the outcome pause below) cannot refund it (T-06). Only the graded run can lose one.
+  const { heartsLost } = graded;
   useEffect(() => {
     onHeartsSpentRef.current?.(heartsLost);
   }, [heartsLost]);
@@ -137,6 +166,11 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
       tone: 'amber',
     };
   else if (framing === 'lost') status = { text: `Paused: ${NOT_VISIBLE_MESSAGE} No heart is lost while paused.`, tone: 'amber' };
+  else if (justPassed)
+    status = {
+      text: 'That counted: the right sound with good posture. Practise again, or start the graded attempt when you are ready.',
+      tone: 'emerald',
+    };
   else if (!running) status = { text: 'Get ready…', tone: 'slate' };
   else if (drill.state === 'paused') status = { text: 'Paused', tone: 'slate' };
   else if (drill.state === 'latching') status = { text: 'That is the right sound. Hold your posture to lock it in.', tone: 'amber' };
@@ -145,10 +179,18 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
   else if (drill.state === 'verifying') status = { text: 'Listening…', tone: 'cyan' };
   else if (drill.lastAttempt === 'miss')
     status = {
-      text: `${drill.lastHeard ? `That sounded like ${drill.lastHeard}. ` : 'Not quite. '}Try again${settings.drillHeartCost === 0 ? '. Warm-up lesson: no hearts are lost.' : ` (${drill.consecutiveMisses} of 3 wrong tries before a heart is lost).`}`,
+      text: `${drill.lastHeard ? `That sounded like ${drill.lastHeard}. ` : 'Not quite. '}Try again${
+        practicing
+          ? '. Practice: no timer and no hearts.'
+          : settings.drillHeartCost === 0
+            ? '. Warm-up lesson: no hearts are lost.'
+            : ` (${drill.consecutiveMisses} of 3 wrong tries before a heart is lost).`
+      }`,
       tone: 'rose',
     };
-  else status = { text: 'Play it on your piano now.', tone: 'slate' };
+  else if (practicing)
+    status = { text: 'Practice: play it as often as you like. Nothing is graded, there is no timer and no heart is lost.', tone: 'slate' };
+  else status = { text: 'Graded attempt: play it on your piano now.', tone: 'slate' };
 
   const TONE = {
     slate: 'border-slate-700 bg-slate-900/70 text-slate-200',
@@ -177,9 +219,34 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
       {problems.length > 0 ? (
         <MediaDiagnostics problems={problems} onRetry={() => void rig.start()} />
       ) : ready || ended ? (
-        <p role="status" className={cn('rounded-xl border px-5 py-3 text-base font-semibold', TONE[status.tone])}>
-          {status.text}
-        </p>
+        <div className="space-y-3">
+          <p role="status" className={cn('rounded-xl border px-5 py-3 text-base font-semibold', TONE[status.tone])}>
+            {status.text}
+          </p>
+          {practicing && !ended && (
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={startGradedAttempt}
+                className="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-2.5 text-sm font-bold uppercase tracking-wider text-white transition hover:brightness-110 focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-300"
+              >
+                Start graded attempt
+              </button>
+              {justPassed && (
+                <button
+                  type="button"
+                  onClick={practiseAgain}
+                  className="rounded-xl border border-slate-600 px-5 py-2.5 text-sm font-bold text-slate-200 transition hover:border-slate-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-300"
+                >
+                  Practise again
+                </button>
+              )}
+              <span className="text-xs text-slate-400">
+                The graded attempt uses your hearts and a {settings.timeoutSec}-second timer, which starts when you press it.
+              </span>
+            </div>
+          )}
+        </div>
       ) : (
         <CameraSetupGuide needsMic starting={starting} onStart={() => void rig.start()} />
       )}
@@ -191,15 +258,22 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-widest text-violet-300">
-                {targets.length > 1 ? `Step ${Math.min(drill.stepIndex + 1, targets.length)} of ${targets.length}` : 'Target'}
+                {practicing ? 'Practice · not graded' : 'Graded attempt'}
+                {targets.length > 1 ? ` · Step ${Math.min(drill.stepIndex + 1, targets.length)} of ${targets.length}` : ''}
               </p>
               <p className="truncate text-3xl font-black text-white">{targetTitle(target)}</p>
             </div>
-            <Ring
-              fraction={ended?.passed ? 1 : drill.timeoutMs > 0 ? drill.remainingMs / drill.timeoutMs : 0}
-              label={ended?.passed ? '✓' : String(seconds)}
-              tone={ended?.passed ? 'emerald' : seconds <= 5 ? 'rose' : 'violet'}
-            />
+            {practicing ? (
+              <span className="shrink-0 rounded-full border border-slate-600 px-3 py-1 text-xs font-bold uppercase tracking-wider text-slate-300">
+                No timer
+              </span>
+            ) : (
+              <Ring
+                fraction={ended?.passed ? 1 : drill.timeoutMs > 0 ? drill.remainingMs / drill.timeoutMs : 0}
+                label={ended?.passed ? '✓' : String(seconds)}
+                tone={ended?.passed ? 'emerald' : seconds <= 5 ? 'rose' : 'violet'}
+              />
+            )}
           </div>
 
           {targets.length > 1 && (
@@ -255,7 +329,7 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
           </p>
 
           <div className="mt-auto flex items-center justify-between">
-            <HeartRow hearts={drill.hearts} />
+            <HeartRow hearts={practicing ? hearts : graded.hearts} />
             <MicMeter rmsDb={drill.rmsDb} />
           </div>
         </div>

@@ -4,7 +4,7 @@
  * Drawn on a canvas from refs inside requestAnimationFrame; React never re-renders per frame.
  */
 import { useEffect, useRef } from 'react';
-import { segmentAt, type RhythmPlan } from '../../../lib/rhythm/plan';
+import { rhythmCue, segmentAt, type RhythmPlan } from '../../../lib/rhythm/plan';
 import { GOOD_MS, type JudgedTap } from '../../../lib/rhythm/timing';
 
 interface BeatHighwayProps {
@@ -142,14 +142,16 @@ export default function BeatHighway({ plan, now, taps }: BeatHighwayProps) {
       g.font = '700 12px Inter, "Segoe UI", sans-serif';
       g.textAlign = 'right';
       if (seg?.kind === 'count-in') {
-        const left = Math.max(1, Math.ceil((seg.end - Math.max(0, t)) / p.beatSec - 1e-6));
+        // Count the bar the way a musician counts in: "1 2 3 4" in 4/4, "1 2 3 | 1 2 3" in 3/4.
+        const cue = rhythmCue(p, Math.max(0, t));
+        const beat = cue.kind === 'count' ? cue.measureBeat : 1;
         g.fillStyle = COLORS.textDim;
-        g.fillText('GET READY', width - 16, 12);
+        g.fillText(cue.kind === 'count' && cue.of > cue.beatsPerMeasure ? `COUNT-IN · BAR ${Math.ceil(cue.beat / cue.beatsPerMeasure)}` : 'COUNT-IN', width - 16, 12);
         g.fillStyle = COLORS.text;
         g.font = '900 44px Inter, "Segoe UI", sans-serif';
         g.textAlign = 'center';
         g.textBaseline = 'middle';
-        g.fillText(String(left), width * 0.6, midY);
+        g.fillText(String(beat), width * 0.6, midY);
       } else if (seg?.kind === 'listen') {
         g.fillStyle = COLORS.listen;
         g.fillText('LISTEN', width - 16, 12);
