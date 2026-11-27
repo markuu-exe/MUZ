@@ -630,7 +630,10 @@ const DRAWINGS: Record<IllustrationId, () => JSX.Element> = {
 };
 
 export default function Illustration({ id }: { id: IllustrationId }) {
-  const Drawing = DRAWINGS[id];
+  const Drawing = DRAWINGS[id] as (() => JSX.Element) | undefined;
+  // Lesson payloads come from the database, which can be re-seeded ahead of a deploy:
+  // an id this build does not know is skipped instead of crashing the lesson.
+  if (!Drawing) return null;
   return (
     <div className="rounded-xl border border-[#7c3aed]/25 bg-[#0b1120] p-4">
       <svg viewBox="0 0 240 120" className="mx-auto h-auto w-full max-w-md" aria-hidden="true" focusable="false">
