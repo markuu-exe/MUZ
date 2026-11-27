@@ -6,7 +6,7 @@
  * graded as your playing.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Mic, Music2, Play, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Mic, Music2, PenLine, Play, RotateCcw } from 'lucide-react';
 import { useRhythmCue } from '../../hooks/useRhythmCue';
 import { audioTimeAt } from '../../lib/rhythm/audioClock';
 import type { JudgedTap } from '../../lib/rhythm/timing';
@@ -25,6 +25,10 @@ import MediaDiagnostics, { mediaProblems } from '../lesson/practice/MediaDiagnos
 import { PracticeRigProvider, usePracticeRig } from '../lesson/practice/PracticeRigContext';
 import BeatHighway from '../lesson/rhythm/BeatHighway';
 import CountInBadge from '../lesson/rhythm/CountInBadge';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
+import FallingNotes from './FallingNotes';
+import SheetEditor, { NEW_SHEET } from './SheetEditor';
+import { deleteCustomSheet, listCustomSongs, saveCustomSheet, type CustomPiece } from '../../performance/customSongs';
 
 type Frame = PerfFrame & HeardFrameLike;
 const LEAD_SEC = 0.4;
@@ -42,38 +46,88 @@ const MODES = [
 
 const LEVEL_LABEL: Record<Song['level'], string> = { novice: 'Novice', proficient: 'Proficient', virtuoso: 'Virtuoso' };
 
-function SongList({ onPick, best }: { onPick: (s: Song) => void; best: Record<string, number> }) {
+const CARD =
+  'group flex h-full w-full flex-col rounded-2xl border border-slate-800 bg-slate-900/80 p-4 text-left transition duration-150 hover:-translate-y-0.5 hover:border-violet-500/50 hover:bg-slate-900 motion-reduce:hover:translate-y-0 focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-300';
+
+function SongCard({ s, best, onPick }: { s: Song; best: Record<string, number>; onPick: (s: Song) => void }) {
+  return (
+    <button type="button" onClick={() => onPick(s)} className={CARD}>
+      <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-violet-300">
+        <Music2 className="h-4 w-4" aria-hidden="true" /> {s.kind === 'melody' ? 'Melody' : 'Chords'} · {s.meter} · {s.bpm} BPM · {LEVEL_LABEL[s.level]}
+      </span>
+      <span className="mt-1.5 text-lg font-black text-white">{s.title}</span>
+      <span className="text-xs text-slate-400">{s.credit}</span>
+      {s.description && <span className="mt-1.5 text-sm text-slate-300">{s.description}</span>}
+      <span className="mt-auto pt-3 text-xs font-semibold text-slate-300">
+        {best[s.id] !== undefined ? `Best on this device: ${best[s.id]}%` : 'Not played yet'}
+      </span>
+    </button>
+  );
+}
+
+interface SongListProps {
+  onPick: (s: Song) => void;
+  best: Record<string, number>;
+  customs: CustomPiece[];
+  onNew: () => void;
+  onEdit: (piece: CustomPiece) => void;
+}
+
+function SongList({ onPick, best, customs, onNew, onEdit }: SongListProps) {
   return (
     <div className="mx-auto max-w-6xl space-y-5 pb-12">
-      <div>
-        <h2 className="text-2xl font-black text-white">Choose a piece</h2>
-        <p className="mt-1 text-sm text-slate-400">
-          Play a melody or a chord progression in time with the click. The microphone checks each note or chord on its beat.
-          Practice only: no hearts and no EXP.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-black text-white">Choose a piece</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Play a melody or a chord progression in time with the click, or at your own pace. The microphone checks each note or chord.
+            Practice only: no hearts and no EXP.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onNew}
+          className="flex items-center gap-2 rounded-xl border border-violet-500/50 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-violet-200 hover:bg-violet-500/10 focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-300"
+        >
+          <PenLine className="h-4 w-4" aria-hidden="true" /> Write a piece
+        </button>
       </div>
       <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {SONGS.map((s) => (
           <li key={s.id}>
-            <button
-              type="button"
-              onClick={() => onPick(s)}
-              className="group flex h-full w-full flex-col rounded-2xl border border-slate-800 bg-slate-900/80 p-4 text-left transition duration-150 hover:-translate-y-0.5 hover:border-violet-500/50 hover:bg-slate-900 motion-reduce:hover:translate-y-0 focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-300"
-            >
-              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-violet-300">
-                <Music2 className="h-4 w-4" aria-hidden="true" /> {s.kind === 'melody' ? 'Melody' : 'Chords'} · {s.meter} · {s.bpm} BPM ·{' '}
-                {LEVEL_LABEL[s.level]}
-              </span>
-              <span className="mt-1.5 text-lg font-black text-white">{s.title}</span>
-              <span className="text-xs text-slate-400">{s.credit}</span>
-              <span className="mt-1.5 text-sm text-slate-300">{s.description}</span>
-              <span className="mt-auto pt-3 text-xs font-semibold text-slate-300">
-                {best[s.id] !== undefined ? `Best on this device: ${best[s.id]}%` : 'Not played yet'}
-              </span>
-            </button>
+            <SongCard s={s} best={best} onPick={onPick} />
           </li>
         ))}
       </ul>
+      {customs.length > 0 && (
+        <section className="space-y-3" aria-label="Your pieces">
+          <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">Your pieces</h3>
+          <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {customs.map((c) => (
+              <li key={c.id} className="relative">
+                {c.song ? (
+                  <SongCard s={c.song} best={best} onPick={onPick} />
+                ) : (
+                  <button type="button" onClick={() => onEdit(c)} className={CARD}>
+                    <span className="text-xs font-bold uppercase tracking-wider text-rose-300">Needs a fix</span>
+                    <span className="mt-1.5 text-sm text-slate-300">This sheet no longer reads correctly. Open it to fix it.</span>
+                  </button>
+                )}
+                {c.song && (
+                  <button
+                    type="button"
+                    onClick={() => onEdit(c)}
+                    aria-label={`Edit ${c.song.title}`}
+                    className="absolute right-3 top-3 rounded-lg border border-slate-700 bg-slate-900 p-1.5 text-slate-300 hover:border-violet-500/50 hover:text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-300"
+                  >
+                    <PenLine className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }
@@ -86,16 +140,24 @@ interface WaitDisplayProps {
   lastWrong: boolean;
   /** What the last wrong attempt sounded like ("E4", "D minor"), when known. */
   lastHeard: string | null;
+  /** The falling-notes view shows what to play: one line instead of the big cards and chips. */
+  compact: boolean;
   summary: WaitSummary | null;
   nowLabel: string;
   nextLabel: string | null;
 }
 
 /** "Wait for me": every step of the piece as a chip, the step being waited on, and the result. */
-function WaitDisplay({ song, phase, current, wrongs, lastWrong, lastHeard, summary, nowLabel, nextLabel }: WaitDisplayProps) {
+function WaitDisplay({ song, phase, current, wrongs, lastWrong, lastHeard, summary, nowLabel, nextLabel, compact }: WaitDisplayProps) {
   return (
     <div className="space-y-4">
-      <ol className="flex flex-wrap gap-1.5" aria-label="Notes and chords in this piece">
+      {compact && phase === 'running' && (
+        <p className={cn('text-lg font-black', lastWrong ? 'text-rose-200' : 'text-white')} aria-live="polite">
+          {lastWrong ? `${lastHeard ? `That was ${lastHeard}.` : 'Not quite.'} Try ${nowLabel} again.` : `Play ${nowLabel}`}
+          {!lastWrong && nextLabel && <span className="text-sm font-semibold text-slate-400"> · next {nextLabel}</span>}
+        </p>
+      )}
+      <ol className={cn('flex flex-wrap gap-1.5', compact && phase !== 'done' && 'hidden')} aria-label="Notes and chords in this piece">
         {song.events.map((e, i) => {
           const finished = (phase === 'running' && i < current) || (phase === 'done' && summary !== null);
           const isNow = phase === 'running' && i === current;
@@ -124,7 +186,7 @@ function WaitDisplay({ song, phase, current, wrongs, lastWrong, lastHeard, summa
         </p>
       )}
 
-      {phase === 'running' && (
+      {phase === 'running' && !compact && (
         <>
           <div className="grid grid-cols-2 gap-4 text-center">
             <div
@@ -182,6 +244,9 @@ function Player({ song: fullSong, onBack, onBest }: { song: Song; onBack: () => 
   const [summary, setSummary] = useState<(PerformanceSummary & { newBest: boolean }) | null>(null);
   // "Wait for me": no click, no tempo; each note or chord waits until it is heard (performance/wait.ts).
   const [mode, setMode] = useState<'time' | 'wait'>('time');
+  // Falling notes (Synthesia-style) by default; the beat highway / step chips stay available.
+  const [view, setView] = useState<'falling' | 'highway'>('falling');
+  const reducedMotion = useReducedMotion();
   const [wrongs, setWrongs] = useState<number[]>(() => song.events.map(() => 0));
   const [lastWrong, setLastWrong] = useState(false);
   const [lastHeard, setLastHeard] = useState<string | null>(null);
@@ -382,7 +447,28 @@ function Player({ song: fullSong, onBack, onBest }: { song: Song; onBack: () => 
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Songs
         </button>
-        <div className="flex gap-2 text-xs font-bold uppercase tracking-wider">
+        <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wider">
+          <div role="group" aria-label="View" className="flex rounded-full border border-slate-700 bg-slate-900 p-0.5">
+            {(
+              [
+                ['falling', 'Falling notes'],
+                ['highway', mode === 'wait' ? 'Steps' : 'Highway'],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={view === id}
+                onClick={() => setView(id)}
+                className={cn(
+                  'rounded-full px-3 py-0.5 transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-300',
+                  view === id ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-100',
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-slate-300">{song.meter}</span>
           <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-slate-300">{mode === 'wait' ? 'Your pace' : `${plan.bpm} BPM`}</span>
         </div>
@@ -484,7 +570,20 @@ function Player({ song: fullSong, onBack, onBest }: { song: Song; onBack: () => 
         </div>
       ) : null}
 
-      {mode === 'time' && <BeatHighway plan={plan} now={now} taps={marks} labels={plan.labels} />}
+      {view === 'falling' && (
+        <FallingNotes
+          song={song}
+          plan={plan}
+          mode={mode}
+          now={now}
+          running={phase === 'running'}
+          current={current}
+          results={live}
+          wrongs={wrongs}
+          reducedMotion={reducedMotion}
+        />
+      )}
+      {mode === 'time' && view === 'highway' && <BeatHighway plan={plan} now={now} taps={marks} labels={plan.labels} />}
 
       {mode === 'wait' && (
         <WaitDisplay
@@ -497,12 +596,14 @@ function Player({ song: fullSong, onBack, onBest }: { song: Song; onBack: () => 
           summary={waitSummary}
           nowLabel={nowLabel}
           nextLabel={nextLabel}
+          compact={view === 'falling'}
         />
       )}
 
       {mode === 'time' && phase === 'running' && (
         <>
           <CountInBadge cue={cue} tapText={`Play now: ${nowLabel}${nextLabel ? ` · next ${nextLabel}` : ''}`} />
+          {view === 'highway' && (
           <div className="grid grid-cols-2 gap-4 text-center" aria-hidden="true">
             <div className="rounded-2xl border border-violet-500/40 bg-violet-950/40 px-4 py-3">
               <p className="text-xs font-bold uppercase tracking-widest text-violet-300">Now</p>
@@ -513,6 +614,7 @@ function Player({ song: fullSong, onBack, onBest }: { song: Song; onBack: () => 
               <p className="text-4xl font-black text-slate-300">{nextLabel ?? '—'}</p>
             </div>
           </div>
+          )}
         </>
       )}
 
@@ -572,15 +674,51 @@ function Player({ song: fullSong, onBack, onBest }: { song: Song; onBack: () => 
   );
 }
 
+type Screen = { kind: 'list' } | { kind: 'play'; song: Song } | { kind: 'edit'; id: string | null; text: string };
+
 export default function PerformView() {
-  const [song, setSong] = useState<Song | null>(null);
+  const [screen, setScreen] = useState<Screen>({ kind: 'list' });
   const [best, setBest] = useState(readBestScores);
+  const [customs, setCustoms] = useState(listCustomSongs);
   const refreshBest = useCallback(() => setBest(readBestScores()), []);
-  if (!song) return <SongList onPick={setSong} best={best} />;
+  if (screen.kind === 'edit') {
+    return (
+      <SheetEditor
+        key={screen.id ?? 'new'}
+        initialText={screen.text}
+        existing={screen.id !== null}
+        onCancel={() => setScreen({ kind: 'list' })}
+        onSave={(text) => {
+          const id = saveCustomSheet(text, screen.id ?? undefined);
+          const pieces = listCustomSongs();
+          setCustoms(pieces);
+          const saved = pieces.find((p) => p.id === id)?.song;
+          setScreen(saved ? { kind: 'play', song: saved } : { kind: 'list' });
+        }}
+        onDelete={() => {
+          if (screen.id) deleteCustomSheet(screen.id);
+          setCustoms(listCustomSongs());
+          setScreen({ kind: 'list' });
+        }}
+      />
+    );
+  }
+  if (screen.kind === 'list') {
+    return (
+      <SongList
+        onPick={(s) => setScreen({ kind: 'play', song: s })}
+        best={best}
+        customs={customs}
+        onNew={() => setScreen({ kind: 'edit', id: null, text: NEW_SHEET })}
+        onEdit={(c) => setScreen({ kind: 'edit', id: c.id, text: c.text })}
+      />
+    );
+  }
+  const song = screen.song;
   return (
     // Own rig: the microphone is released when you leave the song.
     <PracticeRigProvider key={song.id}>
-      <Player song={song} onBack={() => setSong(null)} onBest={refreshBest} />
+      <Player song={song} onBack={() => setScreen({ kind: 'list' })} onBest={refreshBest} />
     </PracticeRigProvider>
   );
 }
