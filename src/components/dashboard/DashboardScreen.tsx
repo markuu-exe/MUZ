@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   BookOpen,
   GitBranch,
+  Music2,
   Heart,
   LogOut,
   Piano,
@@ -87,6 +88,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'skill-tree', label: 'Skill Tree', icon: GitBranch },
+  { id: 'perform', label: 'Perform', icon: Music2 },
   { id: 'lessons', label: 'Lessons', icon: BookOpen },
   { id: 'profile', label: 'Profile & Analytics', icon: UserRound },
   { id: 'settings', label: 'Settings', icon: Settings },
@@ -97,6 +99,7 @@ const NAV_ITEMS: NavItem[] = [
 const LessonPlayer = lazy(() => import('../lesson/LessonPlayer'));
 const ProfileAnalyticsView = lazy(() => import('./ProfileAnalyticsView'));
 const CameraCheckModal = lazy(() => import('./CameraCheckModal'));
+const PerformView = lazy(() => import('../perform/PerformView'));
 
 export default function DashboardScreen() {
   const { user, profile, profileStatus, isDemo, signOut, refreshProfile } = useAuth();
@@ -675,7 +678,9 @@ export default function DashboardScreen() {
                     ? 'Profile & Performance Telemetry'
                     : view === 'lessons'
                       ? 'Lesson Notes'
-                      : 'Studio Settings'}
+                      : view === 'perform'
+                        ? 'Performance Mode'
+                        : 'Studio Settings'}
               </h1>
             </div>
           </div>
@@ -776,6 +781,13 @@ export default function DashboardScreen() {
                 suggestion={{ lessons: data.lessons, progress: data.progress, exp, onOpen: openLesson }}
                 onContinue={currentNode ? () => openLesson(currentNode, continueStatus) : undefined}
               />
+            </LazyBoundary>
+          )}
+
+          {/* Performance mode: songs and progressions in time (practice only). */}
+          {view === 'perform' && (
+            <LazyBoundary label="performance mode" onCancel={() => setView('skill-tree')}>
+              <PerformView />
             </LazyBoundary>
           )}
 
