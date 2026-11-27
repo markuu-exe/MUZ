@@ -1,7 +1,8 @@
 import { Moon, Sun } from 'lucide-react';
 import { useTheme } from '../../lib/theme';
 import { MuzLogo } from '../brand/MuzLogo';
-import { lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
 import {
   AlertTriangle,
   BookOpen,
@@ -441,6 +442,40 @@ export default function DashboardScreen() {
     return null;
   }, [data.lessons, data.progress, exp]);
 
+  // Polish 2026-11-28: each tab opens at its top (the workspace scroll was shared, so switching
+  // from a long page could land mid-page), and the background glow drifts slower than the content.
+  const mainRef = useRef<HTMLElement | null>(null);
+  const atmosphereRef = useRef<HTMLDivElement | null>(null);
+  const reducedMotion = useReducedMotion();
+  // Layout effect: runs before the new tab's own effects, so the Skill Tree can still scroll to
+  // the current lesson afterwards.
+  useLayoutEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 });
+  }, [view]);
+  useEffect(() => {
+    const main = mainRef.current;
+    const layer = atmosphereRef.current;
+    if (!main || !layer) return;
+    if (reducedMotion) {
+      layer.style.removeProperty('--muz-parallax');
+      return;
+    }
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      layer.style.setProperty('--muz-parallax', `${-Math.min(main.scrollTop * 0.06, 90).toFixed(1)}px`);
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(update);
+    };
+    update();
+    main.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      main.removeEventListener('scroll', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [reducedMotion]);
+
   // Remember where the learner is (this tab only), so a refresh comes back here.
   useEffect(() => {
     savePlace({ account: placeAccount, view, lessonId: activeLesson?.id ?? null });
@@ -652,7 +687,8 @@ export default function DashboardScreen() {
       {/* =========================================================================
           MAIN APPLICATION WORKSPACE (TOP HEADER & VIEWPORT)
           ========================================================================= */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-muz-bg">
+      <div className="relative isolate flex min-w-0 flex-1 flex-col overflow-clip bg-muz-bg">
+        <div ref={atmosphereRef} className="muz-atmosphere" aria-hidden="true" />
         {isDemo && <DemoBanner onExit={() => void signOut()} />}
         {/* TOP GAMIFICATION HEADER */}
         <header className="flex min-h-20 shrink-0 flex-wrap items-center justify-between gap-4 border-b border-slate-800/90 bg-muz-sidebar/90 px-8 py-3 backdrop-blur-md">
@@ -740,11 +776,16 @@ export default function DashboardScreen() {
         )}
 
         {/* Scrollable Main Content Container */}
-        <main className="relative flex-1 overflow-y-auto px-8 py-8">
+        <main ref={mainRef} className="relative flex-1 overflow-y-auto px-8 py-8">
+          {/* Keyed by tab: a short enter transition on every switch (none with reduced motion). */}
+          <div key={view} className="muz-view-enter">
           {/* VIEW 1: SKILL TREE PROGRESSION (Default State) */}
           {view === 'skill-tree' && !treeReady && <SkillTreeSkeleton />}
           {view === 'skill-tree' && treeReady && currentNode && (
-            <ContinueCard lesson={currentNode} onContinue={() => openLesson(currentNode, continueStatus)} />
+            // Sticky: the tree scrolls to your current node, which used to push Continue off screen.
+            <div className="sticky -top-8 z-20 -mx-8 -mt-8 mb-6 px-8 pb-3 pt-5 bg-gradient-to-b from-muz-bg via-muz-bg/95 to-transparent">
+              <ContinueCard lesson={currentNode} onContinue={() => openLesson(currentNode, continueStatus)} className="mb-0" />
+            </div>
           )}
           {view === 'skill-tree' && treeReady && (
             <SkillTreeView
@@ -924,6 +965,7 @@ export default function DashboardScreen() {
               </div>
             </div>
           )}
+          </div>
 
           {/* =========================================================================
               SELECTED NODE INTERACTIVE TRAY / DRAWER
