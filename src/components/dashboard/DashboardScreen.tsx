@@ -747,6 +747,7 @@ export default function DashboardScreen() {
                 userId={profile?.id ?? null}
                 isDemo={isDemo}
                 continueLesson={currentNode}
+                suggestion={{ lessons: data.lessons, progress: data.progress, exp, onOpen: openLesson }}
                 onContinue={currentNode ? () => openLesson(currentNode, continueStatus) : undefined}
               />
             </LazyBoundary>

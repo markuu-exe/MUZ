@@ -33,7 +33,8 @@ import {
 } from 'chart.js';
 import { Bar, Line } from 'react-chartjs-2';
 import type { UserProfile } from '../../types/auth.types';
-import { displayNameFromProfile, expProgress, type CurriculumNode } from '../../lib/dashboard/curriculum';
+import { displayNameFromProfile, expProgress, type CurriculumNode, type NodeStatus, type ProgressMap } from '../../lib/dashboard/curriculum';
+import PracticeSuggestionCard from './PracticeSuggestionCard';
 import {
   ACHIEVEMENT_DESCRIPTIONS,
   ACHIEVEMENT_TITLES,
@@ -100,6 +101,13 @@ interface ProfileAnalyticsViewProps {
   /** UX 2026-11-27: the next action comes first on Profile. */
   continueLesson?: Pick<CurriculumNode, 'title' | 'description' | 'kind'> | null;
   onContinue?: () => void;
+  /** Smart practice suggestion inputs (the course, progress and how to open a lesson). */
+  suggestion?: {
+    lessons: CurriculumNode[];
+    progress: ProgressMap;
+    exp: number;
+    onOpen: (lesson: CurriculumNode, status: NodeStatus) => void;
+  };
 }
 
 interface Achievement {
@@ -143,6 +151,7 @@ export default function ProfileAnalyticsView({
   isDemo = false,
   continueLesson = null,
   onContinue,
+  suggestion,
 }: ProfileAnalyticsViewProps) {
   const [internalRange, setInternalRange] = useState<AnalyticsDateRange>('7d');
   const activeRange = controlledRange ?? internalRange;
@@ -408,6 +417,17 @@ export default function ProfileAnalyticsView({
 
       {/* 2. Row of 4 Summary Statistic Cards */}
       {continueLesson && onContinue && <ContinueCard lesson={continueLesson} onContinue={onContinue} compact />}
+
+      {suggestion && (
+        <PracticeSuggestionCard
+          userId={userId}
+          isDemo={isDemo}
+          lessons={suggestion.lessons}
+          progress={suggestion.progress}
+          exp={suggestion.exp}
+          onOpen={suggestion.onOpen}
+        />
+      )}
 
       <WeeklyGoalCard userId={userId} isDemo={isDemo} lastActivityDate={profile?.last_activity_date} />
 
