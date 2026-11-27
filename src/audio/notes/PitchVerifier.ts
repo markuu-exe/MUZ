@@ -6,6 +6,12 @@ import { NoteMatcher } from './NoteMatcher';
 /** "That sounded like …" only names notes within an octave and a whole tone of the target. */
 const PLAUSIBLE_SEMITONES = 14;
 
+/**
+ * While a previous sound rings, a pitch reading within this many cents of the target is a mix of
+ * the new note and its ringing neighbour (up to a whole tone and a half away), not a wrong note.
+ */
+const RINGING_NEAR_CENTS = 300;
+
 /** Shared chroma cross-check: the target must also be the dominant pitch class. */
 const defaultMatcher = new NoteMatcher();
 
@@ -74,7 +80,13 @@ export class PitchVerifier implements AcousticVerifier {
     let passed = false;
     const hz = frame.pitchHz;
     const clarity = frame.clarity ?? 0;
-    if (frame.voiced && hz != null && Number.isFinite(hz) && hz > 0 && clarity >= cfg.minClarity) {
+    const usableHz = frame.voiced && hz != null && Number.isFinite(hz) && hz > 0;
+    if (usableHz && frame.ringing && hz >= DEFAULT_CHROMA_CONFIG.minFreqHz && Math.abs(centsOff(hz, this.targetMidi)) <= RINGING_NEAR_CENTS) {
+      // A neighbouring note still rings: pitchy measures the mix (F4 over a ringing G4 reads
+      // ~380 Hz, often below the clarity floor), but the ringing-subtracted chroma holds the new
+      // note. The reading is near the target, so the octave is right; the chroma decides.
+      passed = this.chromaPasses(frame);
+    } else if (usableHz && clarity >= cfg.minClarity) {
       if (hz < DEFAULT_CHROMA_CONFIG.minFreqHz) {
         passed = this.chromaPasses(frame);
       } else if (hz <= DEFAULT_CHROMA_CONFIG.maxFreqHz) {
