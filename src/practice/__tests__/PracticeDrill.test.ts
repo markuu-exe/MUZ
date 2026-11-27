@@ -233,7 +233,8 @@ describe('PracticeDrill single-note verifier seam (T-08)', { timeout: 60_000 }, 
     at40.start(0);
     hold(at40, 440 * 2 ** (40 / 1200), 0.95, 500);
     expect(log40).toEqual([]);
-    expect(at40.snapshot(1000)).toMatchObject({ lastAttempt: 'miss', lastHeard: 'A4' });
+    // 40 cents off is outside the grading tolerance, so it is not named "A4" either (no "That sounded like A4" for an A4 target).
+    expect(at40.snapshot(1000)).toMatchObject({ lastAttempt: 'miss', lastHeard: null });
   });
 
   it('keeps the chroma NoteVerifier behind useChromaNoteVerifier for the T-19 comparison', () => {

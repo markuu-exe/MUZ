@@ -23,7 +23,12 @@ import type { SongTarget } from './songs';
 export type WaitEvent =
   | { kind: 'advance'; index: number; firstTry: boolean }
   /** `heard`: what the wrong attempt sounded like ("E4", "D minor"), as the lessons say it; null when unclear. */
-  | { kind: 'wrong'; index: number; heard: string | null };
+  /**
+   * `heardTarget`: the clearest pitch was the target itself, but other notes sounded with it
+   * (often the previous key still held), so the grader rejected it. Never say "That was F4. Try
+   * F4 again" for that (owner report 2026-11-28).
+   */
+  | { kind: 'wrong'; index: number; heard: string | null; heardTarget: boolean };
 
 export interface WaitSummary {
   total: number;
@@ -79,7 +84,10 @@ export class WaitStepper {
     const index = this._index;
     if (attempt.kind === 'miss') {
       this.wrongs[index]++;
-      return { kind: 'wrong', index, heard: describeAttempt(this.verifier, attempt) };
+      const heard = describeAttempt(this.verifier, attempt);
+      const target = this.targets[index];
+      const heardTarget = heard !== null && target.kind === 'note' && heard === midiToNoteName(target.note);
+      return { kind: 'wrong', index, heard: heardTarget ? null : heard, heardTarget };
     }
     this._index++;
     this.verifier = this.done ? null : this.createVerifier(this.targets[this._index]);
