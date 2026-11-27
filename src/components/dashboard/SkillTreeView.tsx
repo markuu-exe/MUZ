@@ -5,6 +5,7 @@ import {
   MODULE_COPY,
   groupByModule,
   nodeStatus,
+  nodeStatusLabel,
   type CurriculumNode,
   type NodeStatus,
 } from '../../lib/dashboard/curriculum';
@@ -69,12 +70,6 @@ function isCheckpoint(lesson: CurriculumNode): boolean {
   return isLessonPayload(lesson.payload) && lesson.payload.isCheckpoint;
 }
 
-function statusText(lesson: CurriculumNode, status: NodeStatus, exp: number): string {
-  if (status === 'mastered') return `Mastered · +${lesson.expReward} XP`;
-  if (status === 'current') return `Up next · +${lesson.expReward} XP`;
-  const required = lesson.required_exp ?? 0;
-  return required > exp ? `Locked · needs ${required} XP` : 'Locked · finish the previous step';
-}
 
 export default function SkillTreeView({
   lessons,
@@ -217,7 +212,7 @@ export default function SkillTreeView({
                   status !== 'locked' &&
                   isLessonPayload(lesson.payload) &&
                   lessonNeedsHearts(lesson.payload);
-                const meta = statusText(lesson, status, exp);
+                const meta = nodeStatusLabel(lesson, status, exp, lessons, progress);
 
                 return (
                   <div key={lesson.id}>

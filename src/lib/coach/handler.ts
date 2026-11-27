@@ -11,7 +11,8 @@
  */
 import { cleanTip, parseCoachInput, type CoachInput } from './coach';
 
-export type TipResult = { kind: 'tip'; text: string } | { kind: 'declined' } | { kind: 'error'; retryable: boolean };
+export type CoachSource = 'gemini' | 'claude';
+export type TipResult = { kind: 'tip'; text: string; source?: CoachSource } | { kind: 'declined' } | { kind: 'error'; retryable: boolean };
 
 export interface CoachDeps {
   writeTip: (input: CoachInput) => Promise<TipResult>;
@@ -85,7 +86,7 @@ export async function handleCoachRequest(request: Request, deps: CoachDeps): Pro
   }
   if (result.kind === 'tip') {
     const tip = cleanTip(result.text);
-    return tip ? json(200, { tip }) : json(502, { error: 'empty' });
+    return tip ? json(200, { tip, source: result.source ?? null }) : json(502, { error: 'empty' });
   }
   if (result.kind === 'declined') return json(422, { error: 'declined' });
   return json(result.retryable ? 503 : 502, { error: 'upstream' });

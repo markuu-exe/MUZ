@@ -110,7 +110,7 @@ describe('coach endpoint guards', () => {
     const d = deps();
     const res = await handleCoachRequest(post(valid(), { origin: 'https://muz.example' }), d);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ tip: 'You held the C chord well. Next, keep your wrist straight.' });
+    expect(await res.json()).toEqual({ tip: 'You held the C chord well. Next, keep your wrist straight.', source: null });
     expect(d.writeTip).toHaveBeenCalledWith(valid());
   });
 
@@ -154,12 +154,13 @@ describe('browser side', () => {
     (async () => new Response(typeof body === 'string' ? body : JSON.stringify(body), { status })) as unknown as typeof fetch;
 
   it('returns the tip', async () => {
-    expect(await requestTip(valid(), respond(200, { tip: 'Nice.' }))).toEqual({ ok: true, tip: 'Nice.' });
+    expect(await requestTip(valid(), respond(200, { tip: 'Nice.', source: 'gemini' }))).toEqual({ ok: true, tip: 'Nice.', source: 'gemini' });
+    expect(await requestTip(valid(), respond(200, { tip: 'Nice.', source: 'evil' }))).toEqual({ ok: true, tip: 'Nice.', source: null });
   });
 
   it('turns every failure into a readable message and never throws', async () => {
     expect(await requestTip(valid(), respond(404, '<html>'))).toEqual({ ok: false, message: coachErrorMessage(404) });
-    expect(await requestTip(valid(), respond(503, { error: 'not_configured' }))).toMatchObject({ ok: false, message: expect.stringMatching(/not available/) });
+    expect(await requestTip(valid(), respond(503, { error: 'not_configured' }))).toMatchObject({ ok: false, message: expect.stringMatching(/not set up/) });
     expect(await requestTip(valid(), respond(429, { error: 'rate_limited' }))).toMatchObject({ message: expect.stringMatching(/break/) });
     const offline = (async () => {
       throw new TypeError('Failed to fetch');

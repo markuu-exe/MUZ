@@ -3,13 +3,14 @@
  * to a short message the results screen can show. Never throws.
  */
 import type { CoachInput } from './coach';
+import type { CoachSource } from './handler';
 
-export type TipResponse = { ok: true; tip: string } | { ok: false; message: string };
+export type TipResponse = { ok: true; tip: string; source: CoachSource | null } | { ok: false; message: string };
 
 export const COACH_TIMEOUT_MS = 25_000;
 
 export function coachErrorMessage(status: number, error?: string): string {
-  if (status === 404 || error === 'not_configured') return 'The AI coach is not available on this version of MUZ.';
+  if (status === 404 || error === 'not_configured') return 'The AI coach is not set up on this version of MUZ.';
   if (status === 429 || error === 'rate_limited') return 'The coach needs a short break. Try again in a minute.';
   if (error === 'declined') return 'The coach could not write a tip for this lesson.';
   return 'The coach could not be reached. Check your connection and try again.';
@@ -25,13 +26,16 @@ export async function requestTip(input: CoachInput, fetchImpl: typeof fetch = fe
       body: JSON.stringify(input),
       signal: controller.signal,
     });
-    let data: { tip?: unknown; error?: string } = {};
+    let data: { tip?: unknown; error?: string; source?: unknown } = {};
     try {
       data = (await res.json()) as typeof data;
     } catch {
       // Not JSON (e.g. the dev server's HTML for an unknown route).
     }
-    if (res.ok && typeof data.tip === 'string' && data.tip.trim()) return { ok: true, tip: data.tip };
+    if (res.ok && typeof data.tip === 'string' && data.tip.trim()) {
+      const source = data.source === 'gemini' || data.source === 'claude' ? data.source : null;
+      return { ok: true, tip: data.tip, source };
+    }
     return { ok: false, message: coachErrorMessage(res.ok ? 502 : res.status, data.error) };
   } catch {
     return { ok: false, message: coachErrorMessage(0) };
