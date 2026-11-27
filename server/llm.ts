@@ -1,6 +1,6 @@
 /**
- * Shared AI providers for the Vercel Functions (/api/coach, /api/ask). The leading underscore
- * keeps Vercel from serving this file as an endpoint.
+ * Shared AI providers for the Vercel Functions (/api/coach, /api/ask). Kept outside /api: Vercel
+ * leaves underscore files in /api out of the deployment, which crashed both endpoints.
  *
  *   1. Google Gemini free tier, when GEMINI_API_KEY is set (GEMINI_MODEL, default
  *      gemini-3.5-flash-lite). Free-tier content is used by Google to improve its products.

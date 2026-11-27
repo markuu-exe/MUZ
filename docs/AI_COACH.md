@@ -36,7 +36,7 @@ Only: the lesson's course title, its status (passed / failed / out of hearts), f
 
 ## Ask the coach (Lesson Notes)
 
-A box at the top of **Lesson Notes** answers one music question at a time (`/api/ask`, same keys and providers as the coach; shared code in `api/_llm.ts`). Because the learner's own words are sent, the guards are tighter (`src/lib/coach/ask.ts`):
+A box at the top of **Lesson Notes** answers one music question at a time (`/api/ask`, same keys and providers as the coach; shared code in `server/llm.ts`). Because the learner's own words are sent, the guards are tighter (`src/lib/coach/ask.ts`):
 
 - 3–300 characters, plain text; one question per request, no chat history kept.
 - The prompt limits answers to piano, music and using MUZ (2–5 sentences, under 120 words); anything else gets one fixed reply, and the question is treated as a question, never as instructions. The model has no tools and the prompt holds no secrets.
