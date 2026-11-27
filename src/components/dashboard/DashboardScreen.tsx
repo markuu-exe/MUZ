@@ -42,6 +42,7 @@ import SkillTreeSkeleton from './SkillTreeSkeleton';
 import LessonNotesView from './LessonNotesView';
 import type { LessonSaveFeedback } from '../lesson/LessonPlayer';
 import LazyBoundary from '../common/LazyBoundary';
+import { readCameraCheck } from '../../practice/cameraCheck';
 import { isLessonPayload, type LessonPayload } from '../../types/lesson.types';
 import type { AnalyticsDateRange } from './ProfileAnalyticsView';
 import PlacementModal from './PlacementModal';
@@ -92,6 +93,7 @@ const NAV_ITEMS: NavItem[] = [
 // player (and its exercise views) or chart.js for the Profile charts.
 const LessonPlayer = lazy(() => import('../lesson/LessonPlayer'));
 const ProfileAnalyticsView = lazy(() => import('./ProfileAnalyticsView'));
+const CameraCheckModal = lazy(() => import('./CameraCheckModal'));
 
 export default function DashboardScreen() {
   const { user, profile, profileStatus, isDemo, signOut, refreshProfile } = useAuth();
@@ -110,6 +112,13 @@ export default function DashboardScreen() {
   // D1: where this lesson's results are saved, decided once when it is opened.
   const [activeDestination, setActiveDestination] = useState<ResultDestination>('learner');
   const [placementDone, setPlacementDone] = useState(false);
+  // P4: camera check, offered once per device right after placement, and from Settings.
+  const [cameraCheckOpen, setCameraCheckOpen] = useState(false);
+  const [cameraCheckResult, setCameraCheckResult] = useState(readCameraCheck);
+  const closeCameraCheck = useCallback(() => {
+    setCameraCheckOpen(false);
+    setCameraCheckResult(readCameraCheck());
+  }, []);
   // T-14 (U-25): the welcome step shows until placement is finished; placement itself is stored on the account.
   const [welcomeSeen, setWelcomeSeen] = useState(false);
   const [analyticsRange, setAnalyticsRange] = useState<AnalyticsDateRange>('7d');
@@ -221,6 +230,7 @@ export default function DashboardScreen() {
     if (!profile) return;
     await savePlacement(supabase, profile.id, startUnit, data.lessons);
     setPlacementDone(true);
+    if (readCameraCheck() === null) setCameraCheckOpen(true);
     await refreshProfile();
     data.reload();
   };
@@ -680,6 +690,8 @@ export default function DashboardScreen() {
                 loading={analytics.loading}
                 error={analytics.error}
                 look={look}
+                userId={profile?.id ?? null}
+                isDemo={isDemo}
               />
             </LazyBoundary>
           )}
@@ -757,6 +769,21 @@ export default function DashboardScreen() {
                     <span className="text-xs font-bold text-slate-300">Acoustic Piano</span>
                   </div>
                 </div>
+              </div>
+
+              <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-xl">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Camera check</h3>
+                <p className="mb-3 mt-1 text-xs text-slate-400">
+                  Checks that your camera can see your shoulder, elbow and wrist for practice lessons.
+                  {cameraCheckResult === 'passed' ? ' Last check on this device: passed.' : cameraCheckResult === 'skipped' ? ' Last time it was skipped on this device.' : ''}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setCameraCheckOpen(true)}
+                  className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-violet-500"
+                >
+                  Check my camera
+                </button>
               </div>
 
               <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-xl">
@@ -902,6 +929,11 @@ export default function DashboardScreen() {
 
       {needsPlacement && !welcomeSeen && <OnboardingWelcome onContinue={() => setWelcomeSeen(true)} />}
       {needsPlacement && welcomeSeen && <PlacementModal onChoose={choosePlacement} />}
+      {cameraCheckOpen && !activeLesson && (
+        <LazyBoundary label="camera check" overlay onCancel={closeCameraCheck}>
+          <CameraCheckModal onClose={closeCameraCheck} />
+        </LazyBoundary>
+      )}
       <AchievementToast toasts={achievementToasts} onDismiss={dismissAchievementToast} />
       {!isDemo && <ConnectionStatus online={online} pending={pendingSync} justSynced={justSynced} />}
     </div>

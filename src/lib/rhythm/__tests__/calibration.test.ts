@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { CALIBRATION_COUNT_IN, MAX_LATENCY_MS, calibrationCue, calibrationSchedule, estimateLatencyMs, measuredTaps } from '../calibration';
+import {
+  CALIBRATION_BPM,
+  CALIBRATION_CLICKS,
+  CALIBRATION_COUNT_IN,
+  MAX_LATENCY_MS,
+  calibrationMarks,
+  calibrationPlan,
+  calibrationSchedule,
+  estimateLatencyMs,
+  measuredTaps,
+} from '../calibration';
 
 const clicks = Array.from({ length: 8 }, (_, i) => i * 0.6);
 
@@ -24,39 +34,40 @@ describe('estimateLatencyMs', () => {
   });
 });
 
-describe('tap-test count-in (owner feedback 2026-11-27)', () => {
-  const s = calibrationSchedule(1, 0.6, 8);
+describe('tap-test plan (owner feedback 2026-11-27)', () => {
+  const plan = calibrationPlan();
+  const s = calibrationSchedule(plan, 1);
+  const gap = 60 / CALIBRATION_BPM;
 
-  it('puts four count-in clicks before the eight measured clicks, on the same grid', () => {
+  it('is a 4/4 lesson plan: one bar of count-in, then the measured clicks on the same grid', () => {
+    expect(plan.beatsPerMeasure).toBe(4);
     expect(s.countIn).toHaveLength(CALIBRATION_COUNT_IN);
     expect(s.countIn[0]).toBeCloseTo(1);
-    expect(s.countIn[3]).toBeCloseTo(2.8);
-    expect(s.measured).toHaveLength(8);
-    expect(s.measured[0]).toBeCloseTo(3.4);
-    expect(s.measured[7]).toBeCloseTo(7.6);
+    expect(s.countIn[3]).toBeCloseTo(1 + 3 * gap);
+    expect(s.measured).toHaveLength(CALIBRATION_CLICKS);
+    expect(s.measured[0]).toBeCloseTo(1 + 4 * gap);
+    expect(s.measured[7]).toBeCloseTo(1 + 11 * gap);
   });
 
   it('ignores taps made along with the count-in, even late ones', () => {
     const countInTaps = s.countIn.map((c) => c + 0.05);
-    const lateLastCountIn = s.countIn[3] + 0.29; // 310 ms before the first measured click
+    const lateLastCountIn = s.countIn[3] + gap / 2 - 0.01; // just before half a gap ahead of the first measured click
     const real = s.measured.map((c) => c + 0.06);
-    const kept = measuredTaps([...countInTaps, lateLastCountIn, ...real], s, 0.6);
+    const kept = measuredTaps([...countInTaps, lateLastCountIn, ...real], s, gap);
     expect(kept).toEqual(real);
     expect(estimateLatencyMs(kept, s.measured)).toBe(60);
   });
 
   it('keeps an early first measured tap (within half a gap)', () => {
-    const early = s.measured[0] - 0.2;
-    expect(measuredTaps([early], s, 0.6)).toEqual([early]);
+    const early = s.measured[0] - gap / 2 + 0.01;
+    expect(measuredTaps([early], s, gap)).toEqual([early]);
   });
 
-  it('counts the beats down on the audio clock, then says tap', () => {
-    expect(calibrationCue(0.5, s)).toEqual({ kind: 'wait' });
-    expect(calibrationCue(1.0, s)).toEqual({ kind: 'count', beat: 1, of: 4 });
-    expect(calibrationCue(1.59, s)).toEqual({ kind: 'count', beat: 1, of: 4 });
-    expect(calibrationCue(1.6, s)).toEqual({ kind: 'count', beat: 2, of: 4 });
-    expect(calibrationCue(2.85, s)).toEqual({ kind: 'count', beat: 4, of: 4 });
-    expect(calibrationCue(3.4, s)).toEqual({ kind: 'tap' });
-    expect(calibrationCue(9, s)).toEqual({ kind: 'tap' });
+  it('marks on the highway only the clicks that got a tap', () => {
+    const taps = [s.measured[0] + 0.04, s.measured[2] - 0.02, s.measured[7] + 0.5]; // the last one is a stray press after the test
+    expect(calibrationMarks(taps, s)).toEqual([
+      { rating: 'Perfect', deltaMs: 40, beatIndex: 0 },
+      { rating: 'Perfect', deltaMs: -20, beatIndex: 2 },
+    ]);
   });
 });

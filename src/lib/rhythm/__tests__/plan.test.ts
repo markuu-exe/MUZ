@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { COURSE_LESSONS, exerciseBpm, exerciseSettings, getPattern } from '../../../content';
 import { EXERCISE_ENGINE, type TapExercise } from '../../../types/lesson.types';
-import { acceptsTap, buildRhythmPlan, scoreRhythm, segmentAt } from '../plan';
+import { acceptsTap, buildRhythmPlan, rhythmCue, rhythmCueText, scoreRhythm, segmentAt } from '../plan';
 import { summarize, type JudgedTap } from '../timing';
 
 const perfect = (i: number): JudgedTap => ({ rating: 'Perfect', deltaMs: 0, beatIndex: i });
@@ -110,5 +110,41 @@ describe('scoreRhythm', () => {
 
   it('no taps at all fails', () => {
     expect(scoreRhythm(summarize([], 8), [], 8, 0.7)).toMatchObject({ score: 0, passed: false });
+  });
+});
+
+describe('rhythmCue: the count-in follows the time signature', () => {
+  const opts = { mode: 'tap-along' as const, bpm: 60, countInBeats: 4, repeats: 1 };
+
+  it('4/4: one bar of 4, counted 1-4, then tap', () => {
+    const p = buildRhythmPlan(getPattern('quarters'), opts);
+    expect(rhythmCue(p, -0.1)).toEqual({ kind: 'wait' });
+    expect(rhythmCue(p, 0)).toMatchObject({ kind: 'count', beat: 1, of: 4, measureBeat: 1, beatsPerMeasure: 4 });
+    expect(rhythmCue(p, 3.5)).toMatchObject({ kind: 'count', beat: 4, measureBeat: 4 });
+    expect(rhythmCue(p, 4)).toEqual({ kind: 'play' });
+    expect(rhythmCueText(rhythmCue(p, 1))).toBe("Count-in 2 of 4. Listen, don't tap yet.");
+  });
+
+  it('3/4: two bars of 3 (6 clicks), counted 1-2-3 | 1-2-3', () => {
+    const p = buildRhythmPlan(getPattern('waltz'), opts);
+    const counts = [0, 1, 2, 3, 4, 5].map((t) => rhythmCue(p, t));
+    expect(counts.map((c) => (c.kind === 'count' ? c.measureBeat : null))).toEqual([1, 2, 3, 1, 2, 3]);
+    expect(counts[5]).toMatchObject({ of: 6, beatsPerMeasure: 3 });
+    expect(rhythmCueText(counts[4])).toBe("Count-in 2 of 3 (bar 2 of 2). Listen, don't tap yet.");
+    expect(rhythmCue(p, 6)).toEqual({ kind: 'play' });
+  });
+
+  it('6/8: one bar of 6 eighth-note clicks', () => {
+    const p = buildRhythmPlan(getPattern('six-eight'), opts);
+    expect(rhythmCue(p, 0)).toMatchObject({ kind: 'count', of: 6, beatsPerMeasure: 6 });
+    expect(rhythmCueText(rhythmCue(p, 5))).toBe("Count-in 6 of 6. Listen, don't tap yet.");
+  });
+
+  it('tap-echo: listen pass after the count-in, then your turn', () => {
+    const p = buildRhythmPlan(getPattern('quarters'), { ...opts, mode: 'tap-echo' });
+    expect(rhythmCue(p, 4.5)).toEqual({ kind: 'listen' });
+    expect(rhythmCue(p, 8.5)).toEqual({ kind: 'play' });
+    expect(rhythmCueText({ kind: 'play' }, 'tap-echo')).toBe('Your turn: tap it back.');
+    expect(rhythmCue(p, p.endSec)).toEqual({ kind: 'done' });
   });
 });

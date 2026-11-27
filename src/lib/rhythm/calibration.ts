@@ -5,6 +5,9 @@
  * stored per device and subtracted from every rhythm tap. Only the device delay is
  * measured: a learner who plays late in a lesson is still judged late.
  */
+import { getPattern } from '../../content/patterns';
+import { buildRhythmPlan, type RhythmPlan } from './plan';
+import type { JudgedTap } from './timing';
 
 export const TAP_LATENCY_KEY = 'muz-tap-latency-ms';
 /** Ignore taps farther than this from every click (stray presses). */
@@ -59,11 +62,24 @@ export function saveTapLatencyMs(ms: number): void {
 }
 
 /**
- * Count-in before the measured clicks (owner feedback 2026-11-27: without it the first click
- * was already being measured and took the learner by surprise). Same length and voice as the
- * rhythm-lesson count-in (tiers.ts countInBeats: 4; clickVoice countIn).
+ * The tap test is a 4/4 rhythm plan built exactly like a lesson's (buildRhythmPlan), so it gets
+ * the lesson count-in (countInBeats 4, rounded up to whole measures: one bar of 4 in 4/4), the
+ * same click voices and the same beat highway. Owner feedback 2026-11-27: the first click used
+ * to be measured at once, with no count-in and nothing to watch.
  */
 export const CALIBRATION_COUNT_IN = 4;
+export const CALIBRATION_BPM = 100;
+export const CALIBRATION_CLICKS = 8;
+
+export function calibrationPlan(): RhythmPlan {
+  const quarters = getPattern('quarters');
+  return buildRhythmPlan(quarters, {
+    mode: 'tap-along',
+    bpm: CALIBRATION_BPM,
+    countInBeats: CALIBRATION_COUNT_IN,
+    repeats: Math.ceil(CALIBRATION_CLICKS / quarters.hits.length),
+  });
+}
 
 export interface CalibrationSchedule {
   /** AudioContext times of the count-in clicks (not measured). */
@@ -72,10 +88,11 @@ export interface CalibrationSchedule {
   measured: number[];
 }
 
-export function calibrationSchedule(startSec: number, gapSec: number, measuredClicks: number, countIn = CALIBRATION_COUNT_IN): CalibrationSchedule {
+/** Absolute AudioContext times for a plan whose t = 0 is at context time `t0`. */
+export function calibrationSchedule(plan: RhythmPlan, t0: number): CalibrationSchedule {
   return {
-    countIn: Array.from({ length: countIn }, (_, i) => startSec + i * gapSec),
-    measured: Array.from({ length: measuredClicks }, (_, i) => startSec + (countIn + i) * gapSec),
+    countIn: plan.clicks.filter((c) => c.countIn).map((c) => t0 + c.time),
+    measured: plan.targets.map((t) => t0 + t),
   };
 }
 
@@ -86,18 +103,16 @@ export function measuredTaps(tapTimesSec: readonly number[], schedule: Calibrati
   return tapTimesSec.filter((t) => t >= first - gapSec / 2);
 }
 
-export type CalibrationCue =
-  | { kind: 'wait' }
-  /** `beat` is 1-based; `of` is the count-in length. Shown as "4 3 2 1" counting down. */
-  | { kind: 'count'; beat: number; of: number }
-  | { kind: 'tap' };
-
-/** What to show at audible time `nowSec`: wait before the first click, count down during the count-in, then tap. */
-export function calibrationCue(nowSec: number, schedule: CalibrationSchedule): CalibrationCue {
-  const { countIn, measured } = schedule;
-  if (measured.length > 0 && nowSec >= measured[0]) return { kind: 'tap' };
-  if (countIn.length === 0 || nowSec < countIn[0]) return { kind: 'wait' };
-  let beat = 0;
-  for (let i = 0; i < countIn.length; i++) if (nowSec >= countIn[i]) beat = i + 1;
-  return { kind: 'count', beat, of: countIn.length };
+/**
+ * Highway marks for the tap test: a measured click with a tap within CALIBRATION_MATCH_MS turns
+ * green ("your tap was heard"); the others fade once passed. Nothing is graded here.
+ */
+export function calibrationMarks(tapTimesSec: readonly number[], schedule: CalibrationSchedule): JudgedTap[] {
+  const marks: JudgedTap[] = [];
+  schedule.measured.forEach((click, i) => {
+    let best = Infinity;
+    for (const tap of tapTimesSec) if (Math.abs(tap - click) < Math.abs(best)) best = tap - click;
+    if (Math.abs(best) * 1000 <= CALIBRATION_MATCH_MS) marks.push({ rating: 'Perfect', deltaMs: Math.round(best * 1000), beatIndex: i });
+  });
+  return marks;
 }

@@ -14,7 +14,9 @@ import { cn } from '../../../lib/cn';
 import { buildRhythmPlan, scoreRhythm, type RhythmScore } from '../../../lib/rhythm/plan';
 import { POINTS } from '../../../lib/rhythm/timing';
 import type { TapExercise, TapExerciseType } from '../../../types/lesson.types';
+import { useRhythmCue } from '../../../hooks/useRhythmCue';
 import BeatHighway from './BeatHighway';
+import CountInBadge from './CountInBadge';
 import RhythmNotation from './RhythmNotation';
 
 const COPY: Record<TapExerciseType, { title: string; how: string; showNotation: boolean }> = {
@@ -64,6 +66,8 @@ export default function TapExerciseView({ exercise, payload, settings, onOutcome
     },
     windows,
   );
+  // The count-in follows the meter (4/4 counts 4, 3/4 counts two bars of 3, 6/8 one bar of 6).
+  const cue = useRhythmCue(plan, session.now, session.phase === 'running');
   const copy = COPY[exercise.type];
   const [needsCalibration, setNeedsCalibration] = useState(() => !hasTapCalibration());
   const last = session.taps[session.taps.length - 1];
@@ -137,6 +141,7 @@ export default function TapExerciseView({ exercise, payload, settings, onOutcome
           </p>
         )}
       </div>
+      {session.phase === 'running' && <CountInBadge cue={cue} mode={exercise.type} />}
 
       {session.phase === 'idle' && !done && needsCalibration && (
         <details className="rounded-xl border border-cyan-500/30 bg-cyan-950/30 p-4 text-sm text-cyan-100" open>

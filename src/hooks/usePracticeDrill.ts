@@ -36,6 +36,26 @@ export function usePracticeDrill(options: UsePracticeDrillOptions) {
 
   const drillRef = useRef<PracticeDrill | null>(null);
   const rmsRef = useRef(-Infinity);
+  const idleView = useCallback(
+    (): PracticeDrillView => ({
+      state: 'idle',
+      stepIndex: 0,
+      stepCount: targets.length,
+      hearts,
+      heartsLost: 0,
+      remainingMs: timeoutSec * 1000,
+      timeoutMs: timeoutSec * 1000,
+      consecutiveMisses: 0,
+      lastAttempt: null,
+      lastHeard: null,
+      lastCheck: null,
+      postureBlocked: false,
+      complete: false,
+      running: false,
+      rmsDb: -Infinity,
+    }),
+    [targets.length, hearts, timeoutSec],
+  );
   const [view, setView] = useState<PracticeDrillView>(() => ({
     state: 'idle',
     stepIndex: 0,
@@ -116,5 +136,12 @@ export function usePracticeDrill(options: UsePracticeDrillOptions) {
     refresh();
   }, [suspended, refresh]);
 
-  return { ...view, start };
+  /** Stop and discard the drill without penalty (P5: leaving practice, or practising again). */
+  const reset = useCallback(() => {
+    drillRef.current?.stop(performance.now());
+    drillRef.current = null;
+    setView(idleView());
+  }, [idleView]);
+
+  return { ...view, start, reset };
 }
