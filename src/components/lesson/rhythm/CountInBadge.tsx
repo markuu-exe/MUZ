@@ -13,12 +13,15 @@ interface CountInBadgeProps {
   mode?: TapExerciseType;
   /** Replaces the default "Tap now." line (e.g. with a tap counter). */
   tapText?: string;
+  /** Replaces the default count-in line (e.g. for a drill's count-in, where there is nothing to tap). */
+  countText?: (cue: Extract<RhythmCue, { kind: 'count' }>) => string;
 }
 
-export default function CountInBadge({ cue, mode = 'tap-along', tapText }: CountInBadgeProps) {
+export default function CountInBadge({ cue, mode = 'tap-along', tapText, countText }: CountInBadgeProps) {
   const counting = cue.kind === 'count';
   const beatsPerBar = counting ? cue.beatsPerMeasure : 0;
-  const text = cue.kind === 'play' && tapText ? tapText : rhythmCueText(cue, mode);
+  const text =
+    cue.kind === 'play' && tapText ? tapText : cue.kind === 'count' && countText ? countText(cue) : rhythmCueText(cue, mode);
   return (
     <div className="flex items-center gap-4 rounded-xl border border-violet-500/40 bg-violet-950/40 px-4 py-3">
       <span

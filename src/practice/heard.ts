@@ -15,7 +15,7 @@
  * for the ?debug view.
  */
 import { compensateHarmonics, type ChordMatcher } from '../audio/chords/ChordMatcher';
-import { DEFAULT_MATCHER_CONFIG, DEFAULT_PITCH_CONFIG } from '../audio/config';
+import { DEFAULT_MATCHER_CONFIG, DEFAULT_PITCH_CONFIG, DEFAULT_VERIFIER_CONFIG, type MatcherConfig } from '../audio/config';
 import { PITCH_CLASS_NAMES, centsOff, freqToMidi, midiToNoteName } from '../audio/dsp/pitch';
 
 export interface HeardFrameLike {
@@ -53,10 +53,19 @@ function confidentMidi(frame: HeardFrameLike, minClarity: number): number | null
   return frame.pitchHz != null && frame.pitchHz > 0 && (frame.clarity ?? 0) >= minClarity ? Math.round(freqToMidi(frame.pitchHz)) : null;
 }
 
+/**
+ * Pitch classes to list for a chord target, read like the grader reads them: a chord tone
+ * counts when it reaches the matcher's coverage floor (minToneCoverage, 25 %), but a note
+ * that is NOT in the chord is only listed when it is loud enough for the grader to reject
+ * the chord for it (maxExtraTone, 35 %; 50 % while a previous sound is still ringing).
+ * Without a target, every pitch class must clear the extra-tone bar.
+ * Listing every class above 25 % showed overtones and room noise as notes you never played.
+ */
 export function heardFromFrame(
   frame: HeardFrameLike,
   minClarity = DEFAULT_PITCH_CONFIG.minClarity,
-  matcher: { harmonicDecay: number; minToneCoverage: number } = DEFAULT_MATCHER_CONFIG,
+  matcher: Pick<MatcherConfig, 'harmonicDecay' | 'minToneCoverage' | 'maxExtraTone' | 'maxExtraToneRinging'> = DEFAULT_MATCHER_CONFIG,
+  targetPcs: readonly number[] = [],
 ): Heard {
   if (!frame.voiced) return NOTHING_HEARD;
   let rawMax = 0;
@@ -64,9 +73,17 @@ export function heardFromFrame(
   if (rawMax <= 0) return { midi: confidentMidi(frame, minClarity), pitchClasses: [], rawPitchClasses: [] };
   const comp = new Float64Array(12);
   const compMax = compensateHarmonics(frame.chroma, matcher.harmonicDecay, comp);
+  const extraBar = frame.ringing ? matcher.maxExtraToneRinging : matcher.maxExtraTone;
+  const listed =
+    compMax > 0
+      ? Array.from({ length: 12 }, (_, i) => i)
+          .filter((i) => comp[i] > 0 && (targetPcs.includes(i) ? comp[i] >= compMax * matcher.minToneCoverage : comp[i] > compMax * extraBar))
+          .sort((a, b) => comp[b] - comp[a])
+          .slice(0, MAX_LISTED)
+      : [];
   return {
     midi: confidentMidi(frame, minClarity),
-    pitchClasses: compMax > 0 ? ranked(comp, compMax * matcher.minToneCoverage) : [],
+    pitchClasses: listed,
     rawPitchClasses: ranked(frame.chroma, rawMax * CHROMA_SHARE),
   };
 }
@@ -105,4 +122,69 @@ export function heardKeys(heard: Heard, chordTarget: boolean, start: number, end
   const keys: number[] = [];
   for (let m = start; m <= end; m++) if (heard.pitchClasses.includes(((m % 12) + 12) % 12)) keys.push(m);
   return keys;
+}
+
+interface WindowFrame {
+  tMs: number;
+  voiced: boolean;
+  chroma: Float64Array;
+  ringing: boolean;
+  midi: number | null;
+  passes: boolean;
+}
+
+/**
+ * The Hearing display's short memory: like ChordVerifier, it looks at a window of frames
+ * (150 ms, about 14 analysis hops) instead of one ~10 ms frame.
+ * - Listed notes come from the window's average chroma, so a note must sound for a while
+ *   to appear (single-frame noise and attack transients no longer flash up as notes).
+ * - "Matches" (green) needs the grader's per-frame test to pass on at least minPassRatio
+ *   (80 %) of the voiced frames, the same ratio the grader requires over its 200 ms window.
+ * - A single note shows the most frequent confident pitch in the window.
+ */
+export class HearingWindow {
+  private frames: WindowFrame[] = [];
+
+  constructor(
+    private readonly windowMs = 150,
+    private readonly minPassRatio = DEFAULT_VERIFIER_CONFIG.minPassRatio,
+    private readonly minFrames = 3,
+  ) {}
+
+  push(frame: HeardFrameLike & { tMs: number }, target: HeardTarget, chordMatcher: Pick<ChordMatcher, 'match'>): void {
+    const chroma = new Float64Array(12);
+    for (let i = 0; i < 12; i++) chroma[i] = frame.chroma[i] ?? 0;
+    this.frames.push({
+      tMs: frame.tMs,
+      voiced: frame.voiced,
+      chroma,
+      ringing: frame.ringing ?? false,
+      midi: confidentMidi(frame, DEFAULT_PITCH_CONFIG.minClarity),
+      passes: frameMatchesTarget(frame, target, chordMatcher),
+    });
+    const cutoff = frame.tMs - this.windowMs;
+    while (this.frames.length > 0 && this.frames[0].tMs < cutoff) this.frames.shift();
+  }
+
+  clear(): void {
+    this.frames = [];
+  }
+
+  read(targetPcs: readonly number[] = []): { heard: Heard; matches: boolean } {
+    const voiced = this.frames.filter((f) => f.voiced);
+    // Mostly silence in the window: nothing is being played right now.
+    if (voiced.length < this.minFrames || voiced.length * 2 < this.frames.length) return { heard: NOTHING_HEARD, matches: false };
+    const avg = new Float64Array(12);
+    for (const f of voiced) for (let i = 0; i < 12; i++) avg[i] += f.chroma[i] / voiced.length;
+    const counts = new Map<number, number>();
+    for (const f of voiced) if (f.midi !== null) counts.set(f.midi, (counts.get(f.midi) ?? 0) + 1);
+    let midi: number | null = null;
+    let best = 0;
+    for (const [m, n] of counts) if (n > best) [midi, best] = [m, n];
+    // A pitch heard on only a few frames is not shown.
+    if (best * 2 < voiced.length) midi = null;
+    const heard = heardFromFrame({ voiced: true, chroma: avg, ringing: voiced[voiced.length - 1].ringing }, undefined, undefined, targetPcs);
+    const passes = voiced.filter((f) => f.passes).length;
+    return { heard: { ...heard, midi }, matches: passes / voiced.length >= this.minPassRatio };
+  }
 }
