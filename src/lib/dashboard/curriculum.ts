@@ -188,3 +188,23 @@ export function groupByModule(lessons: CurriculumNode[]): Array<{ moduleIndex: n
 export function displayNameFromProfile(profile: UserProfile | null, email?: string | null): string {
   return profile?.username || email?.split('@')[0] || 'Pianist';
 }
+
+/**
+ * The text shown under a Skill Tree node (and read out in its label). A locked node names what
+ * unlocks it right on the node: the lesson to finish first, or the EXP it needs (UX request
+ * 2026-11-27: the reason used to appear only in a banner after clicking).
+ */
+export function nodeStatusLabel(
+  lesson: CurriculumNode,
+  status: NodeStatus,
+  exp: number,
+  catalog: CurriculumNode[],
+  progress: ProgressMap,
+): string {
+  if (status === 'mastered') return `Mastered · +${lesson.expReward} XP`;
+  if (status === 'current') return `Up next · +${lesson.expReward} XP`;
+  const blocking = blockingLesson(lesson, catalog, progress);
+  if (blocking) return `Locked · finish "${blocking.title}" first`;
+  const required = lesson.required_exp ?? 0;
+  return required > exp ? `Locked · needs ${required} XP (you have ${exp})` : 'Locked · finish the previous step';
+}

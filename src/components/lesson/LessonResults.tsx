@@ -16,6 +16,10 @@ interface LessonResultsProps {
   onClose: () => void;
   /** D1: a developer test run (lesson opened while locked); never shown as learner progress. */
   testRun?: boolean;
+  /** The run was not saved (and not queued); offer to try again. */
+  unsaved?: boolean;
+  savingAgain?: boolean;
+  onRetrySave?: () => void;
 }
 
 const HEADLINE: Record<LessonResult['status'], { title: string; body: string }> = {
@@ -92,7 +96,17 @@ function CountUp({ text, animate }: { text: string; animate: boolean }) {
   );
 }
 
-export default function LessonResults({ title, result, note, onRetry, onClose, testRun = false }: LessonResultsProps) {
+export default function LessonResults({
+  title,
+  result,
+  note,
+  onRetry,
+  onClose,
+  testRun = false,
+  unsaved = false,
+  savingAgain = false,
+  onRetrySave,
+}: LessonResultsProps) {
   const head = resultSummary(result, { testRun });
   const reduced = useReducedMotion();
   // One chime when the results appear (the lesson, and any microphone, has finished).
@@ -143,6 +157,22 @@ export default function LessonResults({ title, result, note, onRetry, onClose, t
             <p className="mt-2 text-xs text-slate-500">{note}</p>
           ))}
       </div>
+
+      {(unsaved || savingAgain) && onRetrySave && (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-500/50 bg-rose-950/50 px-4 py-3 text-left">
+          <p className="text-sm font-semibold text-rose-100">
+            {savingAgain ? 'Saving your result…' : 'This result was not saved yet. Your progress, EXP and streak will not count until it is.'}
+          </p>
+          <button
+            type="button"
+            disabled={savingAgain}
+            onClick={onRetrySave}
+            className="rounded-lg bg-rose-500 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-rose-400 disabled:opacity-60"
+          >
+            {savingAgain ? 'Saving…' : 'Try saving again'}
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         {stats.map(({ label, value, icon: Icon, tone }) => (

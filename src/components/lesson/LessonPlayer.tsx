@@ -32,6 +32,8 @@ import './lesson.css';
 export interface LessonSaveFeedback {
   note?: string | null;
   expAwarded?: number;
+  /** false: the run was NOT saved (and not queued); the results screen offers to try again. */
+  saved?: boolean;
 }
 
 type LessonCompleteReturn = void | string | LessonSaveFeedback;
@@ -81,6 +83,9 @@ export default function LessonPlayer({
   const [pending, setPending] = useState<ExerciseOutcome | null>(null);
   const [confirmQuit, setConfirmQuit] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  // UX 2026-11-27: a run whose save failed is not silently dropped; the learner can try again.
+  const [unsaved, setUnsaved] = useState(false);
+  const [retryingSave, setRetryingSave] = useState(false);
   const [savedExp, setSavedExp] = useState<number | null>(null);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
@@ -97,13 +102,12 @@ export default function LessonPlayer({
   const progress = lessonProgress(run);
   const result = useMemo(() => (run.status === 'running' ? null : buildLessonResult(run)), [run]);
 
-  // Report each finished run exactly once.
-  useEffect(() => {
-    if (!result || reported.current === run) return;
-    reported.current = run;
-    void Promise.resolve(onCompleteRef.current?.(result)).then(
+  const saveRun = useCallback((finished: LessonResult) =>
+    Promise.resolve(onCompleteRef.current?.(finished)).then(
       (feedback) => {
-        if (!mounted.current || !feedback) return;
+        if (!mounted.current) return;
+        setUnsaved(typeof feedback === 'object' && feedback !== null && feedback.saved === false);
+        if (!feedback) return;
         if (typeof feedback === 'string') {
           setNote(feedback);
           return;
@@ -112,10 +116,27 @@ export default function LessonPlayer({
         if (typeof feedback.expAwarded === 'number') setSavedExp(feedback.expAwarded);
       },
       () => {
-        if (mounted.current) setNote('Your result could not be saved.');
+        if (!mounted.current) return;
+        setNote('Your result could not be saved.');
+        setUnsaved(true);
       },
-    );
-  }, [result, run]);
+    ), []);
+
+  // Report each finished run exactly once (a retry after a failed save reuses the same run id).
+  useEffect(() => {
+    if (!result || reported.current === run) return;
+    reported.current = run;
+    void saveRun(result);
+  }, [result, run, saveRun]);
+
+  const retrySave = useCallback(() => {
+    if (!result || retryingSave) return;
+    setRetryingSave(true);
+    setNote(null);
+    void saveRun(result).finally(() => {
+      if (mounted.current) setRetryingSave(false);
+    });
+  }, [result, retryingSave, saveRun]);
 
   /** Hearts the current exercise has spent but not yet reported (T-06). */
   const inFlightHeartsLost = useRef(0);
@@ -170,6 +191,7 @@ export default function LessonPlayer({
   const retry = () => {
     inFlightHeartsLost.current = 0;
     setNote(null);
+    setUnsaved(false);
     setSavedExp(null);
     setPending(null);
     setRun(createLessonRun(lessonId, payload, result?.heartsEnd ?? hearts, Date.now()));
@@ -238,6 +260,9 @@ export default function LessonPlayer({
             title={title}
             result={savedExp === null ? result : { ...result, expAwarded: savedExp }}
             note={note}
+            unsaved={unsaved}
+            savingAgain={retryingSave}
+            onRetrySave={retrySave}
             onRetry={retry}
             onClose={onClose}
             testRun={testRun}

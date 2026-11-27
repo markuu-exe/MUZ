@@ -390,7 +390,7 @@ export default function DashboardScreen() {
       return feedback;
     } catch (err) {
       if (destination === 'dev-test') {
-        return { note: 'Your result could not be saved.' };
+        return { note: 'Your result could not be saved.', saved: false };
       }
       // T-13 (SRS 3.3.2): offline, keep the run in the local queue and sync it when the connection returns.
       if (isNetworkError(err) && syncQueueRef.current) {
@@ -415,6 +415,7 @@ export default function DashboardScreen() {
           ? `Could not save to server; achievements checked locally.\n${badgeNote}`
           : 'Your result could not be saved.',
         expAwarded: 0,
+        saved: false,
       };
     }
   };
