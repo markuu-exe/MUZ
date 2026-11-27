@@ -40,6 +40,7 @@ import SoundToggle from './SoundToggle';
 import AppearanceCard from './AppearanceCard';
 import SkillTreeSkeleton from './SkillTreeSkeleton';
 import LessonNotesView from './LessonNotesView';
+import PianoSandboxView from './PianoSandboxView';
 import LessonPlayer, { type LessonSaveFeedback } from '../lesson/LessonPlayer';
 import { isLessonPayload, type LessonPayload } from '../../types/lesson.types';
 import ProfileAnalyticsView, { type AnalyticsDateRange } from './ProfileAnalyticsView';
@@ -83,6 +84,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: 'skill-tree', label: 'Skill Tree', icon: GitBranch },
   { id: 'lessons', label: 'Lessons', icon: BookOpen },
+  { id: 'sandbox', label: 'Piano Sandbox', icon: Piano },
   { id: 'profile', label: 'Profile & Analytics', icon: UserRound },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
@@ -482,7 +484,7 @@ export default function DashboardScreen() {
                 type="button"
                 onClick={() => {
                   setView(item.id);
-                  if (item.id === 'settings' || item.id === 'profile') {
+                  if (item.id === 'settings' || item.id === 'profile' || item.id === 'sandbox') {
                     setSelected(null);
                     setSelectedStatus(null);
                   }
@@ -582,7 +584,9 @@ export default function DashboardScreen() {
                     ? 'Profile & Performance Telemetry'
                     : view === 'lessons'
                       ? 'Lesson Notes'
-                      : 'Studio Settings'}
+                      : view === 'sandbox'
+                        ? 'Piano Sandbox'
+                        : 'Studio Settings'}
               </h1>
             </div>
           </div>
@@ -678,6 +682,9 @@ export default function DashboardScreen() {
 
           {/* VIEW 3: LESSON NOTES (read-only study notes; practice lives on the Skill Tree) */}
           {view === 'lessons' && <LessonNotesView />}
+
+          {/* VIEW 3B: PIANO SANDBOX (free play with computer keyboard or mouse) */}
+          {view === 'sandbox' && <PianoSandboxView />}
 
           {/* VIEW 4: SETTINGS */}
           {view === 'settings' && (
