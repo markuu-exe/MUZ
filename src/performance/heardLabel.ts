@@ -7,7 +7,8 @@
  * - Chord target: ChordMatcher's closest competing chord for the strike's average chroma.
  */
 import { DEFAULT_PITCH_CONFIG } from '../audio/config';
-import { centsOff, freqToMidi, midiToNoteName } from '../audio/dsp/pitch';
+import { midiToNoteName } from '../audio/dsp/pitch';
+import { nearestTunedMidi, tunedCentsOff } from '../audio/tuning';
 import { chordMatcher } from '../practice/PracticeDrill';
 import type { HeardFrameLike } from '../practice/heard';
 import type { SongTarget } from './songs';
@@ -21,10 +22,10 @@ export function describeHeard(frames: readonly HeardFrameLike[], target: SongTar
     const counts = new Map<number, number>();
     for (const f of voiced) {
       if (f.pitchHz == null || !(f.pitchHz > 0) || (f.clarity ?? 0) < DEFAULT_PITCH_CONFIG.minClarity) continue;
-      const midi = Math.round(freqToMidi(f.pitchHz));
+      const midi = nearestTunedMidi(f.pitchHz);
       if (Math.abs(midi - target.note) > PLAUSIBLE_SEMITONES) continue;
       // The grader's tolerance: 40 cents off F4 is not "F4".
-      if (Math.abs(centsOff(f.pitchHz, midi)) > DEFAULT_PITCH_CONFIG.centsTolerance) continue;
+      if (Math.abs(tunedCentsOff(f.pitchHz, midi)) > DEFAULT_PITCH_CONFIG.centsTolerance) continue;
       counts.set(midi, (counts.get(midi) ?? 0) + 1);
     }
     let best = -1;
