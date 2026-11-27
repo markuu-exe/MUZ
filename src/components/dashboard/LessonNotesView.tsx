@@ -6,6 +6,7 @@ import type { Tier } from '../../types/lesson.types';
 import { buildLessonNotes } from '../../lib/dashboard/lessonNotes';
 import NoteFigure from '../lesson/theory/NoteFigure';
 import Illustration from '../theory/Illustration';
+import AskCoach from './AskCoach';
 
 /**
  * Lessons tab: study notes only. Practice happens on the Skill Tree; nothing
@@ -23,6 +24,9 @@ export default function LessonNotesView() {
         <p className="mt-1 text-sm text-slate-400">
           Read-only notes from every unit. To practise a topic, open its lesson on the Skill Tree.
         </p>
+        <div className="mt-4">
+          <AskCoach />
+        </div>
         <div className="mt-4 flex gap-1.5 rounded-2xl border border-slate-800 bg-slate-900/90 p-1" role="tablist" aria-label="Level">
           {(['novice', 'proficient', 'virtuoso'] as const).map((t) => (
             <button

@@ -19,13 +19,18 @@ export function geminiUrl(model: string): string {
   return `${GEMINI_ENDPOINT}/${model}:generateContent`;
 }
 
-export function geminiRequestBody(input: CoachInput) {
+/** A single-turn request: system instructions plus one user message. */
+export function geminiTextBody(system: string, user: string, maxOutputTokens = 1024) {
   return {
-    systemInstruction: { parts: [{ text: COACH_SYSTEM_PROMPT }] },
-    contents: [{ role: 'user', parts: [{ text: coachUserMessage(input) }] }],
-    // Room for a model that thinks before answering; the prompt asks for ~60 words.
-    generationConfig: { maxOutputTokens: 1024 },
+    systemInstruction: { parts: [{ text: system }] },
+    contents: [{ role: 'user', parts: [{ text: user }] }],
+    // Room for a model that thinks before answering; prompts ask for short answers.
+    generationConfig: { maxOutputTokens },
   };
+}
+
+export function geminiRequestBody(input: CoachInput) {
+  return geminiTextBody(COACH_SYSTEM_PROMPT, coachUserMessage(input));
 }
 
 interface GeminiResponse {

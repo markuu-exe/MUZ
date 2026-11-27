@@ -10,6 +10,7 @@
  *   set on the Anthropic Console key).
  */
 import { cleanTip, parseCoachInput, type CoachInput } from './coach';
+import { clientIp, createRateLimiter, json, readJson, sameSite } from './guard';
 
 export type CoachSource = 'gemini' | 'claude';
 export type TipResult = { kind: 'tip'; text: string; source?: CoachSource } | { kind: 'declined' } | { kind: 'error'; retryable: boolean };
@@ -24,39 +25,11 @@ export interface CoachDeps {
 export const MAX_BODY_BYTES = 4096;
 export const RATE_LIMIT = { windowMs: 60_000, max: 10 };
 
-const hits = new Map<string, number[]>();
+const limiter = createRateLimiter(RATE_LIMIT.windowMs, RATE_LIMIT.max);
 
 /** Test hook: clear the in-memory rate limiter. */
 export function resetCoachRateLimit(): void {
-  hits.clear();
-}
-
-function json(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
-  });
-}
-
-function sameSite(request: Request): boolean {
-  const origin = request.headers.get('origin');
-  if (!origin) return true; // same-origin fetches from some browsers omit it; non-browsers are covered by the rate limit
-  try {
-    return new URL(origin).host === new URL(request.url).host;
-  } catch {
-    return false;
-  }
-}
-
-function rateLimited(ip: string, now: number): boolean {
-  const recent = (hits.get(ip) ?? []).filter((t) => now - t < RATE_LIMIT.windowMs);
-  if (recent.length >= RATE_LIMIT.max) {
-    hits.set(ip, recent);
-    return true;
-  }
-  recent.push(now);
-  hits.set(ip, recent);
-  return false;
+  limiter.reset();
 }
 
 export async function handleCoachRequest(request: Request, deps: CoachDeps): Promise<Response> {
@@ -64,18 +37,11 @@ export async function handleCoachRequest(request: Request, deps: CoachDeps): Pro
   if (!deps.configured) return json(503, { error: 'not_configured' });
   if (!sameSite(request)) return json(403, { error: 'forbidden' });
 
-  const ip = (request.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() || 'unknown';
-  if (rateLimited(ip, (deps.now ?? Date.now)())) return json(429, { error: 'rate_limited' });
+  if (limiter.hit(clientIp(request), (deps.now ?? Date.now)())) return json(429, { error: 'rate_limited' });
 
-  let body: unknown;
-  try {
-    const raw = await request.text();
-    if (raw.length > MAX_BODY_BYTES) return json(413, { error: 'too_large' });
-    body = JSON.parse(raw);
-  } catch {
-    return json(400, { error: 'bad_request' });
-  }
-  const input = parseCoachInput(body);
+  const read = await readJson(request, MAX_BODY_BYTES);
+  if (!read.ok) return json(read.status, { error: read.status === 413 ? 'too_large' : 'bad_request' });
+  const input = parseCoachInput(read.body);
   if (!input) return json(400, { error: 'bad_request' });
 
   let result: TipResult;
