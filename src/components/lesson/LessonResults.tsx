@@ -20,6 +20,9 @@ interface LessonResultsProps {
   unsaved?: boolean;
   savingAgain?: boolean;
   onRetrySave?: () => void;
+  /** After a pass: open the next lesson straight away. */
+  nextTitle?: string | null;
+  onNext?: () => void;
 }
 
 const HEADLINE: Record<LessonResult['status'], { title: string; body: string }> = {
@@ -106,6 +109,8 @@ export default function LessonResults({
   unsaved = false,
   savingAgain = false,
   onRetrySave,
+  nextTitle = null,
+  onNext,
 }: LessonResultsProps) {
   const head = resultSummary(result, { testRun });
   const reduced = useReducedMotion();
@@ -214,13 +219,32 @@ export default function LessonResults({
             <RotateCcw className="h-4 w-4" /> Try again
           </button>
         )}
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex-1 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 py-3 text-sm font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(168,85,247,0.45)] transition hover:brightness-110 active:scale-[0.98]"
-        >
-          {result.passed ? 'Continue' : 'Back to skill tree'}
-        </button>
+        {result.passed && onNext && nextTitle && !testRun ? (
+          <>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-xl border border-slate-600 px-6 py-3 text-sm font-bold uppercase tracking-wider text-slate-200 transition hover:border-slate-400"
+            >
+              Skill tree
+            </button>
+            <button
+              type="button"
+              onClick={onNext}
+              className="flex flex-[2] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 py-3 text-sm font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(168,85,247,0.45)] transition hover:brightness-110 active:scale-[0.98]"
+            >
+              <span className="truncate">Next: {nextTitle}</span>
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 py-3 text-sm font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(168,85,247,0.45)] transition hover:brightness-110 active:scale-[0.98]"
+          >
+            {result.passed ? 'Continue' : 'Back to skill tree'}
+          </button>
+        )}
       </div>
     </div>
   );

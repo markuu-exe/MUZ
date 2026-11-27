@@ -1,5 +1,6 @@
 import ProfileAvatar from '../common/ProfileAvatar';
 import WeeklyGoalCard from './WeeklyGoalCard';
+import ContinueCard from './ContinueCard';
 import type { ProfileLook } from '../../lib/profile/look';
 import { useMemo, useState } from 'react';
 import {
@@ -32,7 +33,7 @@ import {
 } from 'chart.js';
 import { Bar, Line } from 'react-chartjs-2';
 import type { UserProfile } from '../../types/auth.types';
-import { displayNameFromProfile, expProgress } from '../../lib/dashboard/curriculum';
+import { displayNameFromProfile, expProgress, type CurriculumNode } from '../../lib/dashboard/curriculum';
 import {
   ACHIEVEMENT_DESCRIPTIONS,
   ACHIEVEMENT_TITLES,
@@ -96,6 +97,9 @@ interface ProfileAnalyticsViewProps {
   /** P8: whose week to load for the daily goal / weekly summary card. */
   userId?: string | null;
   isDemo?: boolean;
+  /** UX 2026-11-27: the next action comes first on Profile. */
+  continueLesson?: Pick<CurriculumNode, 'title' | 'description' | 'kind'> | null;
+  onContinue?: () => void;
 }
 
 interface Achievement {
@@ -137,6 +141,8 @@ export default function ProfileAnalyticsView({
   look,
   userId = null,
   isDemo = false,
+  continueLesson = null,
+  onContinue,
 }: ProfileAnalyticsViewProps) {
   const [internalRange, setInternalRange] = useState<AnalyticsDateRange>('7d');
   const activeRange = controlledRange ?? internalRange;
@@ -401,6 +407,8 @@ export default function ProfileAnalyticsView({
       </div>
 
       {/* 2. Row of 4 Summary Statistic Cards */}
+      {continueLesson && onContinue && <ContinueCard lesson={continueLesson} onContinue={onContinue} compact />}
+
       <WeeklyGoalCard userId={userId} isDemo={isDemo} lastActivityDate={profile?.last_activity_date} />
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

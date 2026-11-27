@@ -29,6 +29,7 @@ import {
   expProgress,
   groupByModule,
   nodeStatus,
+  nextLessonAfter,
   type CurriculumNode,
   type DashboardView,
   type NodeStatus,
@@ -75,6 +76,7 @@ import { displayedStreak, toLocalDate } from '../../lib/progress/streak';
 import { persistHeartAnchor, persistRegeneratedHearts, savePlacement, supabaseDevTestStore, supabaseProgressStore } from '../../lib/progress/supabaseStore';
 import { lessonNeedsHearts } from '../../lesson/runner';
 import { blockingLesson } from '../../lib/dashboard/curriculum';
+import ContinueCard from './ContinueCard';
 
 interface NavItem {
   id: DashboardView;
@@ -461,7 +463,8 @@ export default function DashboardScreen() {
   }, [restoredPlace, data.loading, data.lessons, data.progress, exp, isDemo, profileIsLoaded, isDev, hearts]);
 
   // Click handler for Skill Tree & Lesson nodes
-  const handleSelect = (lesson: CurriculumNode, status: NodeStatus) => {
+  /** Select a node (opens its detail panel). Returns false when it cannot be opened (locked / no hearts). */
+  const handleSelect = (lesson: CurriculumNode, status: NodeStatus): boolean => {
     if (!canOpenLesson(status, isDev)) {
       setSelected(null);
       setSelectedStatus(null);
@@ -481,7 +484,7 @@ export default function DashboardScreen() {
         message: `Node Locked: "${lesson.title}". ${reason}`,
         type: 'warning',
       });
-      return;
+      return false;
     }
 
     if (profileIsLoaded && hearts === 0 && isLessonPayload(lesson.payload) && lessonNeedsHearts(lesson.payload)) {
@@ -493,13 +496,32 @@ export default function DashboardScreen() {
         message: 'No Stamina Hearts remaining! Complete a free Theory unit or wait for your heart regeneration.',
         type: 'error',
       });
-      return;
+      return false;
     }
 
     setBanner(null);
     setSelected(lesson);
     setSelectedStatus(status);
+    return true;
   };
+
+  /** Open a lesson straight away (Continue / Next lesson), with the same checks as the Start button. */
+  const openLesson = (lesson: CurriculumNode, status: NodeStatus) => {
+    if (!handleSelect(lesson, status)) return;
+    if (!isLessonPayload(lesson.payload)) {
+      setBanner({ message: 'This lesson has no playable content yet.', type: 'warning' });
+      return;
+    }
+    setActiveLesson(lesson);
+    setActiveDestination(resultDestination(status));
+    setSelected(null);
+    setSelectedStatus(null);
+  };
+
+  // UX 2026-11-27: what to do next. Continue = the first open lesson not yet mastered; Next = the
+  // lesson after the one open now (recomputed after a pass reloads progress).
+  const continueStatus: NodeStatus = 'current';
+  const nextAfterActive = activeLesson ? nextLessonAfter(activeLesson.id, data.lessons, data.progress, exp) : null;
 
 
   return (
@@ -690,6 +712,9 @@ export default function DashboardScreen() {
         <main className="relative flex-1 overflow-y-auto px-8 py-8">
           {/* VIEW 1: SKILL TREE PROGRESSION (Default State) */}
           {view === 'skill-tree' && !treeReady && <SkillTreeSkeleton />}
+          {view === 'skill-tree' && treeReady && currentNode && (
+            <ContinueCard lesson={currentNode} onContinue={() => openLesson(currentNode, continueStatus)} />
+          )}
           {view === 'skill-tree' && treeReady && (
             <SkillTreeView
               lessons={data.lessons}
@@ -721,6 +746,8 @@ export default function DashboardScreen() {
                 look={look}
                 userId={profile?.id ?? null}
                 isDemo={isDemo}
+                continueLesson={currentNode}
+                onContinue={currentNode ? () => openLesson(currentNode, continueStatus) : undefined}
               />
             </LazyBoundary>
           )}
@@ -952,6 +979,15 @@ export default function DashboardScreen() {
             onComplete={(result) => handleLessonComplete(activeLesson, result, activeDestination)}
             testRun={activeDestination === 'dev-test'}
             onClose={() => setActiveLesson(null)}
+            nextTitle={nextAfterActive?.lesson.title ?? null}
+            onNext={
+              nextAfterActive
+                ? () => {
+                    setActiveLesson(null);
+                    openLesson(nextAfterActive.lesson, nextAfterActive.status);
+                  }
+                : undefined
+            }
           />
         </LazyBoundary>
       )}

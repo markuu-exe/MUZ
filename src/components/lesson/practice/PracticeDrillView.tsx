@@ -12,6 +12,8 @@ import { usePracticeDrill } from '../../../hooks/usePracticeDrill';
 import CountInBadge from '../rhythm/CountInBadge';
 import type { ExerciseViewProps } from '../../../lesson/registry';
 import { cn } from '../../../lib/cn';
+import { readBenchView, saveBenchView } from '../../../lib/benchView';
+import { playSfx } from '../../../lib/sfx';
 import { PITCH_CLASS_NAMES } from '../../../audio/dsp/pitch';
 import { chordMatcher, drillTargets, targetLabel, type DrillStats, type DrillTarget } from '../../../practice/PracticeDrill';
 import { FramingTracker, type FramingState } from '../../../practice/framing';
@@ -124,6 +126,23 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
   // Arm once the camera, the pose model and the microphone are live AND the camera can see the arm.
   const { start: startPractice, running: practiceRunning, reset: resetPractice } = practice;
   const justPassed = phase.kind === 'practice' && phase.justPassed;
+
+  // Bench view (UX 2026-11-27): big type for reading the drill from the piano bench. Remembered per device.
+  const [bench, setBench] = useState(readBenchView);
+  const toggleBench = () => {
+    setBench((on) => {
+      saveBenchView(!on);
+      return !on;
+    });
+  };
+  // A success chime only when nothing is listening (sfx.ts rule): after a practice pass (before the
+  // count-in arms the graded attempt) and after the graded attempt passes. Misses stay silent.
+  useEffect(() => {
+    if (justPassed) playSfx('correct');
+  }, [justPassed]);
+  useEffect(() => {
+    if (ended?.passed) playSfx('correct');
+  }, [ended]);
   useEffect(() => {
     if (canRun && practicing && !justPassed && !practiceRunning) startPractice();
   }, [canRun, practicing, justPassed, practiceRunning, startPractice]);
@@ -260,7 +279,7 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
         <MediaDiagnostics problems={problems} onRetry={() => void rig.start()} />
       ) : ready || ended ? (
         <div className="space-y-3">
-          <p role="status" className={cn('rounded-xl border px-5 py-3 text-base font-semibold', TONE[status.tone])}>
+          <p role="status" className={cn('rounded-xl border px-5 py-3 font-semibold', bench ? 'text-2xl leading-snug' : 'text-base', TONE[status.tone])}>
             {status.text}
           </p>
           {practicing && !ended && counting && countIn.cue && (
@@ -300,7 +319,18 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
         <CameraSetupGuide needsMic starting={starting} onStart={() => void rig.start()} />
       )}
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.8fr)_minmax(300px,1fr)]">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          aria-pressed={bench}
+          onClick={toggleBench}
+          className="rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-slate-200 transition hover:border-slate-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-300"
+        >
+          Bench view: {bench ? 'On' : 'Off'}
+        </button>
+      </div>
+
+      <div className={cn('grid gap-5', bench ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]' : 'lg:grid-cols-[minmax(0,1.8fr)_minmax(300px,1fr)]')}>
         <CameraPanel rig={rig} state={state} />
 
         <div className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-5">
@@ -310,7 +340,7 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
                 {practicing ? 'Practice · not graded' : 'Graded attempt'}
                 {targets.length > 1 ? ` · Step ${Math.min(drill.stepIndex + 1, targets.length)} of ${targets.length}` : ''}
               </p>
-              <p className="truncate text-3xl font-black text-white">{targetTitle(target)}</p>
+              <p className={cn('truncate font-black text-white', bench ? 'text-6xl leading-tight' : 'text-3xl')}>{targetTitle(target)}</p>
             </div>
             {practicing ? (
               <span className="shrink-0 rounded-full border border-slate-600 px-3 py-1 text-xs font-bold uppercase tracking-wider text-slate-300">
@@ -348,12 +378,13 @@ export default function PracticeDrillView({ exercise, settings, hearts, onOutcom
               <GrandStaff notes={[target.note]} color="#c4b5fd" />
             </div>
           )}
-          <TargetKeyboard notes={targetNotes(target)} maxWidth={420} heard={(start, end) => heardKeys(heard.heard, chordTarget, start, end)} />
+          <TargetKeyboard notes={targetNotes(target)} maxWidth={bench ? 680 : 420} heard={(start, end) => heardKeys(heard.heard, chordTarget, start, end)} />
           <div
             aria-live="polite"
             data-matches={heardMatches ? 'true' : 'false'}
             className={cn(
-              'rounded-xl border px-4 py-2 text-center text-lg font-black',
+              'rounded-xl border px-4 text-center font-black',
+              bench ? 'py-4 text-4xl' : 'py-2 text-lg',
               !heardText && 'border-slate-800 text-slate-500',
               heardText && heardMatches && 'border-emerald-500/50 bg-emerald-950/40 text-emerald-200',
               heardText && !heardMatches && 'border-amber-500/50 bg-amber-950/40 text-amber-200',
