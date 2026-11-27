@@ -17,6 +17,7 @@ import { readBestScores, saveBestScore } from '../../performance/best';
 import { scheduleNoiseClick } from '../../performance/click';
 import { PerformanceJudge, type EventResult, type PerfFrame, type PerformanceSummary } from '../../performance/judge';
 import { songPlan } from '../../performance/plan';
+import { WaitStepper, type WaitSummary } from '../../performance/wait';
 import { SONGS, targetLabel, type Song } from '../../performance/songs';
 import MediaDiagnostics, { mediaProblems } from '../lesson/practice/MediaDiagnostics';
 import { PracticeRigProvider, usePracticeRig } from '../lesson/practice/PracticeRigContext';
@@ -26,6 +27,11 @@ import CountInBadge from '../lesson/rhythm/CountInBadge';
 type Frame = PerfFrame & HeardFrameLike;
 const LEAD_SEC = 0.4;
 const TAIL_SEC = 0.6;
+
+const MODES = [
+  ['time', 'In time'],
+  ['wait', 'Wait for me'],
+] as const;
 
 const LEVEL_LABEL: Record<Song['level'], string> = { novice: 'Novice', proficient: 'Proficient', virtuoso: 'Virtuoso' };
 
@@ -65,6 +71,92 @@ function SongList({ onPick, best }: { onPick: (s: Song) => void; best: Record<st
   );
 }
 
+interface WaitDisplayProps {
+  song: Song;
+  phase: 'idle' | 'running' | 'done';
+  current: number;
+  wrongs: number[];
+  lastWrong: boolean;
+  summary: WaitSummary | null;
+  nowLabel: string;
+  nextLabel: string | null;
+}
+
+/** "Wait for me": every step of the piece as a chip, the step being waited on, and the result. */
+function WaitDisplay({ song, phase, current, wrongs, lastWrong, summary, nowLabel, nextLabel }: WaitDisplayProps) {
+  return (
+    <div className="space-y-4">
+      <ol className="flex flex-wrap gap-1.5" aria-label="Notes and chords in this piece">
+        {song.events.map((e, i) => {
+          const finished = (phase === 'running' && i < current) || (phase === 'done' && summary !== null);
+          const isNow = phase === 'running' && i === current;
+          return (
+            <li
+              key={i}
+              aria-current={isNow ? 'step' : undefined}
+              className={cn(
+                'rounded-lg border px-2 py-1 text-xs font-bold transition-colors duration-150',
+                finished && wrongs[i] === 0 && 'border-emerald-500/50 bg-emerald-500/10 text-emerald-200',
+                finished && wrongs[i] > 0 && 'border-amber-500/50 bg-amber-500/10 text-amber-200',
+                isNow && 'border-violet-400 bg-violet-500/20 text-white',
+                !finished && !isNow && 'border-slate-800 text-slate-400',
+              )}
+            >
+              {targetLabel(e.target)}
+              {finished && wrongs[i] > 0 ? ` · ${wrongs[i]} ${wrongs[i] === 1 ? 'retry' : 'retries'}` : ''}
+            </li>
+          );
+        })}
+      </ol>
+
+      {phase === 'idle' && (
+        <p className="text-sm text-slate-400">
+          No click and no tempo: each note or chord waits until the microphone hears it, then the next one comes up. Take your time.
+        </p>
+      )}
+
+      {phase === 'running' && (
+        <>
+          <div className="grid grid-cols-2 gap-4 text-center">
+            <div
+              className={cn(
+                'rounded-2xl border px-4 py-3 transition-colors duration-150',
+                lastWrong ? 'border-rose-400/70 bg-rose-950/40' : 'border-violet-500/40 bg-violet-950/40',
+              )}
+            >
+              <p className="text-xs font-bold uppercase tracking-widest text-violet-300">Play</p>
+              <p className="text-4xl font-black text-white">{nowLabel}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3" aria-hidden="true">
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Next</p>
+              <p className="text-4xl font-black text-slate-300">{nextLabel ?? '—'}</p>
+            </div>
+          </div>
+          <p className="min-h-5 text-sm font-semibold text-rose-200" aria-live="polite">
+            {lastWrong ? `Not quite. Try ${nowLabel} again.` : ''}
+          </p>
+        </>
+      )}
+
+      {phase === 'done' && summary && (
+        <div className="space-y-2 rounded-2xl border border-slate-800 bg-slate-900/90 p-5" role="status">
+          <div className="flex items-center justify-between">
+            <p className="text-xl font-black text-white">Piece complete</p>
+            <p className="text-3xl font-black text-white">
+              {summary.firstTry}/{summary.total}
+            </p>
+          </div>
+          <p className="text-sm text-slate-300">
+            {summary.firstTry === summary.total
+              ? 'Every note and chord right on the first try. Ready for In time mode.'
+              : `Right on the first try: ${summary.firstTry} of ${summary.total}. Wrong attempts: ${summary.wrong}. The amber steps are the ones to practise.`}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Player({ song, onBack, onBest }: { song: Song; onBack: () => void; onBest: () => void }) {
   const { rig, state } = usePracticeRig();
   const [slow, setSlow] = useState(false);
@@ -73,6 +165,11 @@ function Player({ song, onBack, onBest }: { song: Song; onBack: () => void; onBe
   const [live, setLive] = useState<EventResult[]>([]);
   const [current, setCurrent] = useState(0);
   const [summary, setSummary] = useState<(PerformanceSummary & { newBest: boolean }) | null>(null);
+  // "Wait for me": no click, no tempo; each note or chord waits until it is heard (performance/wait.ts).
+  const [mode, setMode] = useState<'time' | 'wait'>('time');
+  const [wrongs, setWrongs] = useState<number[]>(() => song.events.map(() => 0));
+  const [lastWrong, setLastWrong] = useState(false);
+  const [waitSummary, setWaitSummary] = useState<WaitSummary | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
   const t0Ref = useRef<number | null>(null);
   const judgeRef = useRef<PerformanceJudge<Frame> | null>(null);
@@ -148,6 +245,47 @@ function Player({ song, onBack, onBest }: { song: Song; onBack: () => void; onBe
     }, 100);
   }, [onBest, plan, rig, slow, song, teardown]);
 
+  const startWait = useCallback(() => {
+    teardown();
+    (document.activeElement as HTMLElement | null)?.blur();
+    rig.resetAudioAnalysis();
+    const stepper = new WaitStepper(song.events.map((e) => e.target));
+    setSummary(null);
+    setWaitSummary(null);
+    setCurrent(0);
+    setWrongs(song.events.map(() => 0));
+    setLastWrong(false);
+    offRef.current = rig.on('audio', (frame) => {
+      const e = stepper.push(frame);
+      if (!e) return;
+      if (e.kind === 'wrong') {
+        setWrongs(stepper.summary().perEvent);
+        setLastWrong(true);
+        return;
+      }
+      setLastWrong(false);
+      setCurrent(Math.min(stepper.index, song.events.length - 1));
+      if (stepper.done) {
+        setWaitSummary(stepper.summary());
+        setPhase('done');
+        queueMicrotask(teardown); // not from inside the rig's own emit
+      }
+    });
+    setPhase('running');
+  }, [rig, song, teardown]);
+
+  const begin = () => (mode === 'wait' ? startWait() : void start());
+
+  const resetForMode = (next: 'time' | 'wait') => {
+    setMode(next);
+    setPhase('idle');
+    setSummary(null);
+    setWaitSummary(null);
+    setCurrent(0);
+    setWrongs(song.events.map(() => 0));
+    setLastWrong(false);
+  };
+
   const stop = () => {
     teardown();
     setPhase('idle');
@@ -156,7 +294,7 @@ function Player({ song, onBack, onBest }: { song: Song; onBack: () => void; onBe
   // Enter starts (or restarts after results) from the piano bench.
   const keyRef = useRef<() => void>(() => undefined);
   keyRef.current = () => {
-    if (micReady && phase !== 'running') void start();
+    if (micReady && phase !== 'running') begin();
   };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -188,7 +326,7 @@ function Player({ song, onBack, onBest }: { song: Song; onBack: () => void; onBe
         </button>
         <div className="flex gap-2 text-xs font-bold uppercase tracking-wider">
           <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-slate-300">{song.meter}</span>
-          <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-slate-300">{plan.bpm} BPM</span>
+          <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-slate-300">{mode === 'wait' ? 'Your pace' : `${plan.bpm} BPM`}</span>
         </div>
       </div>
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -207,17 +345,36 @@ function Player({ song, onBack, onBest }: { song: Song; onBack: () => void; onBe
             <button
               type="button"
               disabled={!micReady}
-              onClick={() => void start()}
+              onClick={begin}
               className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 py-3 text-sm font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(168,85,247,0.3)] transition hover:brightness-110 disabled:opacity-50 disabled:shadow-none focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-300"
             >
               {phase === 'done' ? <RotateCcw className="h-4 w-4" aria-hidden="true" /> : <Play className="h-4 w-4" aria-hidden="true" />}
               {phase === 'done' ? 'Play again (Enter)' : 'Start (Enter)'}
             </button>
           )}
-          <label className="flex items-center gap-2 text-sm text-slate-300">
-            <input type="checkbox" checked={slow} disabled={phase === 'running'} onChange={(e) => setSlow(e.target.checked)} />
-            Slow practice (75% tempo)
-          </label>
+          <div role="group" aria-label="Practice mode" className="flex rounded-xl border border-slate-700 bg-slate-900/80 p-1 text-xs font-bold uppercase tracking-wider">
+            {MODES.map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={mode === id}
+                disabled={phase === 'running'}
+                onClick={() => resetForMode(id)}
+                className={cn(
+                  'rounded-lg px-3 py-1.5 transition-colors disabled:cursor-not-allowed focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-300',
+                  mode === id ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-slate-100',
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {mode === 'time' && (
+            <label className="flex items-center gap-2 text-sm text-slate-300">
+              <input type="checkbox" checked={slow} disabled={phase === 'running'} onChange={(e) => setSlow(e.target.checked)} />
+              Slow practice (75% tempo)
+            </label>
+          )}
         </div>
       </div>
 
@@ -240,9 +397,22 @@ function Player({ song, onBack, onBest }: { song: Song; onBack: () => void; onBe
         </div>
       ) : null}
 
-      <BeatHighway plan={plan} now={now} taps={marks} labels={plan.labels} />
+      {mode === 'time' && <BeatHighway plan={plan} now={now} taps={marks} labels={plan.labels} />}
 
-      {phase === 'running' && (
+      {mode === 'wait' && (
+        <WaitDisplay
+          song={song}
+          phase={phase}
+          current={current}
+          wrongs={wrongs}
+          lastWrong={lastWrong}
+          summary={waitSummary}
+          nowLabel={nowLabel}
+          nextLabel={nextLabel}
+        />
+      )}
+
+      {mode === 'time' && phase === 'running' && (
         <>
           <CountInBadge cue={cue} tapText={`Play now: ${nowLabel}${nextLabel ? ` · next ${nextLabel}` : ''}`} />
           <div className="grid grid-cols-2 gap-4 text-center" aria-hidden="true">
@@ -258,7 +428,7 @@ function Player({ song, onBack, onBest }: { song: Song; onBack: () => void; onBe
         </>
       )}
 
-      {phase === 'done' && summary && (
+      {mode === 'time' && phase === 'done' && summary && (
         <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/90 p-5" role="status">
           <div className="flex items-center justify-between">
             <p className="text-xl font-black text-white">{summary.newBest ? 'New best!' : 'Performance complete'}</p>
