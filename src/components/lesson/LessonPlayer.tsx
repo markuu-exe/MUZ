@@ -52,6 +52,9 @@ export interface LessonPlayerProps {
    */
   onComplete?: (result: LessonResult) => LessonCompleteReturn | Promise<LessonCompleteReturn>;
   onClose: () => void;
+  /** Title of the lesson offered next on the results screen, and how to open it (UX 2026-11-27). */
+  nextTitle?: string | null;
+  onNext?: () => void;
   /** D1: this run is developer test data (lesson opened while locked); results never show EXP. */
   testRun?: boolean;
 }
@@ -76,6 +79,8 @@ export default function LessonPlayer({
   registry = EXERCISE_REGISTRY,
   onComplete,
   onClose,
+  nextTitle = null,
+  onNext,
   testRun = false,
 }: LessonPlayerProps) {
   const [run, setRun] = useState<LessonRunState>(() => createLessonRun(lessonId, payload, hearts, Date.now()));
@@ -265,6 +270,8 @@ export default function LessonPlayer({
             onRetrySave={retrySave}
             onRetry={retry}
             onClose={onClose}
+            nextTitle={nextTitle}
+            onNext={onNext}
             testRun={testRun}
           />
         ) : (
